@@ -1,6 +1,6 @@
 # AIRelay
 
-[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](package.json)
+[![Releases](https://img.shields.io/github/v/release/ksandell/AIRelay?include_prereleases&sort=semver)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%E2%89%A522.0-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED.svg?logo=docker&logoColor=white)](docker-compose.yml)
@@ -18,10 +18,12 @@
 - **Transparent passthrough.** Streaming AI responses (SSE / chunked) flow through unmodified — your SDK doesn't know the proxy is there.
 - **Live dashboard.** RPS, p50/p95/p99, error rate, status pills, network + token throughput (In/Out), tokens/sec, recent-requests feed — updated in real time.
 - **Guided setup.** First time you open the dashboard, a Setup tab walks you through generating the right `.env` for your provider.
-- **Token & cost tracking** — per-request input/output tokens + USD cost for 14 providers (Anthropic, OpenAI, Google, Mistral, Groq, Microsoft, OpenRouter, Together, Fireworks, DeepSeek, xAI, Perplexity, Ollama, Nvidia)
-- **Per-model breakdown** — cost/token aggregates via `/api/metrics/models`, sortable by spend
+- **Token & cost tracking** — per-request input/output tokens + USD cost for 14 providers ([full list in CONFIGURATION.md](CONFIGURATION.md#token--cost-tracking)).
+- **Per-model breakdown** — cost/token aggregates via `/api/metrics/models`, sortable by spend.
 - **Single Docker container.** No DB, no Redis, no system cron. Bring `UPSTREAM_URL` and go.
 - **Cross-platform.** Identical on Windows Docker Desktop, macOS, and Linux.
+
+What shipped in each release: [CHANGELOG.md](CHANGELOG.md). What's coming next: [ROADMAP.md](ROADMAP.md).
 
 ---
 
@@ -56,8 +58,10 @@ That's it. Every request now flows through the proxy and shows up on the dashboa
 |---|---|
 | Install on Windows / macOS / Linux step-by-step | [INSTALL.md](INSTALL.md) |
 | Configure env vars, providers, DNS, TLS | [CONFIGURATION.md](CONFIGURATION.md) |
-| Understand the architecture | [docs/proxy-metrics-plan.md](docs/proxy-metrics-plan.md) |
+| Understand the architecture (diagrams) | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Cut a release | [docs/RELEASING.md](docs/RELEASING.md) |
 | See what's coming next | [ROADMAP.md](ROADMAP.md) |
+| See what shipped | [CHANGELOG.md](CHANGELOG.md) |
 
 ---
 
@@ -72,32 +76,6 @@ That's it. Every request now flows through the proxy and shows up on the dashboa
 | Self-hosted | any HTTP/HTTPS endpoint |
 
 **Not compatible:** AWS Bedrock and other SigV4-signed APIs (the proxy rewrites the `Host` header, which invalidates SigV4 signatures). See [CONFIGURATION.md](CONFIGURATION.md#not-supported-aws-bedrock).
-
----
-
-## Supported Providers
-
-Token & cost tracking is built in for 14 providers. Set `PROXY_PROVIDER` to enable per-request token extraction and cost calculation.
-
-| Provider | `PROXY_PROVIDER` | Tokens | Cost |
-|---|---|---|---|
-| Anthropic Claude | `anthropic` | ✓ | ✓ |
-| OpenAI | `openai` | ✓ | ✓ |
-| Google Gemini | `google` | ✓ | ✓ |
-| Mistral | `mistral` | ✓ | ✓ |
-| Groq | `groq` | ✓ | ✓ |
-| Microsoft Azure OpenAI | `microsoft` | ✓ | ✓ |
-| OpenRouter | `openrouter` | ✓ | ✓ |
-| Together AI | `together` | ✓ | ✓ |
-| Fireworks | `fireworks` | ✓ | ✓ |
-| DeepSeek | `deepseek` | ✓ | ✓ |
-| xAI Grok | `xai` | ✓ | ✓ |
-| Perplexity | `perplexity` | ✓ | ✓ |
-| Ollama | `ollama` | ✓ | $0 (local) |
-| Nvidia NIM | `nvidia` | ✓ | ✓ |
-| _other_ | `generic` | — | — |
-
-`generic` falls back to no extraction — bytes still pass through, but no token or cost data is recorded.
 
 ---
 

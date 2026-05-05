@@ -96,7 +96,7 @@ Every variable, what it does, and when you'd touch it. Defaults match `.env.exam
 | `SSE_EVENT_RATE` | `50` | Per-event metric stream throttle (events/s). Aggregate ticks always go through. |
 | `SSE_HEARTBEAT_MS` | `30000` | Keep-alive ping interval to prevent intermediary timeouts. |
 
-### Token & Cost Tracking (v0.2.0)
+### Token & Cost Tracking
 
 The proxy can extract token usage from upstream responses and compute per-request cost in USD using a bundled pricing table. Tracking is response-only — request bodies are never inspected — and runs on a non-blocking tee of the response stream. If the response exceeds `PROXY_TOKEN_TEE_MAX_BYTES`, extraction is abandoned for that request and the base metric event is recorded without token/cost fields. Set `PROXY_TOKEN_TRACKING=false` to fully bypass the tee for v0.1-equivalent zero overhead.
 
@@ -389,4 +389,4 @@ Before pointing real production traffic at the proxy:
 - [INSTALL.md](INSTALL.md) — first-time setup
 - [README.md](README.md) — what this is
 - [ROADMAP.md](ROADMAP.md) — what's coming
-- [docs/proxy-metrics-plan.md](docs/proxy-metrics-plan.md) — architecture details
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architecture diagrams + design decisions
