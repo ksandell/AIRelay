@@ -53,7 +53,7 @@ If the key is missing, scenarios S1–S4 are skipped; S5–S7 still run.
 ### S1 — Plain chat completion
 
 ```bash
-curl -sS -o /tmp/s1.json -w "%{http_code}\n" \
+curl -sS -o "${TMPDIR:-/tmp}/s1.json" -w "%{http_code}\n" \
   -X POST http://localhost:3000/proxy/v1/chat/completions \
   -H "Authorization: Bearer $MISTRAL_API_KEY" \
   -H "Content-Type: application/json" \
@@ -75,7 +75,7 @@ Expected:
 ### S2 — Streaming chat
 
 ```bash
-curl -sN -o /tmp/s2.txt -w "%{http_code}\n" \
+curl -sN -o "${TMPDIR:-/tmp}/s2.txt" -w "%{http_code}\n" \
   -X POST http://localhost:3000/proxy/v1/chat/completions \
   -H "Authorization: Bearer $MISTRAL_API_KEY" \
   -H "Content-Type: application/json" \
@@ -91,7 +91,7 @@ Expected:
 ### S3 — Tool-call request
 
 ```bash
-curl -sS -o /tmp/s3.json -w "%{http_code}\n" \
+curl -sS -o "${TMPDIR:-/tmp}/s3.json" -w "%{http_code}\n" \
   -X POST http://localhost:3000/proxy/v1/chat/completions \
   -H "Authorization: Bearer $MISTRAL_API_KEY" \
   -H "Content-Type: application/json" \
@@ -116,9 +116,9 @@ Expected:
 Capture `tool_calls[0].id` from the S3 response, then send a follow-up:
 
 ```bash
-TOOL_ID=$(jq -r '.choices[0].message.tool_calls[0].id' /tmp/s3.json)
+TOOL_ID=$(jq -r '.choices[0].message.tool_calls[0].id' "${TMPDIR:-/tmp}/s3.json")
 
-curl -sS -o /tmp/s4.json -w "%{http_code}\n" \
+curl -sS -o "${TMPDIR:-/tmp}/s4.json" -w "%{http_code}\n" \
   -X POST http://localhost:3000/proxy/v1/chat/completions \
   -H "Authorization: Bearer $MISTRAL_API_KEY" \
   -H "Content-Type: application/json" \
