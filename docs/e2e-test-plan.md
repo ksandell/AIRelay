@@ -25,6 +25,20 @@ Run this whenever the dashboard, proxy, or provider extraction code changes.
 
 ---
 
+## Platform
+
+**Docker Desktop** on Windows. The AIRelay container is the unit under test.
+
+Restart the container to pick up env changes or a code rebuild:
+
+```bash
+npm run docker:down
+npm run docker:up
+```
+
+`docker:up` auto-loads `docker-compose.override.yml` in dev, which mounts
+`./src` and `./public` for live edits.
+
 ## Prerequisites
 
 | Check               | Command                                        | Expected                                      |
