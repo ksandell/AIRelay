@@ -6,20 +6,29 @@
     <title>AIRelay — Live</title>
     <link rel="stylesheet" href="style.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   </head>
   <body>
     <header>
       <div class="brand">
         <h1>AIRelay</h1>
         <nav class="tabs">
-          <button class="tab" data-tab="setup" id="setupTab" hidden>Setup</button>
-          <button class="tab active" data-tab="logs">Logs</button>
-          <button class="tab" data-tab="metrics">Metrics</button>
+          <button class="tab" data-tab="setup" id="setupTab" hidden>
+            <i aria-hidden="true" data-lucide="settings"></i>Setup
+          </button>
+          <button class="tab active" data-tab="logs">
+            <i aria-hidden="true" data-lucide="scroll-text"></i>Logs
+          </button>
+          <button class="tab" data-tab="metrics">
+            <i aria-hidden="true" data-lucide="bar-chart-3"></i>Metrics
+          </button>
         </nav>
       </div>
 
       <div class="controls" id="logsControls">
-        <span id="status" class="status disconnected">Connecting…</span>
+        <span id="status" class="status disconnected" role="status" aria-live="polite"
+          >Connecting…</span
+        >
         <select id="dateSelect">
           <option value="">Live</option>
         </select>
@@ -30,12 +39,14 @@
           <option value="warn">warn</option>
           <option value="error">error</option>
         </select>
-        <button id="clearBtn">Clear</button>
-        <button id="pauseBtn">Pause</button>
+        <button id="clearBtn" aria-label="Clear log">Clear</button>
+        <button id="pauseBtn" aria-label="Pause live log updates">Pause</button>
       </div>
 
       <div class="controls hidden" id="metricsControls">
-        <span id="metricsStatus" class="status disconnected">Connecting…</span>
+        <span id="metricsStatus" class="status disconnected" role="status" aria-live="polite"
+          >Connecting…</span
+        >
         <span class="pill" id="inFlightPill">in-flight: 0</span>
         <button id="metricsClearBtn">Clear table</button>
       </div>
@@ -158,7 +169,7 @@ npm run dev</pre
           ><span class="kpi-val" id="kpiCostTotal">—</span>
         </div>
         <div class="kpi">
-          <span class="kpi-label">Cost / min (1m)</span
+          <span class="kpi-label">Cost / min (1 Min)</span
           ><span class="kpi-val" id="kpiCostPerMin">—</span>
         </div>
         <div class="kpi">
@@ -166,52 +177,61 @@ npm run dev</pre
           ><span class="kpi-val" id="kpiCostPerHr">—</span>
         </div>
         <div class="kpi">
-          <span class="kpi-label">Tokens / sec (1m)</span
+          <span class="kpi-label">Tokens / sec (1 Min)</span
           ><span class="kpi-val" id="kpiTokensPerSec">—</span>
         </div>
       </section>
 
       <section class="kpis">
         <div class="kpi">
-          <span class="kpi-label">RPS (1m)</span><span class="kpi-val" id="kpiRps">—</span>
+          <span class="kpi-label">RPS (1 Min)</span><span class="kpi-val" id="kpiRps">—</span>
         </div>
         <div class="kpi">
-          <span class="kpi-label">p95 (1m)</span><span class="kpi-val" id="kpiP95">—</span
-          ><span class="kpi-unit">ms</span>
+          <span class="kpi-label">p95 (1 Min)</span>
+          <div class="kpi-val-row">
+            <span class="kpi-val" id="kpiP95">—</span><span class="kpi-unit">ms</span>
+          </div>
         </div>
         <div class="kpi">
-          <span class="kpi-label">p99 (1m)</span><span class="kpi-val" id="kpiP99">—</span
-          ><span class="kpi-unit">ms</span>
+          <span class="kpi-label">p99 (1 Min)</span>
+          <div class="kpi-val-row">
+            <span class="kpi-val" id="kpiP99">—</span><span class="kpi-unit">ms</span>
+          </div>
         </div>
         <div class="kpi">
-          <span class="kpi-label">Errors (1m)</span><span class="kpi-val" id="kpiErr">—</span
-          ><span class="kpi-unit">%</span>
+          <span class="kpi-label">Errors (1 Min)</span>
+          <div class="kpi-val-row">
+            <span class="kpi-val" id="kpiErr">—</span><span class="kpi-unit">%</span>
+          </div>
         </div>
         <div class="kpi">
-          <span class="kpi-label">Total (5m)</span><span class="kpi-val" id="kpiTotal">—</span>
+          <span class="kpi-label">Total (5 Min)</span><span class="kpi-val" id="kpiTotal">—</span>
         </div>
         <div class="kpi">
-          <span class="kpi-label">Throughput (5m)</span><span class="kpi-val" id="kpiBytes">—</span>
+          <span class="kpi-label">Throughput (5 Min)</span
+          ><span class="kpi-val" id="kpiBytes">—</span>
         </div>
       </section>
 
       <section class="charts">
         <div class="chart-card">
-          <header class="chart-title">Requests / sec — last 5 min</header>
+          <header class="chart-title">Requests / sec — last 5 Min</header>
           <canvas id="chartRps"></canvas>
         </div>
         <div class="chart-card">
-          <header class="chart-title">p95 latency (ms) — last 5 min</header>
+          <header class="chart-title">p95 latency (ms) — last 5 Min</header>
           <canvas id="chartLat"></canvas>
         </div>
         <div class="chart-card">
-          <header class="chart-title">Status mix (1m)</header>
+          <header class="chart-title">Status mix (1 Min)</header>
           <canvas id="chartStatus"></canvas>
         </div>
       </section>
 
       <section class="table-card">
-        <header class="chart-title">Per-model breakdown</header>
+        <header class="chart-title">
+          <i aria-hidden="true" data-lucide="cpu"></i>Per-model breakdown
+        </header>
         <table id="modelsTable">
           <thead>
             <tr>
@@ -237,7 +257,9 @@ npm run dev</pre
       </section>
 
       <section class="table-card">
-        <header class="chart-title">Top 10 most expensive requests</header>
+        <header class="chart-title">
+          <i aria-hidden="true" data-lucide="trending-up"></i>Top 10 most expensive requests
+        </header>
         <table id="topCostTable">
           <thead>
             <tr>
@@ -254,21 +276,25 @@ npm run dev</pre
       </section>
 
       <section class="table-card">
-        <header class="chart-title">Recent requests</header>
-        <table id="recentTable">
-          <thead>
-            <tr>
-              <th>time</th>
-              <th>method</th>
-              <th>path</th>
-              <th>status</th>
-              <th>ms</th>
-              <th>in</th>
-              <th>out</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <header class="chart-title recent-header">
+          <i aria-hidden="true" data-lucide="activity"></i>Recent requests
+        </header>
+        <div id="recentTable-wrap">
+          <table id="recentTable">
+            <thead>
+              <tr>
+                <th>time</th>
+                <th>method</th>
+                <th>path</th>
+                <th>status</th>
+                <th class="num">ms</th>
+                <th class="num">in</th>
+                <th class="num">out</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </section>
     </main>
 
@@ -278,5 +304,8 @@ npm run dev</pre
     </footer>
 
     <script src="app.js" type="module"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => lucide.createIcons())
+    </script>
   </body>
 </html>
