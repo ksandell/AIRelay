@@ -40,6 +40,11 @@ export const config = {
   // real AI providers have valid certs. Opt in only for self-signed dev upstreams.
   proxyInsecureTls: process.env.PROXY_INSECURE_TLS === 'true',
 
+  // Token & Cost Tracking (v0.2.0)
+  proxyProvider: process.env.PROXY_PROVIDER ?? 'generic',
+  proxyTokenTracking: process.env.PROXY_TOKEN_TRACKING !== 'false',
+  pricingConfigPath: process.env.PRICING_CONFIG_PATH ?? null,
+
   // Metrics
   maxMetricEvents: int('MAX_METRIC_EVENTS', 10_000),
   metricsTickMs: int('METRICS_TICK_MS', 1000),
