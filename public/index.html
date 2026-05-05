@@ -50,12 +50,12 @@
         <section class="setup-intro">
           <h2>Welcome — let's get the proxy configured</h2>
           <p>
-            AIRelay hasn't been pointed at an upstream API yet. Pick a provider below
-            and we'll generate the <code>.env</code> file you need.
+            AIRelay hasn't been pointed at an upstream API yet. Pick a provider below and we'll
+            generate the <code>.env</code> file you need.
           </p>
           <p class="muted">
-            The proxy never sees or stores your API key — your SDK sends it on each request and
-            the proxy forwards it untouched. You only configure the <em>upstream URL</em> here.
+            The proxy never sees or stores your API key — your SDK sends it on each request and the
+            proxy forwards it untouched. You only configure the <em>upstream URL</em> here.
           </p>
         </section>
 
@@ -75,7 +75,9 @@
           <div class="field hidden" id="customUrlField">
             <label for="setupCustomUrl">Custom upstream URL</label>
             <input type="text" id="setupCustomUrl" placeholder="https://your-host.example.com/v1" />
-            <p class="hint">Full URL including scheme. Use <code>http://</code> for plain HTTP upstreams.</p>
+            <p class="hint">
+              Full URL including scheme. Use <code>http://</code> for plain HTTP upstreams.
+            </p>
           </div>
 
           <div class="row-2">
@@ -96,8 +98,8 @@
             <label for="setupHost">Public hostname (optional)</label>
             <input type="text" id="setupHost" placeholder="airelay.local" />
             <p class="hint">
-              Informational only — what your team uses to reach this box. Set DNS / Tailscale / hosts
-              file separately. See <code>CONFIGURATION.md</code> for DNS setup.
+              Informational only — what your team uses to reach this box. Set DNS / Tailscale /
+              hosts file separately. See <code>CONFIGURATION.md</code> for DNS setup.
             </p>
           </div>
 
@@ -106,7 +108,9 @@
               <input type="checkbox" id="setupTls" checked />
               Verify upstream TLS certificate
             </label>
-            <p class="hint">Leave on for any real provider. Turn off only for self-signed dev upstreams.</p>
+            <p class="hint">
+              Leave on for any real provider. Turn off only for self-signed dev upstreams.
+            </p>
           </div>
         </section>
 
@@ -125,8 +129,10 @@
             </div>
             <div class="next-card">
               <h4>Local Node</h4>
-              <pre>npm install
-npm run dev</pre>
+              <pre>
+npm install
+npm run dev</pre
+              >
             </div>
           </div>
 
@@ -134,7 +140,8 @@ npm run dev</pre>
           <pre id="setupSdkSnippet"></pre>
 
           <p class="muted">
-            Once the proxy is running and a request has gone through, this Setup tab will hide itself.
+            Once the proxy is running and a request has gone through, this Setup tab will hide
+            itself.
           </p>
         </section>
       </div>
@@ -146,12 +153,27 @@ npm run dev</pre>
 
     <main id="metricsPanel" class="panel hidden">
       <section class="kpis">
-        <div class="kpi"><span class="kpi-label">RPS (1m)</span><span class="kpi-val" id="kpiRps">—</span></div>
-        <div class="kpi"><span class="kpi-label">p95 (1m)</span><span class="kpi-val" id="kpiP95">—</span><span class="kpi-unit">ms</span></div>
-        <div class="kpi"><span class="kpi-label">p99 (1m)</span><span class="kpi-val" id="kpiP99">—</span><span class="kpi-unit">ms</span></div>
-        <div class="kpi"><span class="kpi-label">Errors (1m)</span><span class="kpi-val" id="kpiErr">—</span><span class="kpi-unit">%</span></div>
-        <div class="kpi"><span class="kpi-label">Total (5m)</span><span class="kpi-val" id="kpiTotal">—</span></div>
-        <div class="kpi"><span class="kpi-label">Throughput (5m)</span><span class="kpi-val" id="kpiBytes">—</span></div>
+        <div class="kpi">
+          <span class="kpi-label">RPS (1m)</span><span class="kpi-val" id="kpiRps">—</span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">p95 (1m)</span><span class="kpi-val" id="kpiP95">—</span
+          ><span class="kpi-unit">ms</span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">p99 (1m)</span><span class="kpi-val" id="kpiP99">—</span
+          ><span class="kpi-unit">ms</span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Errors (1m)</span><span class="kpi-val" id="kpiErr">—</span
+          ><span class="kpi-unit">%</span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Total (5m)</span><span class="kpi-val" id="kpiTotal">—</span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Throughput (5m)</span><span class="kpi-val" id="kpiBytes">—</span>
+        </div>
       </section>
 
       <section class="charts">

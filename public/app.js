@@ -169,7 +169,11 @@ function renderEntry(entry) {
   if (levelFilter.value && level !== levelFilter.value) return
   const el = document.createElement('div')
   el.className = `log-entry level-${level}`
-  const meta = entry.meta ? Object.entries(entry.meta).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ') : ''
+  const meta = entry.meta
+    ? Object.entries(entry.meta)
+        .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
+        .join(' ')
+    : ''
   el.innerHTML = `
     <span class="log-ts">${entry.ts ?? ''}</span>
     <span class="log-level ${level}">${level}</span>
@@ -180,7 +184,9 @@ function renderEntry(entry) {
   entryCount.textContent = `${count} entries`
 }
 
-const scrollLogs = () => { logsPanel.scrollTop = logsPanel.scrollHeight }
+const scrollLogs = () => {
+  logsPanel.scrollTop = logsPanel.scrollHeight
+}
 
 async function loadHistory(date) {
   const r = await fetch(`/api/logs/history?date=${date}`)
@@ -235,21 +241,39 @@ async function loadHealth() {
 
 function connectLogsSSE() {
   const es = new EventSource('/api/logs/stream')
-  es.onopen = () => { statusEl.textContent = 'Live'; statusEl.className = 'status connected' }
+  es.onopen = () => {
+    statusEl.textContent = 'Live'
+    statusEl.className = 'status connected'
+  }
   es.onmessage = (e) => {
     if (paused || dateSelect.value) return
-    try { renderEntry(JSON.parse(e.data)); scrollLogs() } catch {}
+    try {
+      renderEntry(JSON.parse(e.data))
+      scrollLogs()
+    } catch {}
   }
-  es.onerror = () => { statusEl.textContent = 'Reconnecting…'; statusEl.className = 'status disconnected' }
+  es.onerror = () => {
+    statusEl.textContent = 'Reconnecting…'
+    statusEl.className = 'status disconnected'
+  }
 }
 
 dateSelect.addEventListener('change', () => {
-  if (dateSelect.value) loadHistory(dateSelect.value); else { loadLive(); scrollLogs() }
+  if (dateSelect.value) loadHistory(dateSelect.value)
+  else {
+    loadLive()
+    scrollLogs()
+  }
 })
 levelFilter.addEventListener('change', () => {
-  if (dateSelect.value) loadHistory(dateSelect.value); else loadLive()
+  if (dateSelect.value) loadHistory(dateSelect.value)
+  else loadLive()
 })
-clearBtn.addEventListener('click', () => { logList.innerHTML = ''; count = 0; entryCount.textContent = '0 entries' })
+clearBtn.addEventListener('click', () => {
+  logList.innerHTML = ''
+  count = 0
+  entryCount.textContent = '0 entries'
+})
 pauseBtn.addEventListener('click', () => {
   paused = !paused
   pauseBtn.textContent = paused ? 'Resume' : 'Pause'
@@ -267,7 +291,7 @@ const kpiTotal = document.getElementById('kpiTotal')
 const kpiBytes = document.getElementById('kpiBytes')
 const recentTbody = document.querySelector('#recentTable tbody')
 
-const MAX_TICKS = 300       // 5 minutes at 1Hz
+const MAX_TICKS = 300 // 5 minutes at 1Hz
 const MAX_TABLE_ROWS = 200
 
 const tickLabels = []
@@ -284,21 +308,35 @@ function fmtBytes(n) {
 function makeLineChart(canvasId, color) {
   return new Chart(document.getElementById(canvasId), {
     type: 'line',
-    data: { labels: tickLabels, datasets: [{
-      data: [],
-      borderColor: color,
-      backgroundColor: color + '22',
-      fill: true,
-      tension: 0.25,
-      pointRadius: 0,
-      borderWidth: 1.5,
-    }] },
+    data: {
+      labels: tickLabels,
+      datasets: [
+        {
+          data: [],
+          borderColor: color,
+          backgroundColor: color + '22',
+          fill: true,
+          tension: 0.25,
+          pointRadius: 0,
+          borderWidth: 1.5,
+        },
+      ],
+    },
     options: {
-      responsive: true, maintainAspectRatio: false, animation: false,
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
       plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
       scales: {
-        x: { ticks: { color: '#8b949e', maxTicksLimit: 6, font: { size: 10 } }, grid: { color: '#21262d' } },
-        y: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' }, beginAtZero: true },
+        x: {
+          ticks: { color: '#8b949e', maxTicksLimit: 6, font: { size: 10 } },
+          grid: { color: '#21262d' },
+        },
+        y: {
+          ticks: { color: '#8b949e', font: { size: 10 } },
+          grid: { color: '#21262d' },
+          beginAtZero: true,
+        },
       },
     },
   })
@@ -311,15 +349,19 @@ const chartStatus = new Chart(document.getElementById('chartStatus'), {
   type: 'doughnut',
   data: {
     labels: ['2xx', '3xx', '4xx', '5xx', 'other'],
-    datasets: [{
-      data: [0, 0, 0, 0, 0],
-      backgroundColor: ['#3fb950', '#58a6ff', '#d29922', '#f85149', '#8b949e'],
-      borderColor: '#161b22',
-      borderWidth: 1,
-    }],
+    datasets: [
+      {
+        data: [0, 0, 0, 0, 0],
+        backgroundColor: ['#3fb950', '#58a6ff', '#d29922', '#f85149', '#8b949e'],
+        borderColor: '#161b22',
+        borderWidth: 1,
+      },
+    ],
   },
   options: {
-    responsive: true, maintainAspectRatio: false, animation: false,
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
     plugins: { legend: { position: 'right', labels: { color: '#e6edf3', font: { size: 11 } } } },
   },
 })
@@ -342,7 +384,9 @@ function pushTick(tick) {
   rpsSeries.push(w1.rps)
   p95Series.push(w1.p95)
   if (tickLabels.length > MAX_TICKS) {
-    tickLabels.shift(); rpsSeries.shift(); p95Series.shift()
+    tickLabels.shift()
+    rpsSeries.shift()
+    p95Series.shift()
   }
   chartRps.data.datasets[0].data = rpsSeries
   chartRps.update('none')
@@ -392,19 +436,37 @@ async function loadRecent() {
 
 function connectMetricsSSE() {
   const es = new EventSource('/api/metrics/stream')
-  es.onopen = () => { metricsStatus.textContent = 'Live'; metricsStatus.className = 'status connected' }
-  es.onerror = () => { metricsStatus.textContent = 'Reconnecting…'; metricsStatus.className = 'status disconnected' }
-  es.addEventListener('tick', (e) => { try { pushTick(JSON.parse(e.data)) } catch {} })
-  es.addEventListener('request', (e) => { try { appendRequest(JSON.parse(e.data)) } catch {} })
-  es.addEventListener('evicted', () => { metricsStatus.textContent = 'Evicted (cap)'; metricsStatus.className = 'status disconnected' })
+  es.onopen = () => {
+    metricsStatus.textContent = 'Live'
+    metricsStatus.className = 'status connected'
+  }
+  es.onerror = () => {
+    metricsStatus.textContent = 'Reconnecting…'
+    metricsStatus.className = 'status disconnected'
+  }
+  es.addEventListener('tick', (e) => {
+    try {
+      pushTick(JSON.parse(e.data))
+    } catch {}
+  })
+  es.addEventListener('request', (e) => {
+    try {
+      appendRequest(JSON.parse(e.data))
+    } catch {}
+  })
+  es.addEventListener('evicted', () => {
+    metricsStatus.textContent = 'Evicted (cap)'
+    metricsStatus.className = 'status disconnected'
+  })
 }
 
-document.getElementById('metricsClearBtn').addEventListener('click', () => { recentTbody.innerHTML = '' })
+document.getElementById('metricsClearBtn').addEventListener('click', () => {
+  recentTbody.innerHTML = ''
+})
 
 // ─── Boot ────────────────────────────────────────────────────
-const initialTab = location.hash === '#metrics' ? 'metrics'
-  : location.hash === '#setup' ? 'setup'
-  : 'logs'
+const initialTab =
+  location.hash === '#metrics' ? 'metrics' : location.hash === '#setup' ? 'setup' : 'logs'
 activateTab(initialTab)
 
 loadAvailable()
