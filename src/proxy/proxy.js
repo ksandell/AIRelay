@@ -4,6 +4,22 @@ import { pickAgent } from './agent.js'
 import { record, incInFlight, decInFlight } from '../metrics/collector.js'
 import { loadProvider } from '../providers/registry.js'
 
+// Maps Node.js error codes to discrete dashboard labels (H6).
+const ERROR_LABELS = {
+  ECONNREFUSED: 'upstream_refused',
+  ECONNRESET: 'upstream_reset',
+  ETIMEDOUT: 'upstream_timeout',
+  ENOTFOUND: 'upstream_dns',
+  CERT_HAS_EXPIRED: 'tls',
+  UNABLE_TO_VERIFY_LEAF_SIGNATURE: 'tls',
+  ERR_TLS_CERT_ALTNAME_INVALID: 'tls',
+}
+
+function errorLabel(err) {
+  if (err.code === 'ECONNABORTED' || err.message?.includes('client abort')) return 'client_abort'
+  return ERROR_LABELS[err.code] ?? err.code ?? 'error'
+}
+
 // Provider singleton — constructed once at module load. Null when token tracking
 // is disabled, which short-circuits all per-request buffering for zero overhead.
 const provider = config.proxyTokenTracking
@@ -46,8 +62,8 @@ proxy.on('proxyRes', (proxyRes, req) => {
       if (m.teeAborted) return
       m.teeBytes += chunk.length
       if (m.teeBytes > cap) {
-        m.chunks = null
         m.teeAborted = true
+        m.chunks = null
         return
       }
       m.chunks.push(chunk)
@@ -58,7 +74,7 @@ proxy.on('proxyRes', (proxyRes, req) => {
 proxy.on('error', (err, req, res) => {
   const m = req?._metrics
   if (m) {
-    m.error = err.code || err.message
+    m.error = errorLabel(err)
     m.status = m.status || 502
   }
   if (res && !res.headersSent) {
@@ -66,11 +82,7 @@ proxy.on('error', (err, req, res) => {
     res.setHeader('Content-Type', 'application/json')
     res.end(JSON.stringify({ error: 'bad gateway', code: err.code ?? null }))
   } else if (res && res.writable) {
-    try {
-      res.end()
-    } catch {
-      // ignore close errors
-    }
+    try { res.end() } catch { /* ignore */ }
   }
 })
 
@@ -180,6 +192,25 @@ export function createProxyHandler() {
     req._metrics = m
     incInFlight()
 
+    // Idle watchdog — destroy hung connections after proxyRequestIdleTimeoutMs.
+    let idleTimer = null
+    if (config.proxyRequestIdleTimeoutMs > 0) {
+      idleTimer = setTimeout(() => {
+        if (!m.recorded) {
+          m.error = 'upstream_timeout'
+          m.status = m.status || 504
+          finalize(m)
+        }
+        try { req.destroy() } catch { /* ignore */ }
+        try { res.destroy() } catch { /* ignore */ }
+      }, config.proxyRequestIdleTimeoutMs)
+      idleTimer.unref()
+    }
+
+    const clearIdle = () => { if (idleTimer) { clearTimeout(idleTimer); idleTimer = null } }
+    res.on('finish', clearIdle)
+    res.on('close', clearIdle)
+
     req.on('data', (chunk) => {
       m.bytesIn += chunk.length
       if (provider && !m.reqTeeAborted) {
@@ -197,7 +228,7 @@ export function createProxyHandler() {
       }
     })
     req.on('aborted', () => {
-      m.error = m.error || 'client_aborted'
+      m.error = m.error || 'client_abort'
     })
 
     // 'finish' fires when the response body has been flushed to the kernel —
@@ -209,7 +240,7 @@ export function createProxyHandler() {
     proxy.web(req, res, {}, (err) => {
       // Fallback for the err callback variant (rare — error event usually fires first).
       if (err && !m.recorded) {
-        m.error = err.code || err.message
+        m.error = errorLabel(err)
         m.status = m.status || 502
         finalize(m)
         if (!res.headersSent) {
