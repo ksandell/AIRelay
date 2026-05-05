@@ -1,0 +1,12 @@
+node_modules
+data
+.env
+.env.local
+tests
+docs
+*.md
+.git
+.gitignore
+.gitattributes
+.claude
+docker-compose*.yml

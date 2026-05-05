@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AIRelay — Live</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <h1>AIRelay</h1>
+        <nav class="tabs">
+          <button class="tab" data-tab="setup" id="setupTab" hidden>Setup</button>
+          <button class="tab active" data-tab="logs">Logs</button>
+          <button class="tab" data-tab="metrics">Metrics</button>
+        </nav>
+      </div>
+
+      <div class="controls" id="logsControls">
+        <span id="status" class="status disconnected">Connecting…</span>
+        <select id="dateSelect">
+          <option value="">Live</option>
+        </select>
+        <select id="levelFilter">
+          <option value="">All levels</option>
+          <option value="debug">debug</option>
+          <option value="info">info</option>
+          <option value="warn">warn</option>
+          <option value="error">error</option>
+        </select>
+        <button id="clearBtn">Clear</button>
+        <button id="pauseBtn">Pause</button>
+      </div>
+
+      <div class="controls hidden" id="metricsControls">
+        <span id="metricsStatus" class="status disconnected">Connecting…</span>
+        <span class="pill" id="inFlightPill">in-flight: 0</span>
+        <button id="metricsClearBtn">Clear table</button>
+      </div>
+
+      <div class="controls hidden" id="setupControls">
+        <span class="pill warn">proxy not configured</span>
+      </div>
+    </header>
+
+    <main id="setupPanel" class="panel hidden">
+      <div class="setup-wrap">
+        <section class="setup-intro">
+          <h2>Welcome — let's get the proxy configured</h2>
+          <p>
+            AIRelay hasn't been pointed at an upstream API yet. Pick a provider below
+            and we'll generate the <code>.env</code> file you need.
+          </p>
+          <p class="muted">
+            The proxy never sees or stores your API key — your SDK sends it on each request and
+            the proxy forwards it untouched. You only configure the <em>upstream URL</em> here.
+          </p>
+        </section>
+
+        <section class="setup-form">
+          <div class="field">
+            <label for="setupProvider">Provider</label>
+            <select id="setupProvider">
+              <option value="anthropic">Anthropic (Claude API)</option>
+              <option value="openai">OpenAI</option>
+              <option value="gemini">Google Gemini</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="custom">Custom / self-hosted</option>
+            </select>
+            <p class="hint" id="providerHint">https://api.anthropic.com</p>
+          </div>
+
+          <div class="field hidden" id="customUrlField">
+            <label for="setupCustomUrl">Custom upstream URL</label>
+            <input type="text" id="setupCustomUrl" placeholder="https://your-host.example.com/v1" />
+            <p class="hint">Full URL including scheme. Use <code>http://</code> for plain HTTP upstreams.</p>
+          </div>
+
+          <div class="row-2">
+            <div class="field">
+              <label for="setupPathPrefix">Proxy path prefix</label>
+              <input type="text" id="setupPathPrefix" value="/proxy" />
+              <p class="hint">SDK <code>baseURL</code> ends with this.</p>
+            </div>
+
+            <div class="field">
+              <label for="setupPort">Port</label>
+              <input type="number" id="setupPort" value="3000" min="1" max="65535" />
+              <p class="hint">HTTP port the dashboard + proxy listen on.</p>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="setupHost">Public hostname (optional)</label>
+            <input type="text" id="setupHost" placeholder="airelay.local" />
+            <p class="hint">
+              Informational only — what your team uses to reach this box. Set DNS / Tailscale / hosts
+              file separately. See <code>CONFIGURATION.md</code> for DNS setup.
+            </p>
+          </div>
+
+          <div class="field checkbox">
+            <label>
+              <input type="checkbox" id="setupTls" checked />
+              Verify upstream TLS certificate
+            </label>
+            <p class="hint">Leave on for any real provider. Turn off only for self-signed dev upstreams.</p>
+          </div>
+        </section>
+
+        <section class="setup-output">
+          <div class="output-head">
+            <h3>1. Save this as <code>.env</code> in the project root</h3>
+            <button id="setupCopyBtn" class="copy-btn">Copy</button>
+          </div>
+          <pre id="setupEnvBlock"></pre>
+
+          <h3>2. Start the proxy</h3>
+          <div class="next-steps">
+            <div class="next-card">
+              <h4>Docker</h4>
+              <pre>npm run docker:up</pre>
+            </div>
+            <div class="next-card">
+              <h4>Local Node</h4>
+              <pre>npm install
+npm run dev</pre>
+            </div>
+          </div>
+
+          <h3>3. Point your SDK at the proxy</h3>
+          <pre id="setupSdkSnippet"></pre>
+
+          <p class="muted">
+            Once the proxy is running and a request has gone through, this Setup tab will hide itself.
+          </p>
+        </section>
+      </div>
+    </main>
+
+    <main id="logsPanel" class="panel">
+      <div id="logList"></div>
+    </main>
+
+    <main id="metricsPanel" class="panel hidden">
+      <section class="kpis">
+        <div class="kpi"><span class="kpi-label">RPS (1m)</span><span class="kpi-val" id="kpiRps">—</span></div>
+        <div class="kpi"><span class="kpi-label">p95 (1m)</span><span class="kpi-val" id="kpiP95">—</span><span class="kpi-unit">ms</span></div>
+        <div class="kpi"><span class="kpi-label">p99 (1m)</span><span class="kpi-val" id="kpiP99">—</span><span class="kpi-unit">ms</span></div>
+        <div class="kpi"><span class="kpi-label">Errors (1m)</span><span class="kpi-val" id="kpiErr">—</span><span class="kpi-unit">%</span></div>
+        <div class="kpi"><span class="kpi-label">Total (5m)</span><span class="kpi-val" id="kpiTotal">—</span></div>
+        <div class="kpi"><span class="kpi-label">Throughput (5m)</span><span class="kpi-val" id="kpiBytes">—</span></div>
+      </section>
+
+      <section class="charts">
+        <div class="chart-card">
+          <header class="chart-title">Requests / sec — last 5 min</header>
+          <canvas id="chartRps"></canvas>
+        </div>
+        <div class="chart-card">
+          <header class="chart-title">p95 latency (ms) — last 5 min</header>
+          <canvas id="chartLat"></canvas>
+        </div>
+        <div class="chart-card">
+          <header class="chart-title">Status mix (1m)</header>
+          <canvas id="chartStatus"></canvas>
+        </div>
+      </section>
+
+      <section class="table-card">
+        <header class="chart-title">Recent requests</header>
+        <table id="recentTable">
+          <thead>
+            <tr>
+              <th>time</th>
+              <th>method</th>
+              <th>path</th>
+              <th>status</th>
+              <th>ms</th>
+              <th>in</th>
+              <th>out</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </main>
+
+    <footer id="statusBar">
+      <span id="entryCount">0 entries</span>
+      <span id="healthInfo"></span>
+    </footer>
+
+    <script src="app.js" type="module"></script>
+  </body>
+</html>

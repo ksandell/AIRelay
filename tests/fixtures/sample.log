@@ -1,0 +1,4 @@
+{"ts":"2026-04-29T00:00:01.000Z","level":"info","msg":"server started","meta":{"port":3000,"env":"test"}}
+{"ts":"2026-04-29T00:01:00.000Z","level":"debug","msg":"health check","meta":{"requestId":"abc-123"}}
+{"ts":"2026-04-29T00:02:00.000Z","level":"warn","msg":"slow response","meta":{"ms":1500}}
+{"ts":"2026-04-29T00:03:00.000Z","level":"error","msg":"unhandled error","meta":{"message":"ENOENT"}}

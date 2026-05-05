@@ -1,0 +1,15 @@
+services:
+  app:
+    build:
+      target: dev
+    volumes:
+      - ./src:/app/src
+      - ./public:/app/public
+      - ./data/logs:/data/logs
+    environment:
+      NODE_ENV: development
+      TZ: UTC
+      LOG_DIR: /data/logs
+      LOG_LEVEL: debug
+    command: ["node", "--watch", "src/index.js"]
+    restart: "no"
