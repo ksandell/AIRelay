@@ -61,6 +61,10 @@ npm run docker:logs
 - `src/logs/rotation.js` — lifecycle (rotate, cleanup, size guard, startup check)
 - `src/sse/stream.js` — log-stream SSE; module-level `Set<Response>` with hard cap + non-blocking writes
 - `src/config.js` — single source of truth for all env vars; `dotenv` loaded only in non-production
+- `src/providers/registry.js` — provider singleton loader; 14 implementations under `src/providers/*.js`
+- `src/providers/pricing.js` — loads bundled `config/pricing.json`; deep-merges custom file from `PRICING_CONFIG_PATH`
+- `src/middleware/requestLogger.js` — sync `appendFileSync` per non-proxy request (not on proxy hot path)
+- `src/middleware/errorHandler.js` — Express error response middleware
 
 ### Mount order in `server.js` (load-bearing)
 
@@ -112,6 +116,7 @@ GET /api/logs/stream                 — SSE stream of live log entries
 # Metrics
 GET /api/metrics/summary             — snapshot: count, capacity, inFlight, 1m/5m/15m windows
 GET /api/metrics/recent?limit=200    — last N proxied requests (oldest-first)
+GET /api/metrics/models              — per-model cost/token breakdown, sorted by cost desc
 GET /api/metrics/stream              — SSE: 'request' events per proxied request (throttled to SSE_EVENT_RATE/s)
                                        + 'tick' events every METRICS_TICK_MS with rolling aggregates
 
@@ -139,6 +144,14 @@ See [.env.example](.env.example) for all variables with defaults. Critical ones:
 | `LOG_RETENTION_DAYS` | `7` | |
 | `MAX_LOG_SIZE_MB` | `50` | Triggers mid-day rotation |
 | `TZ` | `UTC` | Never change — all timestamps are UTC |
+| `PROXY_PROVIDER`            | `generic`    | Provider for token extraction (anthropic/openai/google/etc.) |
+| `PROXY_TOKEN_TRACKING`      | `true`       | Enable body tee for token/cost extraction |
+| `PRICING_CONFIG_PATH`       | `(unset)`    | Path to custom pricing JSON (deep-merged over bundled) |
+| `PROXY_TOKEN_TEE_MAX_BYTES` | `2097152`    | Per-request buffer cap for token extraction (2 MiB) |
+| `SSE_HEARTBEAT_MS`          | `30000`      | SSE keep-alive ping interval |
+| `LOG_LEVEL`                 | `info`       | Log level: debug/info/warn/error |
+| `CRON_SCHEDULE`             | `0 0 * * *` | Cron for daily midnight log rotation (UTC) |
+| `ENABLE_COMPRESSION`        | `false`      | Gzip rotated logs (reserved, not yet active) |
 
 ## Deployment
 
