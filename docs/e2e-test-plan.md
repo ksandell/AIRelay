@@ -183,12 +183,56 @@ UI: with at least one entry visible, click `Clear`.
 
 ---
 
+## Load test — S8
+
+10 concurrent groups × 100 requests each (1 000 total). Random 1–2 s delay between
+requests within each group. All groups fire in parallel.
+
+```bash
+# Run from the repo root — takes ~2.5 min
+bash docs/load-test.sh
+```
+
+Expected (Mistral `mistral-small-latest`):
+
+- All 1 000 requests return HTTP `200`.
+- p50 ≤ 400 ms, p95 ≤ 600 ms.
+- `errorRate` = 0 in the 5-minute window.
+- `/api/metrics/summary` `.windows["5m"].byModel["mistral-small-latest"].requests` = 1 000.
+
+### Reference run — 2026-05-06
+
+| Metric | Value |
+|---|---|
+| Total | 1 000 / 1 000 ✓ |
+| 200 OK | 100 % |
+| p50 | 245 ms |
+| p95 | 427 ms |
+| p99 | 1 306 ms |
+| Peak RPS | 3.33 |
+| Tokens/s | 93.5 |
+| Total cost | $0.0047 |
+
+---
+
 ## Pass criteria
 
-- All scenario expectations met.
-- `npm test` ≥ 193 passing.
+- All scenario expectations met (S6 requires ≥ 2 days of rotated logs).
+- `npm test` ≥ 579 passing.
 - `npm run lint` clean.
 - No console errors in dashboard.
+
+## DOM IDs (verified via `javascript_tool`)
+
+| Element | Selector |
+|---|---|
+| Log list | `#logList` |
+| Clear button | `#clearBtn` |
+| Date select | `#dateSelect` |
+| Proxy filter checkbox | `#filterProxy` |
+| Status bar | `#statusBar` |
+
+Available dates API: `GET /api/logs/available` → `{ active, rotated: [{date, sizeBytes}] }`
 
 ## MCP execution notes
 
