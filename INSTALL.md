@@ -80,6 +80,8 @@ The first run takes ~1 minute (Docker downloads `node:22-alpine` and builds the 
 
 In your browser: **`http://localhost:3000`**
 
+> **Note:** `localhost` works for local Node.js dev only. For Docker, use your machine's IP or a DNS alias — see [CONFIGURATION.md](CONFIGURATION.md).
+
 You should see a dark dashboard with "Logs" and "Metrics" tabs.
 
 ### A6. (If you skipped A3) configure via the Setup tab
@@ -148,6 +150,8 @@ docker compose up --build
 
 `http://localhost:3000`
 
+> **Note:** `localhost` works for local Node.js dev only. For Docker, use your machine's IP or a DNS alias — see [CONFIGURATION.md](CONFIGURATION.md).
+
 ### B6. Verify
 
 Same `curl` command as [A7](#a7-verify-it-actually-proxies).
@@ -207,6 +211,8 @@ docker compose ps              # check status
 - From the same machine: `http://localhost:3000`
 - From other machines on the LAN: add a hosts-file entry on each client (see [CONFIGURATION.md → DNS](CONFIGURATION.md#dns-and-hostnames)) **or** install Tailscale on the host.
 
+> **Note:** `localhost` works for local Node.js dev only. For Docker, use your machine's IP or a DNS alias — see [CONFIGURATION.md](CONFIGURATION.md).
+
 ### C6. Make it survive a reboot
 
 `docker-compose.yml` already declares `restart: unless-stopped`, so once started with `-d`, the container comes back on host reboot. No systemd unit needed.
@@ -264,7 +270,7 @@ npm run dev
 npm test
 ```
 
-All 36 tests should pass.
+All 182 tests should pass.
 
 ---
 
