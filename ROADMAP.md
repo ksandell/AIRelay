@@ -20,14 +20,14 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 
 | Release | Status | Theme |
 |---|---|---|
-| **v0.1.0** | 🟢 In progress | Passthrough proxy + observability |
-| **v0.2.0** | 🟡 Next | Token & cost tracking |
+| **v0.1.0** | ✅ Done | Passthrough proxy + observability |
+| **v0.2.0** | ✅ Done | Token & cost tracking |
 | **v0.3.0** | ⚪ Planned | Persistence + multi-upstream |
 | **v0.4.0+** | ⚪ Speculative | Caching, retries, routing intelligence |
 
 ---
 
-## v0.1.0 — Passthrough + Observability  🟢
+## v0.1.0 — Passthrough + Observability  ✅
 
 **Theme:** "Make my AI traffic visible without changing a byte."
 
@@ -62,7 +62,7 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 
 ---
 
-## v0.2.0 — Token & Cost Tracking  🟡
+## v0.2.0 — Token & Cost Tracking  ✅
 
 **Theme:** "Tell me how much each call cost — per request, per model, per day."
 
