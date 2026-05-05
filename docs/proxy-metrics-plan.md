@@ -1,5 +1,7 @@
 # Proxy + Metrics Architecture (v0.1.0)
 
+> **Status (2026-05-05):** This document describes the v0.1.0 architecture. Token & cost tracking (v0.2.0) is now fully implemented — see [CHANGELOG.md](../CHANGELOG.md) for what shipped and [CONFIGURATION.md](../CONFIGURATION.md) for the current env var reference.
+
 **Author:** Architect / Dev Manager pass
 **Last updated:** 2026-05-05
 **Goal:** Sit between an application codebase and an upstream AI/LLM HTTP API. Forward bytes unchanged, capture per-request metrics with zero payload mutation, and surface them live in the dashboard.
