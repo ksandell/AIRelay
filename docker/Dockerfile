@@ -12,6 +12,7 @@ COPY package*.json ./
 RUN npm ci
 COPY src/ ./src/
 COPY public/ ./public/
+COPY config/ ./config/
 RUN mkdir -p /data/logs
 EXPOSE 3000
 CMD ["node", "--watch", "src/index.js"]
@@ -24,6 +25,7 @@ ENV NODE_OPTIONS="--max-http-header-size=32768"
 COPY --from=deps /app/node_modules ./node_modules
 COPY src/ ./src/
 COPY public/ ./public/
+COPY config/ ./config/
 COPY package.json ./
 RUN mkdir -p /data/logs
 EXPOSE 3000
