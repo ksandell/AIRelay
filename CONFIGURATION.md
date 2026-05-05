@@ -96,6 +96,58 @@ Every variable, what it does, and when you'd touch it. Defaults match `.env.exam
 | `SSE_EVENT_RATE` | `50` | Per-event metric stream throttle (events/s). Aggregate ticks always go through. |
 | `SSE_HEARTBEAT_MS` | `30000` | Keep-alive ping interval to prevent intermediary timeouts. |
 
+### Token & Cost Tracking (v0.2.0)
+
+The proxy can extract token usage from upstream responses and compute per-request cost in USD using a bundled pricing table. Tracking is response-only — request bodies are never inspected — and runs on a non-blocking tee of the response stream. If the response exceeds `PROXY_TOKEN_TEE_MAX_BYTES`, extraction is abandoned for that request and the base metric event is recorded without token/cost fields. Set `PROXY_TOKEN_TRACKING=false` to fully bypass the tee for v0.1-equivalent zero overhead.
+
+| Var | Default | Notes |
+|---|---|---|
+| `PROXY_PROVIDER` | `generic` | Named providers (14): `anthropic`, `openai`, `google`, `mistral`, `groq`, `microsoft`, `openrouter`, `together`, `fireworks`, `deepseek`, `xai`, `perplexity`, `ollama`, `nvidia`. Fallback: `generic` (records bytes only — no token/cost fields). Selects the response parser and pricing table key. |
+| `PROXY_TOKEN_TRACKING` | `true` | Set `false` to disable body inspection entirely (zero-overhead passthrough). |
+| `PRICING_CONFIG_PATH` | _(unset)_ | Optional path to a JSON file that **deep-merges** over the bundled `config/pricing.json`. Use this to add models or override prices without forking. |
+| `PROXY_TOKEN_TEE_MAX_BYTES` | `2097152` | Per-request body buffer cap (2 MiB) for token extraction. Larger responses skip extraction so big SSE streams don't pin memory. |
+
+#### Provider setup examples
+
+```env
+# Anthropic
+UPSTREAM_URL=https://api.anthropic.com
+PROXY_PROVIDER=anthropic
+
+# OpenAI
+UPSTREAM_URL=https://api.openai.com/v1
+PROXY_PROVIDER=openai
+
+# Groq (OpenAI-compatible, fast inference)
+UPSTREAM_URL=https://api.groq.com/openai/v1
+PROXY_PROVIDER=groq
+
+# Ollama (local, $0 cost — pricing table has "*": {input:0, output:0})
+UPSTREAM_URL=http://ollama-host:11434
+PROXY_PROVIDER=ollama
+```
+
+Cost shows as `$0.00` for Ollama since local inference is free; tokens are still counted and surfaced.
+
+#### Pricing override
+
+Prices are expressed in **USD per million tokens** (`$/MTok`). The bundled file lives at `config/pricing.json`; point `PRICING_CONFIG_PATH` at your own file to layer on top. Format:
+
+```json
+{
+  "providers": {
+    "anthropic": {
+      "claude-sonnet-4-6": { "input": 3.00, "output": 15.00, "cacheWrite": 3.75, "cacheRead": 0.30 }
+    },
+    "openai": {
+      "gpt-4o": { "input": 2.50, "output": 10.00 }
+    }
+  }
+}
+```
+
+`cacheRead` and `cacheWrite` are optional (Anthropic prompt caching). The override is **deep-merged**: only the keys you specify are replaced, everything else from the bundled file is preserved. Use it to add new models, correct stale prices, or pin internal pricing for reimbursable tenants.
+
 ---
 
 ## Provider recipes

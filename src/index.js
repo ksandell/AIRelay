@@ -31,10 +31,14 @@ server.headersTimeout = 70_000
 server.requestTimeout = 0 // proxied uploads can be long; rely on upstream timeouts
 // maxConnections left at default (unlimited). Node treats 0 as "reject all", not "unlimited".
 
-cron.schedule(config.cronSchedule, () => {
-  logger.info('cron: rotating logs')
-  rotateLogs()
-}, { timezone: 'UTC' })
+cron.schedule(
+  config.cronSchedule,
+  () => {
+    logger.info('cron: rotating logs')
+    rotateLogs()
+  },
+  { timezone: 'UTC' },
+)
 
 const sizeGuard = startSizeGuard()
 const heartbeat = startHeartbeat()

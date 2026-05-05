@@ -13,6 +13,9 @@ export function aggregate(seconds) {
   let errors = 0
   let bytesIn = 0
   let bytesOut = 0
+  let totalCostUsd = 0
+  let totalTokens = 0
+  const byModel = {}
 
   for (const ev of iterRecent(seconds)) {
     total++
@@ -20,17 +23,48 @@ export function aggregate(seconds) {
     bytesIn += ev.bytesIn ?? 0
     bytesOut += ev.bytesOut ?? 0
 
+    const cost = ev.costUsd ?? 0
+    const toks = ev.totalTokens ?? 0
+    totalCostUsd += cost
+    totalTokens += toks
+
+    if (ev.model != null) {
+      let m = byModel[ev.model]
+      if (!m) {
+        m = {
+          provider: ev.provider ?? null,
+          requests: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          costUsd: 0,
+        }
+        byModel[ev.model] = m
+      }
+      m.requests++
+      m.inputTokens += ev.inputTokens ?? 0
+      m.outputTokens += ev.outputTokens ?? 0
+      m.costUsd += ev.costUsd ?? 0
+    }
+
     const s = ev.status | 0
     if (s >= 200 && s < 300) statusBuckets['2xx']++
     else if (s >= 300 && s < 400) statusBuckets['3xx']++
-    else if (s >= 400 && s < 500) { statusBuckets['4xx']++; errors++ }
-    else if (s >= 500) { statusBuckets['5xx']++; errors++ }
-    else statusBuckets.other++
+    else if (s >= 400 && s < 500) {
+      statusBuckets['4xx']++
+      errors++
+    } else if (s >= 500) {
+      statusBuckets['5xx']++
+      errors++
+    } else statusBuckets.other++
 
     if (ev.error && s < 400) errors++
   }
 
   durations.sort((a, b) => a - b)
+
+  for (const k of Object.keys(byModel)) {
+    byModel[k].costUsd = +byModel[k].costUsd.toFixed(6)
+  }
 
   return {
     windowSec: seconds,
@@ -43,6 +77,10 @@ export function aggregate(seconds) {
     statusBuckets,
     bytesIn,
     bytesOut,
+    totalCostUsd: +totalCostUsd.toFixed(6),
+    totalTokens,
+    tokensPerSec: +(totalTokens / seconds).toFixed(3),
+    byModel,
   }
 }
 

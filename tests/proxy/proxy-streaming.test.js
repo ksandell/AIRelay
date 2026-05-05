@@ -103,7 +103,9 @@ describe('proxy streaming passthrough', () => {
         { host: '127.0.0.1', port: proxyPort, method: 'GET', path: '/proxy/stream' },
         (res) => {
           let buf = Buffer.alloc(0)
-          res.on('data', (c) => { buf = Buffer.concat([buf, c]) })
+          res.on('data', (c) => {
+            buf = Buffer.concat([buf, c])
+          })
           res.on('end', () => resolve({ headers: res.headers, body: buf }))
         },
       )
