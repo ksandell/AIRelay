@@ -162,13 +162,86 @@ const healthInfo = document.getElementById('healthInfo')
 let paused = false
 let count = 0
 
+// ─── Log panel state ─────────────────────────────────────────
+const LOG_BUFFER_MAX = 2000
+const logBuffer = [] // { type: 'proxy'|'internal'|'system', entry: object }
+
+const filterProxy = document.getElementById('filterProxy')
+const filterInternal = document.getElementById('filterInternal')
+const filterSystem = document.getElementById('filterSystem')
+
+function loadFilterState() {
+  const saved = localStorage.getItem('logFilters')
+  if (!saved) return
+  try {
+    const s = JSON.parse(saved)
+    filterProxy.checked = s.proxy ?? true
+    filterInternal.checked = s.internal ?? false
+    filterSystem.checked = s.system ?? false
+  } catch {}
+}
+
+function saveFilterState() {
+  localStorage.setItem(
+    'logFilters',
+    JSON.stringify({
+      proxy: filterProxy.checked,
+      internal: filterInternal.checked,
+      system: filterSystem.checked,
+    }),
+  )
+}
+
+loadFilterState()
+;[filterProxy, filterInternal, filterSystem].forEach((cb) => {
+  cb.addEventListener('change', () => {
+    saveFilterState()
+    rebuildLogList()
+  })
+})
+
 const escHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-function renderEntry(entry) {
-  const level = entry.level ?? 'info'
-  if (levelFilter.value && level !== levelFilter.value) return
+function typeForAppEntry(entry) {
+  const path = entry.meta?.path ?? entry.meta?.url ?? ''
+  if (path.startsWith('/api/')) return 'internal'
+  return 'system'
+}
+
+function renderProxyRow(ev) {
   const el = document.createElement('div')
-  el.className = `log-entry level-${level}`
+  el.className = 'log-entry type-proxy'
+  const status = ev.status || (ev.error ? 'ERR' : '—')
+  const statusClass = ev.error ? 'err' : `s${(ev.status / 100) | 0}`
+  const rawPath = ev.path ?? '—'
+  const path = rawPath.length > 45 ? rawPath.slice(0, 44) + '…' : rawPath
+  const tokens =
+    ev.inputTokens || ev.outputTokens
+      ? ` <span class="log-meta">${fmtTokens(ev.inputTokens)}↓ ${fmtTokens(ev.outputTokens)}↑ tok</span>`
+      : ''
+  const cost =
+    typeof ev.costUsd === 'number' ? ` <span class="log-meta">${fmtCost(ev.costUsd)}</span>` : ''
+  const model = ev.model ? ` <span class="log-meta">${escHtml(ev.model)}</span>` : ''
+  el.innerHTML = `
+    <span class="log-ts">${fmtTime(ev.ts)}</span>
+    <span class="log-level ${statusClass}">${escHtml(String(status))}</span>
+    <span class="log-msg">
+      <span class="log-method">${escHtml(ev.method ?? '—')}</span>
+      ${escHtml(path)}
+      <span class="log-meta">${ev.durationMs ?? '—'}ms</span>
+      <span class="log-meta">↓${fmtBytes(ev.bytesIn ?? 0)} ↑${fmtBytes(ev.bytesOut ?? 0)}</span>
+      ${model}${tokens}${cost}
+    </span>
+  `
+  return el
+}
+
+function renderLogRow(item) {
+  if (item.type === 'proxy') return renderProxyRow(item.entry)
+  const { entry } = item
+  const level = entry.level ?? 'info'
+  const el = document.createElement('div')
+  el.className = `log-entry type-${item.type} level-${level}`
   const meta = entry.meta
     ? Object.entries(entry.meta)
         .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
@@ -179,27 +252,69 @@ function renderEntry(entry) {
     <span class="log-level ${level}">${level}</span>
     <span class="log-msg">${escHtml(entry.msg ?? '')}${meta ? `<span class="log-meta"> ${escHtml(meta)}</span>` : ''}</span>
   `
+  return el
+}
+
+function isVisible(type) {
+  if (type === 'proxy') return filterProxy.checked
+  if (type === 'internal') return filterInternal.checked
+  return filterSystem.checked
+}
+
+function rebuildLogList() {
+  logList.innerHTML = ''
+  count = 0
+  for (const item of logBuffer) {
+    if (!isVisible(item.type)) continue
+    logList.appendChild(renderLogRow(item))
+    count++
+  }
+  entryCount.textContent = `${count} entries`
+}
+
+function bufferAndRender(type, entry) {
+  if (paused) return
+  logBuffer.unshift({ type, entry })
+  if (logBuffer.length > LOG_BUFFER_MAX) logBuffer.pop()
+  if (!isVisible(type)) return
+  const el = renderLogRow({ type, entry })
   logList.prepend(el)
   count++
   entryCount.textContent = `${count} entries`
+}
+
+function renderEntry(entry) {
+  if (dateSelect.value) return
+  const type = typeForAppEntry(entry)
+  bufferAndRender(type, entry)
 }
 
 async function loadHistory(date) {
   const r = await fetch(`/api/logs/history?date=${date}`)
   if (!r.ok) return
   const entries = await r.json()
-  logList.innerHTML = ''
+  logBuffer.length = 0
   count = 0
-  entries.slice().reverse().forEach(renderEntry)
+  for (const e of [...entries].reverse()) {
+    logBuffer.push({ type: typeForAppEntry(e), entry: e })
+    if (logBuffer.length >= LOG_BUFFER_MAX) break
+  }
+  filterProxy.disabled = true
+  filterProxy.parentElement.title = 'Live only — proxy requests not stored on disk'
+  rebuildLogList()
 }
 
 async function loadLive() {
   const r = await fetch('/api/logs?limit=500')
   if (!r.ok) return
   const entries = await r.json()
-  logList.innerHTML = ''
+  logBuffer.length = 0
   count = 0
-  entries.slice().reverse().forEach(renderEntry)
+  for (const e of [...entries].reverse()) {
+    logBuffer.push({ type: typeForAppEntry(e), entry: e })
+    if (logBuffer.length >= LOG_BUFFER_MAX) break
+  }
+  rebuildLogList()
 }
 
 async function loadAvailable() {
@@ -252,14 +367,20 @@ function connectLogsSSE() {
 }
 
 dateSelect.addEventListener('change', () => {
-  if (dateSelect.value) loadHistory(dateSelect.value)
-  else loadLive()
+  if (dateSelect.value) {
+    loadHistory(dateSelect.value)
+  } else {
+    filterProxy.disabled = false
+    filterProxy.parentElement.title = ''
+    loadLive()
+  }
 })
 levelFilter.addEventListener('change', () => {
   if (dateSelect.value) loadHistory(dateSelect.value)
   else loadLive()
 })
 clearBtn.addEventListener('click', () => {
+  logBuffer.length = 0
   logList.innerHTML = ''
   count = 0
   entryCount.textContent = '0 entries'
@@ -278,12 +399,20 @@ const kpiP95 = document.getElementById('kpiP95')
 const kpiP99 = document.getElementById('kpiP99')
 const kpiErr = document.getElementById('kpiErr')
 const kpiTotal = document.getElementById('kpiTotal')
-const kpiBytes = document.getElementById('kpiBytes')
+const kpiBytesIn = document.getElementById('kpiBytesIn')
+const kpiBytesOut = document.getElementById('kpiBytesOut')
 const recentTbody = document.querySelector('#recentTable tbody')
 const kpiCostTotal = document.getElementById('kpiCostTotal')
 const kpiCostPerMin = document.getElementById('kpiCostPerMin')
 const kpiCostPerHr = document.getElementById('kpiCostPerHr')
-const kpiTokensPerSec = document.getElementById('kpiTokensPerSec')
+const kpiTokensIn = document.getElementById('kpiTokensIn')
+const kpiTokensOut = document.getElementById('kpiTokensOut')
+const kpiToolCalls = document.getElementById('kpiToolCalls')
+const pill2xx = document.getElementById('pill2xx').querySelector('span')
+const pill3xx = document.getElementById('pill3xx').querySelector('span')
+const pill4xx = document.getElementById('pill4xx').querySelector('span')
+const pill5xx = document.getElementById('pill5xx').querySelector('span')
+const pillOther = document.getElementById('pillOther').querySelector('span')
 const modelsTbody = document.querySelector('#modelsTable tbody')
 const modelsTotalReq = document.getElementById('modelsTotalReq')
 const modelsTotalIn = document.getElementById('modelsTotalIn')
@@ -300,6 +429,8 @@ const MAX_TABLE_ROWS = 40
 const tickLabels = []
 const rpsSeries = []
 const p95Series = []
+const tokenInSeries = []
+const tokenOutSeries = []
 
 function fmtCost(n) {
   if (n == null || isNaN(n)) return '—'
@@ -376,26 +507,62 @@ function makeLineChart(canvasId, color) {
 const chartRps = makeLineChart('chartRps', '#58a6ff')
 const chartLat = makeLineChart('chartLat', '#d29922')
 
-const chartStatus = new Chart(document.getElementById('chartStatus'), {
-  type: 'doughnut',
-  data: {
-    labels: ['2xx', '3xx', '4xx', '5xx', 'other'],
-    datasets: [
-      {
-        data: [0, 0, 0, 0, 0],
-        backgroundColor: ['#3fb950', '#58a6ff', '#d29922', '#f85149', '#8b949e'],
-        borderColor: '#161b22',
-        borderWidth: 1,
+function makeDualLineChart(canvasId, color1, color2, label1, label2) {
+  return new Chart(document.getElementById(canvasId), {
+    type: 'line',
+    data: {
+      labels: tickLabels,
+      datasets: [
+        {
+          label: label1,
+          data: [],
+          borderColor: color1,
+          backgroundColor: color1 + '22',
+          fill: false,
+          tension: 0.25,
+          pointRadius: 0,
+          borderWidth: 1.5,
+        },
+        {
+          label: label2,
+          data: [],
+          borderColor: color2,
+          backgroundColor: color2 + '22',
+          fill: false,
+          tension: 0.25,
+          pointRadius: 0,
+          borderWidth: 1.5,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: { color: '#8b949e', font: { size: 10 }, boxWidth: 12 },
+        },
+        tooltip: { mode: 'index', intersect: false },
       },
-    ],
-  },
-  options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: false,
-    plugins: { legend: { position: 'right', labels: { color: '#e6edf3', font: { size: 11 } } } },
-  },
-})
+      scales: {
+        x: {
+          ticks: { color: '#8b949e', maxTicksLimit: 6, font: { size: 10 } },
+          grid: { color: '#21262d' },
+        },
+        y: {
+          ticks: { color: '#8b949e', font: { size: 10 } },
+          grid: { color: '#21262d' },
+          beginAtZero: true,
+        },
+      },
+    },
+  })
+}
+
+const chartTokens = makeDualLineChart('chartTokens', '#58a6ff', '#3fb950', 'Prompt', 'Completion')
 
 function pushTick(tick) {
   const w1 = tick.windows['1m']
@@ -406,14 +573,17 @@ function pushTick(tick) {
   kpiP99.textContent = w1.p99
   kpiErr.textContent = (w1.errorRate * 100).toFixed(1)
   kpiTotal.textContent = fmtNum(w5.total)
-  kpiBytes.textContent = fmtBytes(w5.bytesIn + w5.bytesOut)
+  kpiBytesIn.textContent = fmtBytes(w5.bytesIn)
+  kpiBytesOut.textContent = fmtBytes(w5.bytesOut)
 
   inFlightPill.textContent = `in-flight: ${tick.inFlight}`
 
   const costPerMin = w1.totalCostUsd ?? 0
   kpiCostPerMin.textContent = fmtCost(costPerMin)
   kpiCostPerHr.textContent = fmtCost(costPerMin * 60)
-  kpiTokensPerSec.textContent = (w1.tokensPerSec ?? 0).toFixed(2)
+  kpiTokensIn.textContent = fmtNum(w1.inputTokensPerSec ?? 0, 2)
+  kpiTokensOut.textContent = fmtNum(w1.outputTokensPerSec ?? 0, 2)
+  kpiToolCalls.textContent = fmtNum(w1.toolCalls ?? 0)
   kpiCostTotal.textContent = fmtCost(totalCostSinceBoot)
 
   const t = fmtTime(tick.ts)
@@ -430,9 +600,22 @@ function pushTick(tick) {
   chartLat.data.datasets[0].data = p95Series
   chartLat.update('none')
 
+  tokenInSeries.push(w1.inputTokensPerSec ?? 0)
+  tokenOutSeries.push(w1.outputTokensPerSec ?? 0)
+  if (tokenInSeries.length > MAX_TICKS) {
+    tokenInSeries.shift()
+    tokenOutSeries.shift()
+  }
+  chartTokens.data.datasets[0].data = tokenInSeries
+  chartTokens.data.datasets[1].data = tokenOutSeries
+  chartTokens.update('none')
+
   const sb = w1.statusBuckets
-  chartStatus.data.datasets[0].data = [sb['2xx'], sb['3xx'], sb['4xx'], sb['5xx'], sb.other]
-  chartStatus.update('none')
+  pill2xx.textContent = sb['2xx']
+  pill3xx.textContent = sb['3xx']
+  pill4xx.textContent = sb['4xx']
+  pill5xx.textContent = sb['5xx']
+  pillOther.textContent = sb.other
 }
 
 function rowClass(status, error) {
@@ -562,6 +745,7 @@ function connectMetricsSSE() {
     try {
       const ev = JSON.parse(e.data)
       appendRequest(ev)
+      bufferAndRender('proxy', ev)
       if (ev && typeof ev.costUsd === 'number') {
         totalCostSinceBoot += ev.costUsd
         kpiCostTotal.textContent = fmtCost(totalCostSinceBoot)

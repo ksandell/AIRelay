@@ -108,6 +108,18 @@ describe('aggregator cost + token rollups', () => {
     expect(a.tokensPerSec).toBeCloseTo(10, 3)
   })
 
+  it('inputTokensPerSec equals totalInputTokens / seconds', () => {
+    record(ev({ model: 'm1', provider: 'p', inputTokens: 600 }))
+    const a = aggregate(60)
+    expect(a.inputTokensPerSec).toBeCloseTo(10, 3)
+  })
+
+  it('outputTokensPerSec equals totalOutputTokens / seconds', () => {
+    record(ev({ model: 'm1', provider: 'p', outputTokens: 600 }))
+    const a = aggregate(60)
+    expect(a.outputTokensPerSec).toBeCloseTo(10, 3)
+  })
+
   it('empty buffer yields zeroed cost/token fields', () => {
     const a = aggregate(60)
     expect(a.totalCostUsd).toBe(0)

@@ -45,4 +45,48 @@ describe('GoogleProvider', () => {
   it('calculateCost returns null for unknown model', () => {
     expect(p.calculateCost({ model: 'gemini-99', inputTokens: 100, outputTokens: 50 })).toBeNull()
   })
+
+  describe('extractToolCalls', () => {
+    it('counts functionCall in response', () => {
+      const resp = Buffer.from(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [{ functionCall: { name: 'get_weather', args: { city: 'Oslo' } } }],
+              },
+            },
+          ],
+        }),
+      )
+      const out = p.extractToolCalls(null, resp)
+      expect(out).toMatchObject({ toolCalls: 1 })
+      expect(out.toolBytesOut).toBeGreaterThan(0)
+    })
+
+    it('counts functionResponse parts in request', () => {
+      const req = Buffer.from(
+        JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ functionResponse: { name: 'get_weather', response: { temp: 72 } } }],
+            },
+          ],
+        }),
+      )
+      const out = p.extractToolCalls(req, null)
+      expect(out).toMatchObject({ toolCalls: 1 })
+      expect(out.toolBytesIn).toBeGreaterThan(0)
+    })
+
+    it('returns null when neither side has tools', () => {
+      expect(
+        p.extractToolCalls(
+          Buffer.from('{"contents":[{"parts":[{"text":"hi"}]}]}'),
+          Buffer.from('{"candidates":[{"content":{"parts":[{"text":"hi"}]}}]}'),
+        ),
+      ).toBeNull()
+    })
+  })
 })

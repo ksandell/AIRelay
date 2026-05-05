@@ -16,7 +16,7 @@
 ## What you get
 
 - **Transparent passthrough.** Streaming AI responses (SSE / chunked) flow through unmodified — your SDK doesn't know the proxy is there.
-- **Live dashboard.** RPS, p50/p95/p99, error rate, status histogram, recent-requests table — updated in real time.
+- **Live dashboard.** RPS, p50/p95/p99, error rate, status pills, network + token throughput (In/Out), tokens/sec, recent-requests feed — updated in real time.
 - **Guided setup.** First time you open the dashboard, a Setup tab walks you through generating the right `.env` for your provider.
 - **Token & cost tracking** — per-request input/output tokens + USD cost for 14 providers (Anthropic, OpenAI, Google, Mistral, Groq, Microsoft, OpenRouter, Together, Fireworks, DeepSeek, xAI, Perplexity, Ollama, Nvidia)
 - **Per-model breakdown** — cost/token aggregates via `/api/metrics/models`, sortable by spend

@@ -170,6 +170,16 @@ Healthcheck inside the container uses `127.0.0.1` so it doesn't depend on DNS.
 - `docker-compose.override.yml` — auto-loaded in dev; mounts `./src` + `./public` for live edits, `./data/logs` for local log output
 - `docker/Dockerfile` — multi-stage; prod stage uses `--omit=dev`; `NODE_OPTIONS=--max-http-header-size=32768`; healthcheck via `127.0.0.1`
 
+## Pull Request Policy
+
+PRs **must** close their linked issues on merge. Use GitHub closing keywords in the PR body:
+
+```
+Closes #<issue-number>
+```
+
+Use `Closes`, `Fixes`, or `Resolves` — GitHub auto-closes the issue when the PR merges into the default branch.
+
 ## Docs
 
 - [README.md](README.md) — elevator pitch + 60-second quickstart
@@ -177,4 +187,4 @@ Healthcheck inside the container uses `127.0.0.1` so it doesn't depend on DNS.
 - [CONFIGURATION.md](CONFIGURATION.md) — every env var, provider recipes, DNS, TLS, tuning, prod checklist
 - [ROADMAP.md](ROADMAP.md) — phased plan (v0.1 observability → v0.2 token & cost tracking → stretch)
 - [docs/proxy-metrics-plan.md](docs/proxy-metrics-plan.md) — v0.1.0 architecture: passthrough proxy, metrics, DNS deployment, concurrency design
-- [docs/develpment-plan.md](docs/develpment-plan.md) — original log rotation spec
+- [docs/development-plan.md](docs/development-plan.md) — original log rotation spec
