@@ -73,14 +73,17 @@ export function rotateLogsIfNeeded() {
 }
 
 export function startSizeGuard() {
-  return setInterval(() => {
-    const active = activeLog()
-    if (!fs.existsSync(active)) return
-    const { size } = fs.statSync(active)
-    if (size > config.maxLogSizeMb * 1024 * 1024) {
-      rotateLogs()
-    }
-  }, 5 * 60 * 1000)
+  return setInterval(
+    () => {
+      const active = activeLog()
+      if (!fs.existsSync(active)) return
+      const { size } = fs.statSync(active)
+      if (size > config.maxLogSizeMb * 1024 * 1024) {
+        rotateLogs()
+      }
+    },
+    5 * 60 * 1000,
+  )
 }
 
 export function nextRotationISO() {

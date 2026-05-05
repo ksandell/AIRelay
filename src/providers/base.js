@@ -11,14 +11,14 @@ export class BaseProvider {
   // @returns {{ model: string|null, inputTokens: number|null, outputTokens: number|null,
   //             cacheReadTokens: number|null, cacheWriteTokens: number|null,
   //             totalTokens: number|null } | null}
-  extractTokens(buffer) {
+  extractTokens(_buffer) {
     throw new Error('not implemented')
   }
 
   // @param {{ model: string, inputTokens: number|null, outputTokens: number|null,
   //           cacheReadTokens: number|null, cacheWriteTokens: number|null }} tokens
   // @returns {number | null} cost in USD
-  calculateCost(tokens) {
+  calculateCost(_tokens) {
     throw new Error('not implemented')
   }
 }

@@ -4,21 +4,16 @@ import path from 'node:path'
 import os from 'node:os'
 
 let tmpDir
-let originalLogDir
-let originalRetention
 
 beforeEach(async () => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-opt-test-'))
 
   const { config } = await import('../../src/config.js')
-  originalLogDir = config.logDir
-  originalRetention = config.logRetentionDays
   config.logDir = tmpDir
   config.logRetentionDays = 3
 })
 
 afterEach(() => {
-  const { config } = { config: null }
   fs.rmSync(tmpDir, { recursive: true, force: true })
 })
 

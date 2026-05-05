@@ -14,7 +14,9 @@ beforeAll(async () => {
   // 1. Start upstream that echoes method/headers/body
   upstream = http.createServer((req, res) => {
     let body = Buffer.alloc(0)
-    req.on('data', (c) => { body = Buffer.concat([body, c]) })
+    req.on('data', (c) => {
+      body = Buffer.concat([body, c])
+    })
     req.on('end', () => {
       res.statusCode = 200
       res.setHeader('Content-Type', 'application/octet-stream')
@@ -58,7 +60,9 @@ function request({ method = 'GET', path = '/proxy/', body = null, headers = {} }
       { host: '127.0.0.1', port: proxyPort, method, path, headers },
       (res) => {
         let buf = Buffer.alloc(0)
-        res.on('data', (c) => { buf = Buffer.concat([buf, c]) })
+        res.on('data', (c) => {
+          buf = Buffer.concat([buf, c])
+        })
         res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: buf }))
       },
     )

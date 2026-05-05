@@ -37,8 +37,15 @@ async function checkUpstream() {
         res.resume()
         resolve(lastUpstreamReachable)
       })
-      req.on('error', () => { lastUpstreamReachable = false; resolve(false) })
-      req.on('timeout', () => { req.destroy(); lastUpstreamReachable = false; resolve(false) })
+      req.on('error', () => {
+        lastUpstreamReachable = false
+        resolve(false)
+      })
+      req.on('timeout', () => {
+        req.destroy()
+        lastUpstreamReachable = false
+        resolve(false)
+      })
       req.end()
     } catch {
       lastUpstreamReachable = false
@@ -51,10 +58,19 @@ router.get('/health', async (req, res) => {
   const activeLog = `${config.logDir}/app.log`
 
   let logDirWritable = false
-  try { fs.accessSync(config.logDir, fs.constants.W_OK); logDirWritable = true } catch {}
+  try {
+    fs.accessSync(config.logDir, fs.constants.W_OK)
+    logDirWritable = true
+  } catch {
+    // ignore access errors
+  }
 
   let activeLogSizeBytes = 0
-  try { activeLogSizeBytes = fs.statSync(activeLog).size } catch {}
+  try {
+    activeLogSizeBytes = fs.statSync(activeLog).size
+  } catch {
+    // ignore stat errors
+  }
 
   const upstreamReachable = await checkUpstream()
 

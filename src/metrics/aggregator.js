@@ -23,9 +23,13 @@ export function aggregate(seconds) {
     const s = ev.status | 0
     if (s >= 200 && s < 300) statusBuckets['2xx']++
     else if (s >= 300 && s < 400) statusBuckets['3xx']++
-    else if (s >= 400 && s < 500) { statusBuckets['4xx']++; errors++ }
-    else if (s >= 500) { statusBuckets['5xx']++; errors++ }
-    else statusBuckets.other++
+    else if (s >= 400 && s < 500) {
+      statusBuckets['4xx']++
+      errors++
+    } else if (s >= 500) {
+      statusBuckets['5xx']++
+      errors++
+    } else statusBuckets.other++
 
     if (ev.error && s < 400) errors++
   }

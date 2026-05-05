@@ -26,7 +26,9 @@ proxy.on('proxyRes', (proxyRes, req) => {
   const m = req._metrics
   if (!m) return
   m.status = proxyRes.statusCode
-  proxyRes.on('data', (chunk) => { m.bytesOut += chunk.length })
+  proxyRes.on('data', (chunk) => {
+    m.bytesOut += chunk.length
+  })
 })
 
 proxy.on('error', (err, req, res) => {
@@ -40,7 +42,11 @@ proxy.on('error', (err, req, res) => {
     res.setHeader('Content-Type', 'application/json')
     res.end(JSON.stringify({ error: 'bad gateway', code: err.code ?? null }))
   } else if (res && res.writable) {
-    try { res.end() } catch {}
+    try {
+      res.end()
+    } catch {
+      // ignore close errors
+    }
   }
 })
 
@@ -88,8 +94,12 @@ export function createProxyHandler() {
     req._metrics = m
     incInFlight()
 
-    req.on('data', (chunk) => { m.bytesIn += chunk.length })
-    req.on('aborted', () => { m.error = m.error || 'client_aborted' })
+    req.on('data', (chunk) => {
+      m.bytesIn += chunk.length
+    })
+    req.on('aborted', () => {
+      m.error = m.error || 'client_aborted'
+    })
 
     // 'finish' fires when the response body has been flushed to the kernel —
     // this is the right moment for duration. 'close' is a backstop in case the
@@ -115,5 +125,9 @@ export function createProxyHandler() {
 
 // Test-only: tear down the singleton between vitest runs so file handles close.
 export function _closeProxy() {
-  try { proxy.close() } catch {}
+  try {
+    proxy.close()
+  } catch {
+    // ignore close errors
+  }
 }

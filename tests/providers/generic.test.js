@@ -5,6 +5,7 @@ describe('GenericProvider', () => {
   const p = new GenericProvider({})
 
   it('name is "generic"', () => expect(p.name).toBe('generic'))
-  it('extractTokens returns null for any buffer', () => expect(p.extractTokens(Buffer.from('anything'))).toBeNull())
+  it('extractTokens returns null for any buffer', () =>
+    expect(p.extractTokens(Buffer.from('anything'))).toBeNull())
   it('calculateCost returns null', () => expect(p.calculateCost(null)).toBeNull())
 })

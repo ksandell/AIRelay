@@ -14,7 +14,11 @@ export function record(event) {
   head = (head + 1) % SIZE
   if (count < SIZE) count++
   for (const l of listeners) {
-    try { l(event) } catch {}
+    try {
+      l(event)
+    } catch {
+      // ignore listener errors
+    }
   }
 }
 
@@ -51,9 +55,15 @@ export function onEvent(fn) {
   return () => listeners.delete(fn)
 }
 
-export function incInFlight() { inFlight++ }
-export function decInFlight() { if (inFlight > 0) inFlight-- }
-export function getInFlight() { return inFlight }
+export function incInFlight() {
+  inFlight++
+}
+export function decInFlight() {
+  if (inFlight > 0) inFlight--
+}
+export function getInFlight() {
+  return inFlight
+}
 
 // Test-only: reset all state between vitest runs.
 export function _reset() {
