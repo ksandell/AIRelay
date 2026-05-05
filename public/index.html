@@ -159,6 +159,20 @@ npm run dev</pre
     </main>
 
     <main id="logsPanel" class="panel">
+      <div class="log-filter-bar">
+        <label class="log-filter-check">
+          <input type="checkbox" id="filterProxy" checked />
+          Proxied requests
+        </label>
+        <label class="log-filter-check">
+          <input type="checkbox" id="filterInternal" />
+          Internal API <span class="muted">(/api/*)</span>
+        </label>
+        <label class="log-filter-check">
+          <input type="checkbox" id="filterSystem" />
+          System events
+        </label>
+      </div>
       <div id="logList"></div>
     </main>
 
