@@ -25,6 +25,20 @@ Run this whenever the dashboard, proxy, or provider extraction code changes.
 
 ---
 
+## Platform
+
+**Docker Desktop** on Windows. The AIRelay container is the unit under test.
+
+Restart the container to pick up env changes or a code rebuild:
+
+```bash
+npm run docker:down
+npm run docker:up
+```
+
+`docker:up` auto-loads `docker-compose.override.yml` in dev, which mounts
+`./src` and `./public` for live edits.
+
 ## Prerequisites
 
 | Check               | Command                                        | Expected                                      |
@@ -53,7 +67,7 @@ If the key is missing, scenarios S1–S4 are skipped; S5–S7 still run.
 ### S1 — Plain chat completion
 
 ```bash
-curl -sS -o /tmp/s1.json -w "%{http_code}\n" \
+curl -sS -o "${TMPDIR:-/tmp}/s1.json" -w "%{http_code}\n" \
   -X POST http://localhost:3000/proxy/v1/chat/completions \
   -H "Authorization: Bearer $MISTRAL_API_KEY" \
   -H "Content-Type: application/json" \
@@ -75,7 +89,7 @@ Expected:
 ### S2 — Streaming chat
 
 ```bash
-curl -sN -o /tmp/s2.txt -w "%{http_code}\n" \
+curl -sN -o "${TMPDIR:-/tmp}/s2.txt" -w "%{http_code}\n" \
   -X POST http://localhost:3000/proxy/v1/chat/completions \
   -H "Authorization: Bearer $MISTRAL_API_KEY" \
   -H "Content-Type: application/json" \
@@ -91,7 +105,7 @@ Expected:
 ### S3 — Tool-call request
 
 ```bash
-curl -sS -o /tmp/s3.json -w "%{http_code}\n" \
+curl -sS -o "${TMPDIR:-/tmp}/s3.json" -w "%{http_code}\n" \
   -X POST http://localhost:3000/proxy/v1/chat/completions \
   -H "Authorization: Bearer $MISTRAL_API_KEY" \
   -H "Content-Type: application/json" \
@@ -116,9 +130,9 @@ Expected:
 Capture `tool_calls[0].id` from the S3 response, then send a follow-up:
 
 ```bash
-TOOL_ID=$(jq -r '.choices[0].message.tool_calls[0].id' /tmp/s3.json)
+TOOL_ID=$(jq -r '.choices[0].message.tool_calls[0].id' "${TMPDIR:-/tmp}/s3.json")
 
-curl -sS -o /tmp/s4.json -w "%{http_code}\n" \
+curl -sS -o "${TMPDIR:-/tmp}/s4.json" -w "%{http_code}\n" \
   -X POST http://localhost:3000/proxy/v1/chat/completions \
   -H "Authorization: Bearer $MISTRAL_API_KEY" \
   -H "Content-Type: application/json" \
@@ -169,12 +183,56 @@ UI: with at least one entry visible, click `Clear`.
 
 ---
 
+## Load test — S8
+
+10 concurrent groups × 100 requests each (1 000 total). Random 1–2 s delay between
+requests within each group. All groups fire in parallel.
+
+```bash
+# Run from the repo root — takes ~2.5 min
+bash docs/load-test.sh
+```
+
+Expected (Mistral `mistral-small-latest`):
+
+- All 1 000 requests return HTTP `200`.
+- p50 ≤ 400 ms, p95 ≤ 600 ms.
+- `errorRate` = 0 in the 5-minute window.
+- `/api/metrics/summary` `.windows["5m"].byModel["mistral-small-latest"].requests` = 1 000.
+
+### Reference run — 2026-05-06
+
+| Metric | Value |
+|---|---|
+| Total | 1 000 / 1 000 ✓ |
+| 200 OK | 100 % |
+| p50 | 245 ms |
+| p95 | 427 ms |
+| p99 | 1 306 ms |
+| Peak RPS | 3.33 |
+| Tokens/s | 93.5 |
+| Total cost | $0.0047 |
+
+---
+
 ## Pass criteria
 
-- All scenario expectations met.
-- `npm test` ≥ 193 passing.
+- All scenario expectations met (S6 requires ≥ 2 days of rotated logs).
+- `npm test` ≥ 579 passing.
 - `npm run lint` clean.
 - No console errors in dashboard.
+
+## DOM IDs (verified via `javascript_tool`)
+
+| Element | Selector |
+|---|---|
+| Log list | `#logList` |
+| Clear button | `#clearBtn` |
+| Date select | `#dateSelect` |
+| Proxy filter checkbox | `#filterProxy` |
+| Status bar | `#statusBar` |
+
+Available dates API: `GET /api/logs/available` → `{ active, rotated: [{date, sizeBytes}] }`
 
 ## MCP execution notes
 

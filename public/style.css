@@ -224,9 +224,20 @@ button.active {
 .log-level.error {
   color: var(--error);
 }
+.log-level.s2 {
+  color: var(--ok);
+}
+.log-level.s4 {
+  color: var(--warn);
+}
+.log-level.s5,
+.log-level.err {
+  color: var(--error);
+}
 .log-msg {
-  white-space: pre-wrap;
-  word-break: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .log-meta {
   color: var(--muted);
