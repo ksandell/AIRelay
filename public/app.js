@@ -191,6 +191,7 @@ async function loadHistory(date) {
   logList.innerHTML = ''
   count = 0
   entries.slice().reverse().forEach(renderEntry)
+  entryCount.textContent = `${count} entries`
 }
 
 async function loadLive() {
@@ -200,6 +201,7 @@ async function loadLive() {
   logList.innerHTML = ''
   count = 0
   entries.slice().reverse().forEach(renderEntry)
+  entryCount.textContent = `${count} entries`
 }
 
 async function loadAvailable() {
