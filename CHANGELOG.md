@@ -29,6 +29,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docs/proxy-metrics-plan.md` (superseded by `docs/ARCHITECTURE.md`).
 - `docs/development-plan.md` (content covered in `CONFIGURATION.md` log retention section).
 
+### Known Limitations
+
+The following issues are present in v0.2.1 and fixed in v0.2.2:
+
+- **C1** (`src/logs/logger.js`): `appendFileSync` on every app-route request stalls the event loop under disk pressure. Fixed in #61.
+- **C2** (`src/logs/reader.js`): `readFileSync`/`readdirSync` block the loop on log endpoints; listing grows O(N) with retention. Fixed in #62.
+- **C3** (`src/metrics/aggregator.js`): `/api/metrics/summary` performs 3 full ring-buffer scans per request. Fixed in #63.
+- **C4** (`src/logs/rotation.js`): rotation race condition between `renameSync` and new-file creation can corrupt the log stream. Fixed in #64.
+- **H1** (`src/proxy/proxy.js`): no per-request idle timeout — hung upstream accumulates closures indefinitely. Fixed in #65.
+
 ## [0.2.0] — Token & Cost Tracking
 
 ### Added
