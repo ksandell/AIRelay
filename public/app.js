@@ -222,17 +222,7 @@ function renderProxyRow(ev) {
   const cost =
     typeof ev.costUsd === 'number' ? ` <span class="log-meta">${fmtCost(ev.costUsd)}</span>` : ''
   const model = ev.model ? ` <span class="log-meta">${escHtml(ev.model)}</span>` : ''
-  el.innerHTML = `
-    <span class="log-ts">${fmtTime(ev.ts)}</span>
-    <span class="log-level ${statusClass}">${escHtml(String(status))}</span>
-    <span class="log-msg">
-      <span class="log-method">${escHtml(ev.method ?? '—')}</span>
-      ${escHtml(path)}
-      <span class="log-meta">${ev.durationMs ?? '—'}ms</span>
-      <span class="log-meta">↓${fmtBytes(ev.bytesIn ?? 0)} ↑${fmtBytes(ev.bytesOut ?? 0)}</span>
-      ${model}${tokens}${cost}
-    </span>
-  `
+  el.innerHTML = `<span class="log-ts">${fmtTime(ev.ts)}</span><span class="log-level ${statusClass}">${escHtml(String(status))}</span><span class="log-msg"><span class="log-method">${escHtml(ev.method ?? '—')}</span> ${escHtml(path)} <span class="log-meta">${ev.durationMs ?? '—'}ms</span> <span class="log-meta">↓${fmtBytes(ev.bytesIn ?? 0)} ↑${fmtBytes(ev.bytesOut ?? 0)}</span>${model}${tokens}${cost}</span>`
   return el
 }
 
@@ -433,7 +423,9 @@ const tickLabels = []
 const rpsSeries = []
 const p95Series = []
 const tokenInSeries = []
+const tokenToolInSeries = []
 const tokenOutSeries = []
+const tokenToolOutSeries = []
 
 const SPARK_TICKS = 60
 const sparkSeries = {}
@@ -621,21 +613,45 @@ function makeDivergingTokensChart(canvasId) {
           label: 'IN: prompt tok/s',
           data: [],
           borderColor: '#58a6ff',
-          backgroundColor: '#58a6ff33',
+          backgroundColor: '#58a6ff44',
           fill: 'origin',
           tension: 0.25,
           pointRadius: 0,
           borderWidth: 1.5,
+          stack: 'in',
+        },
+        {
+          label: 'IN: tool tok/s',
+          data: [],
+          borderColor: '#a371f7',
+          backgroundColor: '#a371f744',
+          fill: '-1',
+          tension: 0.25,
+          pointRadius: 0,
+          borderWidth: 1.5,
+          stack: 'in',
         },
         {
           label: 'OUT: completion tok/s',
           data: [],
           borderColor: '#3fb950',
-          backgroundColor: '#3fb95033',
+          backgroundColor: '#3fb95044',
           fill: 'origin',
           tension: 0.25,
           pointRadius: 0,
           borderWidth: 1.5,
+          stack: 'out',
+        },
+        {
+          label: 'OUT: tool tok/s',
+          data: [],
+          borderColor: '#f0b72f',
+          backgroundColor: '#f0b72f44',
+          fill: '+1',
+          tension: 0.25,
+          pointRadius: 0,
+          borderWidth: 1.5,
+          stack: 'out',
         },
       ],
     },
@@ -663,6 +679,7 @@ function makeDivergingTokensChart(canvasId) {
           grid: { color: '#21262d' },
         },
         y: {
+          stacked: true,
           ticks: {
             color: '#8b949e',
             font: { size: 10 },
@@ -772,15 +789,26 @@ function pushTick(tick) {
   chartLat.data.datasets[0].data = p95Series
   chartLat.update('none')
 
-  tokenInSeries.push(w1.inputTokensPerSec ?? 0)
-  tokenOutSeries.push(-(w1.outputTokensPerSec ?? 0))
+  const toolInRate = w1.toolInputTokensPerSec ?? 0
+  const toolOutRate = w1.toolOutputTokensPerSec ?? 0
+  const normalInRate = Math.max(0, (w1.inputTokensPerSec ?? 0) - toolInRate)
+  const normalOutRate = Math.max(0, (w1.outputTokensPerSec ?? 0) - toolOutRate)
+  tokenInSeries.push(normalInRate)
+  tokenToolInSeries.push(toolInRate)
+  tokenOutSeries.push(-normalOutRate)
+  tokenToolOutSeries.push(-toolOutRate)
   if (tokenInSeries.length > MAX_TICKS) {
     tokenInSeries.shift()
+    tokenToolInSeries.shift()
     tokenOutSeries.shift()
+    tokenToolOutSeries.shift()
   }
   chartTokens.data.datasets[0].data = tokenInSeries
-  chartTokens.data.datasets[1].data = tokenOutSeries
-  const peak = Math.max(...tokenInSeries.map(Math.abs), ...tokenOutSeries.map(Math.abs), 0.001)
+  chartTokens.data.datasets[1].data = tokenToolInSeries
+  chartTokens.data.datasets[2].data = tokenOutSeries
+  chartTokens.data.datasets[3].data = tokenToolOutSeries
+  const allVals = [...tokenInSeries, ...tokenToolInSeries, ...tokenOutSeries, ...tokenToolOutSeries]
+  const peak = Math.max(...allVals.map(Math.abs), 0.001)
   chartTokens.options.scales.y.suggestedMin = -peak
   chartTokens.options.scales.y.suggestedMax = peak
   chartTokens.update('none')
