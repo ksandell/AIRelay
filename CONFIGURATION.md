@@ -118,14 +118,25 @@ PROXY_PROVIDER=anthropic
 UPSTREAM_URL=https://api.openai.com/v1
 PROXY_PROVIDER=openai
 
-# Groq (OpenAI-compatible, fast inference)
+# Groq (OpenAI-compatible wire format, but pricing keyed under "groq")
 UPSTREAM_URL=https://api.groq.com/openai/v1
 PROXY_PROVIDER=groq
+
+# Mistral (OpenAI-compatible wire format, but pricing keyed under "mistral")
+UPSTREAM_URL=https://api.mistral.ai
+PROXY_PROVIDER=mistral
 
 # Ollama (local, $0 cost — pricing table has "*": {input:0, output:0})
 UPSTREAM_URL=http://ollama-host:11434
 PROXY_PROVIDER=ollama
 ```
+
+> **OpenAI-compatible ≠ `PROXY_PROVIDER=openai`.** Mistral, Groq, Together,
+> Fireworks, DeepSeek, Perplexity, OpenRouter all speak the OpenAI schema —
+> their providers extend `OpenAIProvider` for extraction. But pricing is keyed
+> by **provider name**, so picking `openai` for a Mistral upstream will extract
+> tokens correctly and report `costUsd=0`. Always pick the provider that owns
+> the model.
 
 Cost shows as `$0.00` for Ollama since local inference is free; tokens are still counted and surfaced.
 

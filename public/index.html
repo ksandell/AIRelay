@@ -189,6 +189,7 @@ npm run dev</pre
           <span class="kpi-label">Cost / min (1 min)</span>
           <span class="kpi-help" title="Estimated cost over the last 60 seconds">?</span>
           <span class="kpi-val" id="kpiCostPerMin">—</span>
+          <canvas class="kpi-spark" id="sparkCostPerMin"></canvas>
         </div>
         <div class="kpi">
           <span class="kpi-label">Est. cost / hr</span>
@@ -196,16 +197,14 @@ npm run dev</pre
           <span class="kpi-val" id="kpiCostPerHr">—</span>
         </div>
         <div class="kpi">
-          <span class="kpi-label">Prompt tok/s (1 min)</span>
-          <span class="kpi-help" title="Prompt tokens per second — 1-minute rolling window">?</span>
-          <span class="kpi-val" id="kpiTokensIn">—</span>
+          <span class="kpi-label">Est. cost / day</span>
+          <span class="kpi-help" title="Extrapolated daily cost (cost/min × 1440)">?</span>
+          <span class="kpi-val" id="kpiCostPerDay">—</span>
         </div>
         <div class="kpi">
-          <span class="kpi-label">Completion tok/s (1 min)</span>
-          <span class="kpi-help" title="Completion tokens per second — 1-minute rolling window"
-            >?</span
-          >
-          <span class="kpi-val" id="kpiTokensOut">—</span>
+          <span class="kpi-label">Est. cost / month</span>
+          <span class="kpi-help" title="Extrapolated monthly cost (cost/min × 1440 × 30)">?</span>
+          <span class="kpi-val" id="kpiCostPerMonth">—</span>
         </div>
       </section>
 
@@ -214,13 +213,59 @@ npm run dev</pre
           <span class="kpi-label">RPS (1 min)</span>
           <span class="kpi-help" title="Requests per second — 1-minute rolling window">?</span>
           <span class="kpi-val" id="kpiRps">—</span>
+          <canvas class="kpi-spark" id="sparkRps"></canvas>
         </div>
+        <div class="kpi">
+          <span class="kpi-label">Total (5 min)</span>
+          <span class="kpi-help" title="Total proxied request count — 5-minute window">?</span>
+          <span class="kpi-val" id="kpiTotal">—</span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Tool calls (1 min)</span>
+          <span
+            class="kpi-help"
+            title="Tool invocations per minute — counts tool_use (Anthropic), tool_calls (OpenAI/Mistral), functionCall (Google)"
+            >?</span
+          >
+          <span class="kpi-val" id="kpiToolCalls">—</span>
+          <canvas class="kpi-spark" id="sparkToolCalls"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Prompt tok/s (1 min)</span>
+          <span class="kpi-help" title="Prompt tokens per second — 1-minute rolling window">?</span>
+          <span class="kpi-val" id="kpiTokensIn">—</span>
+          <canvas class="kpi-spark" id="sparkTokensIn"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Completion tok/s (1 min)</span>
+          <span class="kpi-help" title="Completion tokens per second — 1-minute rolling window"
+            >?</span
+          >
+          <span class="kpi-val" id="kpiTokensOut">—</span>
+          <canvas class="kpi-spark" id="sparkTokensOut"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Bytes in (5 min)</span>
+          <span class="kpi-help" title="Bytes received from upstream — 5-minute window">?</span>
+          <span class="kpi-val" id="kpiBytesIn">—</span>
+          <canvas class="kpi-spark" id="sparkBytesIn"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Bytes out (5 min)</span>
+          <span class="kpi-help" title="Bytes sent to upstream — 5-minute window">?</span>
+          <span class="kpi-val" id="kpiBytesOut">—</span>
+          <canvas class="kpi-spark" id="sparkBytesOut"></canvas>
+        </div>
+      </section>
+
+      <section class="kpis">
         <div class="kpi">
           <span class="kpi-label">p95 (1 min)</span>
           <span class="kpi-help" title="95th-percentile response time — 1-minute window">?</span>
           <div class="kpi-val-row">
             <span class="kpi-val" id="kpiP95">—</span><span class="kpi-unit">ms</span>
           </div>
+          <canvas class="kpi-spark" id="sparkP95"></canvas>
         </div>
         <div class="kpi">
           <span class="kpi-label">p99 (1 min)</span>
@@ -239,40 +284,59 @@ npm run dev</pre
           <div class="kpi-val-row">
             <span class="kpi-val" id="kpiErr">—</span><span class="kpi-unit">%</span>
           </div>
-        </div>
-        <div class="kpi">
-          <span class="kpi-label">Total (5 min)</span>
-          <span class="kpi-help" title="Total proxied request count — 5-minute window">?</span>
-          <span class="kpi-val" id="kpiTotal">—</span>
-        </div>
-        <div class="kpi">
-          <span class="kpi-label">Bytes in (5 min)</span>
-          <span class="kpi-help" title="Bytes received from upstream — 5-minute window">?</span>
-          <span class="kpi-val" id="kpiBytesIn">—</span>
-        </div>
-        <div class="kpi">
-          <span class="kpi-label">Bytes out (5 min)</span>
-          <span class="kpi-help" title="Bytes sent to upstream — 5-minute window">?</span>
-          <span class="kpi-val" id="kpiBytesOut">—</span>
-        </div>
-        <div class="kpi">
-          <span class="kpi-label">Tool calls (1 min)</span>
-          <span
-            class="kpi-help"
-            title="Tool invocations per minute — counts tool_use (Anthropic), tool_calls (OpenAI/Mistral), functionCall (Google)"
-            >?</span
-          >
-          <span class="kpi-val" id="kpiToolCalls">—</span>
+          <canvas class="kpi-spark" id="sparkErr"></canvas>
         </div>
       </section>
 
-      <div class="status-pills" id="statusPills">
-        <span class="status-pill s2" id="pill2xx">2xx <span>0</span></span>
-        <span class="status-pill s3" id="pill3xx">3xx <span>0</span></span>
-        <span class="status-pill s4" id="pill4xx">4xx <span>0</span></span>
-        <span class="status-pill s5" id="pill5xx">5xx <span>0</span></span>
-        <span class="status-pill so" id="pillOther">other <span>0</span></span>
-      </div>
+      <section class="kpis">
+        <div class="kpi">
+          <span class="kpi-label">Avg cost / req (1 min)</span>
+          <span
+            class="kpi-help"
+            title="Mean cost per request — totalCost / count over 1-minute window"
+            >?</span
+          >
+          <span class="kpi-val" id="kpiAvgCost">—</span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Avg tokens / req (1 min)</span>
+          <span
+            class="kpi-help"
+            title="Mean prompt + completion tokens per request — 1-minute window"
+            >?</span
+          >
+          <span class="kpi-val" id="kpiAvgTokens">—</span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Cache hit rate (1 min)</span>
+          <span
+            class="kpi-help"
+            title="cacheReadTokens / (cacheReadTokens + inputTokens) — Anthropic prompt-cache visibility"
+            >?</span
+          >
+          <div class="kpi-val-row">
+            <span class="kpi-val" id="kpiCacheHit">—</span><span class="kpi-unit">%</span>
+          </div>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Avg duration (1 min)</span>
+          <span class="kpi-help" title="Mean request duration — 1-minute window">?</span>
+          <div class="kpi-val-row">
+            <span class="kpi-val" id="kpiAvgDur">—</span><span class="kpi-unit">ms</span>
+          </div>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">In-flight</span>
+          <span class="kpi-help" title="Currently open proxied requests">?</span>
+          <span class="kpi-val" id="kpiInFlight">—</span>
+          <canvas class="kpi-spark" id="sparkInFlight"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Top model (1 min)</span>
+          <span class="kpi-help" title="Highest-cost model in the last minute">?</span>
+          <span class="kpi-val kpi-val-sm" id="kpiTopModel">—</span>
+        </div>
+      </section>
 
       <section class="charts">
         <div class="chart-card">
@@ -284,7 +348,7 @@ npm run dev</pre
           <canvas id="chartLat"></canvas>
         </div>
         <div class="chart-card">
-          <header class="chart-title">Tokens — last 5 min</header>
+          <header class="chart-title">Tokens — last 5 min (IN ▲ / OUT ▼)</header>
           <canvas id="chartTokens"></canvas>
         </div>
       </section>
