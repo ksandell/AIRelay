@@ -1,6 +1,6 @@
 # AIRelay
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](package.json)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](package.json)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%E2%89%A522.0-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED.svg?logo=docker&logoColor=white)](docker-compose.yml)
@@ -18,6 +18,8 @@
 - **Transparent passthrough.** Streaming AI responses (SSE / chunked) flow through unmodified — your SDK doesn't know the proxy is there.
 - **Live dashboard.** RPS, p50/p95/p99, error rate, status histogram, recent-requests table — updated in real time.
 - **Guided setup.** First time you open the dashboard, a Setup tab walks you through generating the right `.env` for your provider.
+- **Token & cost tracking** — per-request input/output tokens + USD cost for 14 providers (Anthropic, OpenAI, Google, Mistral, Groq, Microsoft, OpenRouter, Together, Fireworks, DeepSeek, xAI, Perplexity, Ollama, Nvidia)
+- **Per-model breakdown** — cost/token aggregates via `/api/metrics/models`, sortable by spend
 - **Single Docker container.** No DB, no Redis, no system cron. Bring `UPSTREAM_URL` and go.
 - **Cross-platform.** Identical on Windows Docker Desktop, macOS, and Linux.
 
