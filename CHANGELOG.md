@@ -5,6 +5,24 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Discrete error taxonomy in proxy error handler — `upstream_timeout` / `upstream_refused` / `upstream_reset` / `upstream_dns` / `tls` instead of opaque codes (closes #H6).
+- Vitest coverage thresholds (`statements:80`, `branches:75`, `functions:80`, `lines:80`).
+- Docker Compose log driver caps (`max-size:10m`, `max-file:5`) — bounds container log volume.
+
+### Known limitations (tracked for v0.2.2)
+
+These were surfaced by the 2026-05-06 deep analysis; fixes are tracked in
+milestone [v0.2.2 — Stability](https://github.com/ksandell/AIRelay/milestone/4):
+
+- Sync `appendFileSync` in request logger blocks the event loop on `/api/*` routes (#C1).
+- Sync `readFileSync` / `readdirSync` on `/api/logs*` (#C2).
+- Aggregator scans the ring buffer 3× per `/summary` call (#C3).
+- Log rotation can race with concurrent `appendFileSync` (#C4).
+- No idle watchdog on proxied requests — closures leak under hung upstream (#H1).
+
 ## [0.2.1] — 2026-05-06 — E2E bug fixes + UI/UX polish + docs overhaul
 
 ### Added

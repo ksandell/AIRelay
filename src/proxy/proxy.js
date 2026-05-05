@@ -55,10 +55,22 @@ proxy.on('proxyRes', (proxyRes, req) => {
   }
 })
 
+// Map low-level errors to a stable taxonomy so the dashboard can group
+// timeouts vs. refused connections vs. TLS failures distinctly.
+function classifyError(err) {
+  const code = err?.code || ''
+  if (code === 'ETIMEDOUT' || code === 'ESOCKETTIMEDOUT') return 'upstream_timeout'
+  if (code === 'ECONNREFUSED') return 'upstream_refused'
+  if (code === 'ECONNRESET' || code === 'EPIPE') return 'upstream_reset'
+  if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') return 'upstream_dns'
+  if (code.startsWith('ERR_TLS_') || code.startsWith('CERT_')) return 'tls'
+  return code || err?.message || 'upstream_error'
+}
+
 proxy.on('error', (err, req, res) => {
   const m = req?._metrics
   if (m) {
-    m.error = err.code || err.message
+    m.error = classifyError(err)
     m.status = m.status || 502
   }
   if (res && !res.headersSent) {
@@ -209,7 +221,7 @@ export function createProxyHandler() {
     proxy.web(req, res, {}, (err) => {
       // Fallback for the err callback variant (rare — error event usually fires first).
       if (err && !m.recorded) {
-        m.error = err.code || err.message
+        m.error = classifyError(err)
         m.status = m.status || 502
         finalize(m)
         if (!res.headersSent) {
