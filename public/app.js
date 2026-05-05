@@ -395,12 +395,19 @@ const kpiP95 = document.getElementById('kpiP95')
 const kpiP99 = document.getElementById('kpiP99')
 const kpiErr = document.getElementById('kpiErr')
 const kpiTotal = document.getElementById('kpiTotal')
-const kpiBytes = document.getElementById('kpiBytes')
+const kpiBytesIn = document.getElementById('kpiBytesIn')
+const kpiBytesOut = document.getElementById('kpiBytesOut')
 const recentTbody = document.querySelector('#recentTable tbody')
 const kpiCostTotal = document.getElementById('kpiCostTotal')
 const kpiCostPerMin = document.getElementById('kpiCostPerMin')
 const kpiCostPerHr = document.getElementById('kpiCostPerHr')
-const kpiTokensPerSec = document.getElementById('kpiTokensPerSec')
+const kpiTokensIn = document.getElementById('kpiTokensIn')
+const kpiTokensOut = document.getElementById('kpiTokensOut')
+const pill2xx = document.getElementById('pill2xx').querySelector('span')
+const pill3xx = document.getElementById('pill3xx').querySelector('span')
+const pill4xx = document.getElementById('pill4xx').querySelector('span')
+const pill5xx = document.getElementById('pill5xx').querySelector('span')
+const pillOther = document.getElementById('pillOther').querySelector('span')
 const modelsTbody = document.querySelector('#modelsTable tbody')
 const modelsTotalReq = document.getElementById('modelsTotalReq')
 const modelsTotalIn = document.getElementById('modelsTotalIn')
@@ -417,6 +424,8 @@ const MAX_TABLE_ROWS = 40
 const tickLabels = []
 const rpsSeries = []
 const p95Series = []
+const tokenInSeries = []
+const tokenOutSeries = []
 
 function fmtCost(n) {
   if (n == null || isNaN(n)) return '—'
@@ -493,26 +502,58 @@ function makeLineChart(canvasId, color) {
 const chartRps = makeLineChart('chartRps', '#58a6ff')
 const chartLat = makeLineChart('chartLat', '#d29922')
 
-const chartStatus = new Chart(document.getElementById('chartStatus'), {
-  type: 'doughnut',
-  data: {
-    labels: ['2xx', '3xx', '4xx', '5xx', 'other'],
-    datasets: [
-      {
-        data: [0, 0, 0, 0, 0],
-        backgroundColor: ['#3fb950', '#58a6ff', '#d29922', '#f85149', '#8b949e'],
-        borderColor: '#161b22',
-        borderWidth: 1,
+function makeDualLineChart(canvasId, color1, color2, label1, label2) {
+  return new Chart(document.getElementById(canvasId), {
+    type: 'line',
+    data: {
+      labels: tickLabels,
+      datasets: [
+        {
+          label: label1,
+          data: [],
+          borderColor: color1,
+          backgroundColor: color1 + '22',
+          fill: false,
+          tension: 0.25,
+          pointRadius: 0,
+          borderWidth: 1.5,
+        },
+        {
+          label: label2,
+          data: [],
+          borderColor: color2,
+          backgroundColor: color2 + '22',
+          fill: false,
+          tension: 0.25,
+          pointRadius: 0,
+          borderWidth: 1.5,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: true, position: 'top', labels: { color: '#8b949e', font: { size: 10 }, boxWidth: 12 } },
+        tooltip: { mode: 'index', intersect: false },
       },
-    ],
-  },
-  options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: false,
-    plugins: { legend: { position: 'right', labels: { color: '#e6edf3', font: { size: 11 } } } },
-  },
-})
+      scales: {
+        x: {
+          ticks: { color: '#8b949e', maxTicksLimit: 6, font: { size: 10 } },
+          grid: { color: '#21262d' },
+        },
+        y: {
+          ticks: { color: '#8b949e', font: { size: 10 } },
+          grid: { color: '#21262d' },
+          beginAtZero: true,
+        },
+      },
+    },
+  })
+}
+
+const chartTokens = makeDualLineChart('chartTokens', '#58a6ff', '#3fb950', 'Prompt', 'Completion')
 
 function pushTick(tick) {
   const w1 = tick.windows['1m']
@@ -523,14 +564,16 @@ function pushTick(tick) {
   kpiP99.textContent = w1.p99
   kpiErr.textContent = (w1.errorRate * 100).toFixed(1)
   kpiTotal.textContent = fmtNum(w5.total)
-  kpiBytes.textContent = fmtBytes(w5.bytesIn + w5.bytesOut)
+  kpiBytesIn.textContent = fmtBytes(w5.bytesIn)
+  kpiBytesOut.textContent = fmtBytes(w5.bytesOut)
 
   inFlightPill.textContent = `in-flight: ${tick.inFlight}`
 
   const costPerMin = w1.totalCostUsd ?? 0
   kpiCostPerMin.textContent = fmtCost(costPerMin)
   kpiCostPerHr.textContent = fmtCost(costPerMin * 60)
-  kpiTokensPerSec.textContent = (w1.tokensPerSec ?? 0).toFixed(2)
+  kpiTokensIn.textContent = fmtNum(w1.inputTokensPerSec ?? 0, 2)
+  kpiTokensOut.textContent = fmtNum(w1.outputTokensPerSec ?? 0, 2)
   kpiCostTotal.textContent = fmtCost(totalCostSinceBoot)
 
   const t = fmtTime(tick.ts)
@@ -547,9 +590,19 @@ function pushTick(tick) {
   chartLat.data.datasets[0].data = p95Series
   chartLat.update('none')
 
+  tokenInSeries.push(w1.inputTokensPerSec ?? 0)
+  tokenOutSeries.push(w1.outputTokensPerSec ?? 0)
+  if (tokenInSeries.length > MAX_TICKS) { tokenInSeries.shift(); tokenOutSeries.shift() }
+  chartTokens.data.datasets[0].data = tokenInSeries
+  chartTokens.data.datasets[1].data = tokenOutSeries
+  chartTokens.update('none')
+
   const sb = w1.statusBuckets
-  chartStatus.data.datasets[0].data = [sb['2xx'], sb['3xx'], sb['4xx'], sb['5xx'], sb.other]
-  chartStatus.update('none')
+  pill2xx.textContent = sb['2xx']
+  pill3xx.textContent = sb['3xx']
+  pill4xx.textContent = sb['4xx']
+  pill5xx.textContent = sb['5xx']
+  pillOther.textContent = sb.other
 }
 
 function rowClass(status, error) {
