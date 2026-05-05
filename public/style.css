@@ -634,3 +634,122 @@ footer {
 .icon-live [data-lucide] {
   animation: icon-spin 3s linear infinite;
 }
+
+/* ─── Log filter bar ─────────────────────────────────────────── */
+.log-filter-bar {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.4rem 1rem;
+  border-bottom: 1px solid #21262d;
+  background: #0d1117;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.log-filter-check {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: #8b949e;
+  cursor: pointer;
+  user-select: none;
+}
+.log-filter-check input[type='checkbox'] {
+  accent-color: #58a6ff;
+  cursor: pointer;
+}
+.log-filter-check:has(input:disabled) {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ─── Log entry type tints ───────────────────────────────────── */
+.log-entry.type-internal {
+  background: rgba(56, 139, 253, 0.05);
+  border-left: 2px solid rgba(56, 139, 253, 0.3);
+}
+.log-entry.type-system {
+  background: rgba(210, 153, 34, 0.05);
+  border-left: 2px solid rgba(210, 153, 34, 0.3);
+}
+.log-entry.type-proxy .log-method {
+  font-weight: 600;
+  margin-right: 0.35rem;
+}
+
+/* ─── KPI split (IN / OUT) ───────────────────────────────────── */
+.kpi-split {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.15rem;
+}
+.kpi-split-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+}
+.kpi-split-label {
+  font-size: 0.68rem;
+  color: #8b949e;
+  line-height: 1;
+}
+
+/* ─── KPI help tooltip (?) ───────────────────────────────────── */
+.kpi-help {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.5rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: #21262d;
+  color: #8b949e;
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: help;
+  line-height: 1;
+}
+.kpi-help[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  top: 1.4rem;
+  right: 0;
+  width: 18rem;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.72rem;
+  color: #e6edf3;
+  white-space: normal;
+  z-index: 100;
+  pointer-events: none;
+  font-weight: 400;
+}
+/* Make .kpi position:relative so the (?) can be absolute-positioned */
+.kpi { position: relative; }
+
+/* ─── Status pill row ────────────────────────────────────────── */
+.status-pills {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  flex-wrap: wrap;
+}
+.status-pill {
+  padding: 0.2rem 0.65rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.status-pill.s2 { background: rgba(63, 185, 80, 0.15); color: #3fb950; border: 1px solid rgba(63,185,80,0.3); }
+.status-pill.s3 { background: rgba(88, 166, 255, 0.15); color: #58a6ff; border: 1px solid rgba(88,166,255,0.3); }
+.status-pill.s4 { background: rgba(210, 153, 34, 0.15); color: #d29922; border: 1px solid rgba(210,153,34,0.3); }
+.status-pill.s5 { background: rgba(248, 81, 73, 0.15); color: #f85149; border: 1px solid rgba(248,81,73,0.3); }
+.status-pill.so { background: rgba(139,148,158, 0.15); color: #8b949e; border: 1px solid rgba(139,148,158,0.3); }
