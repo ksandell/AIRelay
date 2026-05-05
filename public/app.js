@@ -295,7 +295,7 @@ let totalCostSinceBoot = 0
 let totalCostSeeded = false
 
 const MAX_TICKS = 300 // 5 minutes at 1Hz
-const MAX_TABLE_ROWS = 200
+const MAX_TABLE_ROWS = 40
 
 const tickLabels = []
 const rpsSeries = []
@@ -308,9 +308,22 @@ function fmtCost(n) {
   return `$${n.toFixed(6)}`
 }
 
+function fmtNum(n, decimals = 0) {
+  if (n == null || isNaN(n)) return '—'
+  const [int, dec] = n.toFixed(decimals).split('.')
+  const intFormatted = int.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  return decimals > 0 ? `${intFormatted}.${dec}` : intFormatted
+}
+
+function fmtTime(ts) {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  }).format(new Date(ts))
+}
+
 function fmtTokens(n) {
   if (n == null || isNaN(n)) return '—'
-  return Math.round(n).toLocaleString()
+  return fmtNum(Math.round(n))
 }
 
 function fmtBytes(n) {
@@ -389,7 +402,7 @@ function pushTick(tick) {
   kpiP95.textContent = w1.p95
   kpiP99.textContent = w1.p99
   kpiErr.textContent = (w1.errorRate * 100).toFixed(1)
-  kpiTotal.textContent = w5.total.toLocaleString()
+  kpiTotal.textContent = fmtNum(w5.total)
   kpiBytes.textContent = fmtBytes(w5.bytesIn + w5.bytesOut)
 
   inFlightPill.textContent = `in-flight: ${tick.inFlight}`
@@ -400,7 +413,7 @@ function pushTick(tick) {
   kpiTokensPerSec.textContent = (w1.tokensPerSec ?? 0).toFixed(2)
   kpiCostTotal.textContent = fmtCost(totalCostSinceBoot)
 
-  const t = new Date(tick.ts).toLocaleTimeString()
+  const t = fmtTime(tick.ts)
   tickLabels.push(t)
   rpsSeries.push(w1.rps)
   p95Series.push(w1.p95)
@@ -428,7 +441,7 @@ function rowClass(status, error) {
 function appendRequest(ev) {
   const tr = document.createElement('tr')
   tr.className = rowClass(ev.status, ev.error)
-  const time = new Date(ev.ts).toLocaleTimeString()
+  const time = fmtTime(ev.ts)
   tr.innerHTML = `
     <td>${time}</td>
     <td>${escHtml(ev.method)}</td>
@@ -484,7 +497,7 @@ async function loadModels() {
     tr.innerHTML = `
       <td>${escHtml(row.model)}</td>
       <td>${escHtml(row.provider ?? '—')}</td>
-      <td class="num">${row.requests.toLocaleString()}</td>
+      <td class="num">${fmtNum(row.requests)}</td>
       <td class="num">${fmtTokens(row.inputTokens)}</td>
       <td class="num">${fmtTokens(row.outputTokens)}</td>
       <td class="num">${fmtCost(row.costUsd)}</td>
@@ -495,7 +508,7 @@ async function loadModels() {
     totOut += row.outputTokens
     totCost += row.costUsd
   }
-  modelsTotalReq.textContent = totReq.toLocaleString()
+  modelsTotalReq.textContent = fmtNum(totReq)
   modelsTotalIn.textContent = fmtTokens(totIn)
   modelsTotalOut.textContent = fmtTokens(totOut)
   modelsTotalCost.textContent = fmtCost(totCost)
@@ -512,7 +525,7 @@ async function loadTopCost() {
   topCostTbody.innerHTML = ''
   for (const ev of top) {
     const tr = document.createElement('tr')
-    const time = new Date(ev.ts).toLocaleTimeString()
+    const time = fmtTime(ev.ts)
     tr.innerHTML = `
       <td>${time}</td>
       <td>${escHtml(ev.model ?? '—')}</td>
@@ -530,10 +543,12 @@ function connectMetricsSSE() {
   es.onopen = () => {
     metricsStatus.textContent = 'Live'
     metricsStatus.className = 'status connected'
+    document.querySelector('.recent-header')?.classList.add('icon-live')
   }
   es.onerror = () => {
     metricsStatus.textContent = 'Reconnecting…'
     metricsStatus.className = 'status disconnected'
+    document.querySelector('.recent-header')?.classList.remove('icon-live')
   }
   es.addEventListener('tick', (e) => {
     try {
@@ -557,6 +572,7 @@ function connectMetricsSSE() {
   es.addEventListener('evicted', () => {
     metricsStatus.textContent = 'Evicted (cap)'
     metricsStatus.className = 'status disconnected'
+    document.querySelector('.recent-header')?.classList.remove('icon-live')
   })
 }
 
