@@ -1,14 +1,25 @@
 # AIRelay E2E Test Plan — Mistral upstream
 
 Authoritative end-to-end test playbook for the dashboard + proxy. Uses **Mistral**
-as the upstream provider (`UPSTREAM_URL=https://api.mistral.ai`,
-`PROXY_PROVIDER=openai` since Mistral speaks the OpenAI-compatible schema).
+as the upstream provider:
 
-> **Provider MUST be Mistral.** Cost calculations rely on the bundled
-> `config/pricing.json`, which ships Mistral pricing. Other providers without
-> bundled pricing report `costUsd=0`, breaking the cost assertions in S1 and
-> S3 totals. Do **not** substitute another provider unless you also load a
-> matching pricing file via `PRICING_CONFIG_PATH`.
+```
+UPSTREAM_URL=https://api.mistral.ai
+PROXY_PROVIDER=mistral
+PROXY_PATH_PREFIX=/proxy
+PROXY_TOKEN_TRACKING=true
+```
+
+> **`PROXY_PROVIDER` MUST be `mistral`, NOT `openai`.** Even though Mistral
+> speaks the OpenAI-compatible wire format, pricing in `config/pricing.json` is
+> keyed by **provider name**. Setting `PROXY_PROVIDER=openai` extracts tokens
+> correctly but reports `costUsd=0` because there is no `openai → mistral-*`
+> entry. The `mistral.js` provider extends `OpenAIProvider`, so extraction
+> logic is identical — only the pricing key differs.
+>
+> Cost assertions in S1/S3 will silently fail otherwise. Do **not** substitute
+> another provider unless you also load a matching pricing file via
+> `PRICING_CONFIG_PATH`.
 
 Run this whenever the dashboard, proxy, or provider extraction code changes.
 
