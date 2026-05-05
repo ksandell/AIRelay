@@ -679,6 +679,7 @@ function connectMetricsSSE() {
     try {
       const ev = JSON.parse(e.data)
       appendRequest(ev)
+      bufferAndRender('proxy', ev)
       if (ev && typeof ev.costUsd === 'number') {
         totalCostSinceBoot += ev.costUsd
         kpiCostTotal.textContent = fmtCost(totalCostSinceBoot)
