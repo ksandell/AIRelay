@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { config } from '../config.js'
+import { redirectStream } from './logger.js'
 
 const activeLog = () => path.join(config.logDir, 'app.log')
 
@@ -21,9 +22,14 @@ export function rotateLogs() {
   const dest = rotatedPath(date)
 
   try {
+    // 1. Point the write stream at the new active path BEFORE the rename so
+    //    any concurrent write lands in the fresh stream, not the renamed dest.
+    redirectStream(active)
+
     if (fs.existsSync(active)) {
       fs.renameSync(active, dest)
     }
+    // 2. Create fresh active file (redirectStream already opened a handle to it).
     fs.writeFileSync(active, '', 'utf8')
     cleanupOldLogs()
   } catch (err) {
