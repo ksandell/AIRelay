@@ -21,6 +21,12 @@
   --font: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
 }
 
+:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
 html,
 body {
   height: 100%;
@@ -29,6 +35,8 @@ body {
   color: var(--text);
   font-family: var(--font);
   font-size: 13px;
+  display: flex;
+  flex-direction: column;
 }
 
 header {
@@ -132,8 +140,36 @@ button.active {
   border-color: #5a4422;
 }
 
+@keyframes live-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(63, 185, 80, 0);
+  }
+}
+.status::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 5px;
+  background: var(--muted);
+  vertical-align: middle;
+}
+.status.connected::before {
+  background: #3fb950;
+  animation: live-pulse 2.4s ease-in-out infinite;
+}
+.status.disconnected::before {
+  background: var(--error);
+}
+
 .panel {
-  height: calc(100vh - 88px);
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
   scroll-behavior: smooth;
 }
@@ -188,9 +224,20 @@ button.active {
 .log-level.error {
   color: var(--error);
 }
+.log-level.s2 {
+  color: var(--ok);
+}
+.log-level.s4 {
+  color: var(--warn);
+}
+.log-level.s5,
+.log-level.err {
+  color: var(--error);
+}
 .log-msg {
-  white-space: pre-wrap;
-  word-break: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .log-meta {
   color: var(--muted);
@@ -203,7 +250,7 @@ button.active {
   padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .kpis {
@@ -219,6 +266,9 @@ button.active {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.4),
+    0 1px 8px rgba(0, 0, 0, 0.2);
 }
 .kpi-label {
   color: var(--muted);
@@ -234,6 +284,22 @@ button.active {
 .kpi-unit {
   color: var(--muted);
   font-size: 11px;
+}
+.kpi-val-row {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+}
+.kpi-val-sm {
+  font-size: 14px;
+  font-weight: 500;
+  word-break: break-all;
+}
+.kpi-spark {
+  width: 100% !important;
+  height: 28px !important;
+  margin-top: 4px;
+  display: block;
 }
 
 .charts {
@@ -253,6 +319,9 @@ button.active {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px 14px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.4),
+    0 1px 8px rgba(0, 0, 0, 0.2);
 }
 .chart-title {
   font-size: 11px;
@@ -267,11 +336,29 @@ button.active {
 
 .table-card {
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
+  flex-shrink: 0;
 }
 .table-card .chart-title {
   padding: 12px 14px 4px;
 }
+
+#recentTable-wrap {
+  max-height: 560px;
+  overflow-y: auto;
+}
+
+#recentTable thead tr {
+  background: var(--surface-2);
+}
+#modelsTable thead tr,
+#topCostTable thead tr {
+  background: var(--surface-2);
+}
+#modelsTable tfoot tr {
+  background: var(--surface-2);
+}
+
 #recentTable {
   width: 100%;
   border-collapse: collapse;
@@ -289,6 +376,9 @@ button.active {
   font-weight: 500;
   font-size: 10px;
   text-transform: uppercase;
+}
+#recentTable th.num {
+  text-align: right;
 }
 #recentTable td.num {
   text-align: right;
@@ -542,4 +632,150 @@ footer {
   color: var(--muted);
   font-size: 11px;
   flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+}
+
+[data-lucide] {
+  width: 14px;
+  height: 14px;
+  vertical-align: middle;
+  margin-right: 4px;
+  stroke-width: 2;
+  stroke: currentColor;
+}
+@keyframes icon-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.icon-live [data-lucide] {
+  animation: icon-spin 3s linear infinite;
+}
+
+/* ─── Log filter bar ─────────────────────────────────────────── */
+.log-filter-bar {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.4rem 1rem;
+  border-bottom: 1px solid #21262d;
+  background: #0d1117;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.log-filter-check {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: #8b949e;
+  cursor: pointer;
+  user-select: none;
+}
+.log-filter-check input[type='checkbox'] {
+  accent-color: #58a6ff;
+  cursor: pointer;
+}
+.log-filter-check:has(input:disabled) {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ─── Log entry type tints ───────────────────────────────────── */
+.log-entry.type-internal {
+  background: rgba(56, 139, 253, 0.05);
+  border-left: 2px solid rgba(56, 139, 253, 0.3);
+}
+.log-entry.type-system {
+  background: rgba(210, 153, 34, 0.05);
+  border-left: 2px solid rgba(210, 153, 34, 0.3);
+}
+.log-entry.type-proxy .log-method {
+  font-weight: 600;
+  margin-right: 0.35rem;
+}
+
+/* ─── KPI help tooltip (?) ───────────────────────────────────── */
+.kpi-help {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.5rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: #21262d;
+  color: #8b949e;
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: help;
+  line-height: 1;
+}
+.kpi-help[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  top: 1.4rem;
+  right: 0;
+  width: 18rem;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.72rem;
+  color: #e6edf3;
+  white-space: normal;
+  z-index: 100;
+  pointer-events: none;
+  font-weight: 400;
+}
+/* Make .kpi position:relative so the (?) can be absolute-positioned */
+.kpi {
+  position: relative;
+}
+
+/* ─── Status pill row ────────────────────────────────────────── */
+.status-pills {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  flex-wrap: wrap;
+}
+.status-pill {
+  padding: 0.2rem 0.65rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.status-pill.s2 {
+  background: rgba(63, 185, 80, 0.15);
+  color: #3fb950;
+  border: 1px solid rgba(63, 185, 80, 0.3);
+}
+.status-pill.s3 {
+  background: rgba(88, 166, 255, 0.15);
+  color: #58a6ff;
+  border: 1px solid rgba(88, 166, 255, 0.3);
+}
+.status-pill.s4 {
+  background: rgba(210, 153, 34, 0.15);
+  color: #d29922;
+  border: 1px solid rgba(210, 153, 34, 0.3);
+}
+.status-pill.s5 {
+  background: rgba(248, 81, 73, 0.15);
+  color: #f85149;
+  border: 1px solid rgba(248, 81, 73, 0.3);
+}
+.status-pill.so {
+  background: rgba(139, 148, 158, 0.15);
+  color: #8b949e;
+  border: 1px solid rgba(139, 148, 158, 0.3);
 }

@@ -63,6 +63,56 @@ export class AnthropicProvider extends BaseProvider {
     return { ...streamed, totalTokens: (streamed.inputTokens ?? 0) + (streamed.outputTokens ?? 0) }
   }
 
+  // Anthropic schema:
+  //   request:  messages[].content[] where block.type === 'tool_result'
+  //   response: content[] where block.type === 'tool_use' (sync)
+  //             stream: content_block_start events with content_block.type === 'tool_use'
+  extractToolCalls(reqBuffer, respBuffer) {
+    let toolCalls = 0
+    let toolBytesIn = 0
+    let toolBytesOut = 0
+
+    const req = reqBuffer ? parseSync(reqBuffer) : null
+    if (req?.messages && Array.isArray(req.messages)) {
+      for (const m of req.messages) {
+        if (!Array.isArray(m.content)) continue
+        for (const block of m.content) {
+          if (block?.type === 'tool_result') {
+            toolCalls++
+            toolBytesIn += Buffer.byteLength(JSON.stringify(block), 'utf8')
+          }
+        }
+      }
+    }
+
+    const resp = respBuffer ? parseSync(respBuffer) : null
+    if (resp?.content && Array.isArray(resp.content)) {
+      for (const block of resp.content) {
+        if (block?.type === 'tool_use') {
+          toolCalls++
+          toolBytesOut += Buffer.byteLength(JSON.stringify(block), 'utf8')
+        }
+      }
+    } else if (respBuffer) {
+      const text = respBuffer.toString('utf8')
+      for (const line of text.split('\n')) {
+        if (!line.startsWith('data: ')) continue
+        try {
+          const ev = JSON.parse(line.slice(6))
+          if (ev.type === 'content_block_start' && ev.content_block?.type === 'tool_use') {
+            toolCalls++
+            toolBytesOut += Buffer.byteLength(JSON.stringify(ev.content_block), 'utf8')
+          }
+        } catch {
+          /* skip */
+        }
+      }
+    }
+
+    if (toolCalls === 0 && toolBytesIn === 0 && toolBytesOut === 0) return null
+    return { toolCalls, toolBytesIn, toolBytesOut }
+  }
+
   calculateCost(tokens) {
     if (!tokens?.model) return null
     const price = lookupModelPrice(this._pricing, tokens.model)

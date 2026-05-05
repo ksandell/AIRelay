@@ -5,6 +5,28 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] — 2026-05-06 — E2E bug fixes + UI/UX polish + docs overhaul
+
+### Added
+- `docs/ARCHITECTURE.md` — canonical architecture reference with Mermaid diagrams (request lifecycle, module map, log rotation).
+- `docs/RELEASING.md` — single release checklist; SSOT for the release process.
+
+### Changed
+- Unified log panel; metrics IN/OUT split; token chart.
+- Metrics dashboard reorganised: KPI tiles grouped into Cost / Throughput-tokens / Latency-errors / Derived sections; 10 sparklines added; status-pills row removed.
+- New diverging Tokens chart (IN above zero, OUT below zero, symmetric Y, abs-value labels/tooltips).
+- Derived KPIs surfaced from existing aggregator data: avg cost/req, avg tokens/req, cache hit rate, avg duration, in-flight, top model.
+- Documentation overhaul — single-source-of-truth for version (package.json), release notes (this file), roadmap (ROADMAP.md), env vars (CONFIGURATION.md), architecture (docs/ARCHITECTURE.md). README and CLAUDE.md trimmed of duplicates.
+
+### Fixed
+- Various E2E-discovered bug fixes and UI/UX improvements.
+- `PROXY_PROVIDER` documentation clarified — pricing is keyed by provider name, not wire format. Setting `PROXY_PROVIDER=openai` for a Mistral upstream extracted tokens fine but silently reported `costUsd=0`. `.env.example`, `CONFIGURATION.md`, and `docs/e2e-test-plan.md` now mandate `PROXY_PROVIDER=mistral` for Mistral.
+- Log-level badge colors corrected (s2/s4/s5/err now use themed colors instead of gray).
+
+### Removed
+- `docs/proxy-metrics-plan.md` (superseded by `docs/ARCHITECTURE.md`).
+- `docs/development-plan.md` (content covered in `CONFIGURATION.md` log retention section).
+
 ## [0.2.0] — Token & Cost Tracking
 
 ### Added

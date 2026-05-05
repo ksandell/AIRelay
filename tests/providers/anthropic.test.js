@@ -84,4 +84,44 @@ describe('AnthropicProvider', () => {
     }
     expect(p.calculateCost(tokens)).toBeCloseTo(0.000225, 8)
   })
+
+  describe('extractToolCalls', () => {
+    it('counts tool_use in sync response', () => {
+      const resp = Buffer.from(
+        JSON.stringify({
+          content: [
+            { type: 'text', text: 'let me check' },
+            { type: 'tool_use', id: 't1', name: 'get_weather', input: { city: 'Oslo' } },
+          ],
+        }),
+      )
+      const out = p.extractToolCalls(null, resp)
+      expect(out).toMatchObject({ toolCalls: 1, toolBytesIn: 0 })
+      expect(out.toolBytesOut).toBeGreaterThan(0)
+    })
+
+    it('counts tool_result blocks in request', () => {
+      const req = Buffer.from(
+        JSON.stringify({
+          messages: [
+            {
+              role: 'user',
+              content: [{ type: 'tool_result', tool_use_id: 't1', content: '72F' }],
+            },
+          ],
+        }),
+      )
+      const out = p.extractToolCalls(req, null)
+      expect(out).toMatchObject({ toolCalls: 1 })
+      expect(out.toolBytesIn).toBeGreaterThan(0)
+    })
+
+    it('returns null when neither side has tools', () => {
+      const out = p.extractToolCalls(
+        Buffer.from('{"messages":[{"role":"user","content":"hi"}]}'),
+        Buffer.from('{"content":[{"type":"text","text":"hello"}]}'),
+      )
+      expect(out).toBeNull()
+    })
+  })
 })

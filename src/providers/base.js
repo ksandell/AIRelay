@@ -15,6 +15,14 @@ export class BaseProvider {
     throw new Error('not implemented')
   }
 
+  // @param {Buffer|null} reqBuffer — full request body (JSON or null)
+  // @param {Buffer|null} respBuffer — full response body (JSON or SSE)
+  // @returns {{ toolCalls: number, toolBytesIn: number, toolBytesOut: number } | null}
+  // Default no-op; providers override.
+  extractToolCalls(_reqBuffer, _respBuffer) {
+    return null
+  }
+
   // @param {{ model: string, inputTokens: number|null, outputTokens: number|null,
   //           cacheReadTokens: number|null, cacheWriteTokens: number|null }} tokens
   // @returns {number | null} cost in USD
