@@ -4,18 +4,24 @@ Authoritative end-to-end test playbook for the dashboard + proxy. Uses **Mistral
 as the upstream provider (`UPSTREAM_URL=https://api.mistral.ai`,
 `PROXY_PROVIDER=openai` since Mistral speaks the OpenAI-compatible schema).
 
+> **Provider MUST be Mistral.** Cost calculations rely on the bundled
+> `config/pricing.json`, which ships Mistral pricing. Other providers without
+> bundled pricing report `costUsd=0`, breaking the cost assertions in S1 and
+> S3 totals. Do **not** substitute another provider unless you also load a
+> matching pricing file via `PRICING_CONFIG_PATH`.
+
 Run this whenever the dashboard, proxy, or provider extraction code changes.
 
 ---
 
 ## Prerequisites
 
-| Check | Command | Expected |
-|---|---|---|
-| Docker compose up | `npm run docker:up` | container `airelay-app-1` healthy |
-| Health endpoint | `curl -s http://localhost:3000/health \| jq .` | `status:"ok"`, `proxy.upstreamReachable:true` |
-| Dashboard reachable | open `http://localhost:3000/` | renders, no console errors |
-| Unit tests | `npm test` | 193+ pass |
+| Check               | Command                                        | Expected                                      |
+| ------------------- | ---------------------------------------------- | --------------------------------------------- |
+| Docker compose up   | `npm run docker:up`                            | container `airelay-app-1` healthy             |
+| Health endpoint     | `curl -s http://localhost:3000/health \| jq .` | `status:"ok"`, `proxy.upstreamReachable:true` |
+| Dashboard reachable | open `http://localhost:3000/`                  | renders, no console errors                    |
+| Unit tests          | `npm test`                                     | 193+ pass                                     |
 
 ## One-time secret input
 
@@ -44,6 +50,7 @@ curl -sS -o /tmp/s1.json -w "%{http_code}\n" \
 ```
 
 Expected:
+
 - HTTP `200`
 - Dashboard `#logs`: a new `POST /proxy/v1/chat/completions` entry with `200`, model badge `mistral-small-latest`, non-zero `↓ ↑` bytes.
 - Dashboard `#metrics`:
@@ -65,6 +72,7 @@ curl -sN -o /tmp/s2.txt -w "%{http_code}\n" \
 ```
 
 Expected:
+
 - HTTP `200`, body is SSE.
 - Token chart updates within ≤ 2 s with rising completion line.
 - Per-model row count increments to 2.
@@ -86,6 +94,7 @@ curl -sS -o /tmp/s3.json -w "%{http_code}\n" \
 ```
 
 Expected:
+
 - HTTP `200`, response body contains `choices[0].message.tool_calls`.
 - Dashboard:
   - `Tool calls (1 min)` increments to `1` within ≤ 2 s.
@@ -114,6 +123,7 @@ curl -sS -o /tmp/s4.json -w "%{http_code}\n" \
 ```
 
 Expected:
+
 - HTTP `200`.
 - `Tool calls (1 min)` increments by ≥ 1 (counts the `role:tool` request block).
 
@@ -128,12 +138,14 @@ curl -sS -o /dev/null -w "%{http_code}\n" \
 ```
 
 Expected:
+
 - HTTP `401`.
 - Dashboard log shows red/4xx entry; status pill `4xx` +1; `Errors (1 min)` > 0.
 
 ### S6 — Past-date selection (regression)
 
 UI: switch the date dropdown from `Live` to a stored date.
+
 - Proxy filter checkbox disabled, label dimmed (opacity ≈ 0.4).
 - Tooltip on the checkbox label: `Live only — proxy requests not stored on disk`.
 - Switch back to `Live` → checkbox re-enabled.
@@ -141,6 +153,7 @@ UI: switch the date dropdown from `Live` to a stored date.
 ### S7 — Clear button (regression)
 
 UI: with at least one entry visible, click `Clear`.
+
 - List empties; footer reads `0 entries`.
 
 ---

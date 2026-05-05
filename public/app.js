@@ -408,11 +408,14 @@ const kpiCostPerHr = document.getElementById('kpiCostPerHr')
 const kpiTokensIn = document.getElementById('kpiTokensIn')
 const kpiTokensOut = document.getElementById('kpiTokensOut')
 const kpiToolCalls = document.getElementById('kpiToolCalls')
-const pill2xx = document.getElementById('pill2xx').querySelector('span')
-const pill3xx = document.getElementById('pill3xx').querySelector('span')
-const pill4xx = document.getElementById('pill4xx').querySelector('span')
-const pill5xx = document.getElementById('pill5xx').querySelector('span')
-const pillOther = document.getElementById('pillOther').querySelector('span')
+const kpiCostPerDay = document.getElementById('kpiCostPerDay')
+const kpiCostPerMonth = document.getElementById('kpiCostPerMonth')
+const kpiAvgCost = document.getElementById('kpiAvgCost')
+const kpiAvgTokens = document.getElementById('kpiAvgTokens')
+const kpiCacheHit = document.getElementById('kpiCacheHit')
+const kpiAvgDur = document.getElementById('kpiAvgDur')
+const kpiInFlight = document.getElementById('kpiInFlight')
+const kpiTopModel = document.getElementById('kpiTopModel')
 const modelsTbody = document.querySelector('#modelsTable tbody')
 const modelsTotalReq = document.getElementById('modelsTotalReq')
 const modelsTotalIn = document.getElementById('modelsTotalIn')
@@ -431,6 +434,52 @@ const rpsSeries = []
 const p95Series = []
 const tokenInSeries = []
 const tokenOutSeries = []
+
+const SPARK_TICKS = 60
+const sparkSeries = {}
+const sparkCharts = {}
+
+function pushSpark(key, value) {
+  const arr = (sparkSeries[key] ||= [])
+  arr.push(value)
+  if (arr.length > SPARK_TICKS) arr.shift()
+  const ch = sparkCharts[key]
+  if (ch) {
+    ch.data.labels = arr.map((_, i) => i)
+    ch.data.datasets[0].data = arr
+    ch.update('none')
+  }
+}
+
+function makeSparkline(canvasId, color) {
+  const el = document.getElementById(canvasId)
+  if (!el) return null
+  return new Chart(el, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        {
+          data: [],
+          borderColor: color,
+          backgroundColor: color + '33',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 0,
+          borderWidth: 1.2,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: { x: { display: false }, y: { display: false, beginAtZero: true } },
+      elements: { line: { borderJoinStyle: 'round' } },
+    },
+  })
+}
 
 function fmtCost(n) {
   if (n == null || isNaN(n)) return '—'
@@ -562,7 +611,94 @@ function makeDualLineChart(canvasId, color1, color2, label1, label2) {
   })
 }
 
-const chartTokens = makeDualLineChart('chartTokens', '#58a6ff', '#3fb950', 'Prompt', 'Completion')
+function makeDivergingTokensChart(canvasId) {
+  return new Chart(document.getElementById(canvasId), {
+    type: 'line',
+    data: {
+      labels: tickLabels,
+      datasets: [
+        {
+          label: 'IN: prompt tok/s',
+          data: [],
+          borderColor: '#58a6ff',
+          backgroundColor: '#58a6ff33',
+          fill: 'origin',
+          tension: 0.25,
+          pointRadius: 0,
+          borderWidth: 1.5,
+        },
+        {
+          label: 'OUT: completion tok/s',
+          data: [],
+          borderColor: '#3fb950',
+          backgroundColor: '#3fb95033',
+          fill: 'origin',
+          tension: 0.25,
+          pointRadius: 0,
+          borderWidth: 1.5,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: { color: '#8b949e', font: { size: 10 }, boxWidth: 12 },
+        },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            label: (ctx) => `${ctx.dataset.label}: ${Math.abs(ctx.parsed.y).toFixed(2)}`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          ticks: { color: '#8b949e', maxTicksLimit: 6, font: { size: 10 } },
+          grid: { color: '#21262d' },
+        },
+        y: {
+          ticks: {
+            color: '#8b949e',
+            font: { size: 10 },
+            callback: (v) => Math.abs(v),
+          },
+          grid: {
+            color: (ctx) => (ctx.tick.value === 0 ? '#8b949e' : '#21262d'),
+            lineWidth: (ctx) => (ctx.tick.value === 0 ? 1.2 : 1),
+          },
+        },
+      },
+    },
+  })
+}
+
+const chartTokens = makeDivergingTokensChart('chartTokens')
+
+function initSparklines() {
+  const specs = [
+    ['sparkRps', '#58a6ff', 'rps'],
+    ['sparkP95', '#d29922', 'p95'],
+    ['sparkErr', '#f85149', 'err'],
+    ['sparkCostPerMin', '#bc8cff', 'costPerMin'],
+    ['sparkTokensIn', '#58a6ff', 'tokIn'],
+    ['sparkTokensOut', '#3fb950', 'tokOut'],
+    ['sparkToolCalls', '#f0b72f', 'toolCalls'],
+    ['sparkBytesIn', '#58a6ff', 'bytesIn'],
+    ['sparkBytesOut', '#3fb950', 'bytesOut'],
+    ['sparkInFlight', '#8b949e', 'inFlight'],
+  ]
+  for (const [id, color, key] of specs) {
+    const ch = makeSparkline(id, color)
+    if (ch) sparkCharts[key] = ch
+  }
+}
+initSparklines()
 
 function pushTick(tick) {
   const w1 = tick.windows['1m']
@@ -581,10 +717,46 @@ function pushTick(tick) {
   const costPerMin = w1.totalCostUsd ?? 0
   kpiCostPerMin.textContent = fmtCost(costPerMin)
   kpiCostPerHr.textContent = fmtCost(costPerMin * 60)
+  if (kpiCostPerDay) kpiCostPerDay.textContent = fmtCost(costPerMin * 1440)
+  if (kpiCostPerMonth) kpiCostPerMonth.textContent = fmtCost(costPerMin * 1440 * 30)
   kpiTokensIn.textContent = fmtNum(w1.inputTokensPerSec ?? 0, 2)
   kpiTokensOut.textContent = fmtNum(w1.outputTokensPerSec ?? 0, 2)
   kpiToolCalls.textContent = fmtNum(w1.toolCalls ?? 0)
   kpiCostTotal.textContent = fmtCost(totalCostSinceBoot)
+
+  const w1count = w1.total ?? w1.count ?? 0
+  if (kpiAvgCost) kpiAvgCost.textContent = w1count > 0 ? fmtCost(costPerMin / w1count) : '—'
+  const inTok = w1.inputTokens ?? (w1.inputTokensPerSec ?? 0) * 60
+  const outTok = w1.outputTokens ?? (w1.outputTokensPerSec ?? 0) * 60
+  if (kpiAvgTokens)
+    kpiAvgTokens.textContent = w1count > 0 ? fmtNum((inTok + outTok) / w1count, 0) : '—'
+  const cacheRead = w1.cacheReadTokens ?? 0
+  const cacheDenom = cacheRead + (w1.inputTokens ?? inTok)
+  if (kpiCacheHit)
+    kpiCacheHit.textContent = cacheDenom > 0 ? ((cacheRead / cacheDenom) * 100).toFixed(1) : '—'
+  const avgDur = w1.avgDurationMs ?? w1.meanDurationMs
+  if (kpiAvgDur) kpiAvgDur.textContent = avgDur != null ? fmtNum(avgDur, 0) : '—'
+  if (kpiInFlight) kpiInFlight.textContent = fmtNum(tick.inFlight ?? 0)
+  if (kpiTopModel) {
+    const byModel = w1.byModel || {}
+    let top = null
+    for (const [name, v] of Object.entries(byModel)) {
+      const c = v?.costUsd ?? v?.totalCostUsd ?? 0
+      if (!top || c > top.cost) top = { name, cost: c }
+    }
+    kpiTopModel.textContent = top ? top.name : '—'
+  }
+
+  pushSpark('rps', w1.rps)
+  pushSpark('p95', w1.p95)
+  pushSpark('err', (w1.errorRate ?? 0) * 100)
+  pushSpark('costPerMin', costPerMin)
+  pushSpark('tokIn', w1.inputTokensPerSec ?? 0)
+  pushSpark('tokOut', w1.outputTokensPerSec ?? 0)
+  pushSpark('toolCalls', w1.toolCalls ?? 0)
+  pushSpark('bytesIn', w5.bytesIn)
+  pushSpark('bytesOut', w5.bytesOut)
+  pushSpark('inFlight', tick.inFlight ?? 0)
 
   const t = fmtTime(tick.ts)
   tickLabels.push(t)
@@ -601,21 +773,17 @@ function pushTick(tick) {
   chartLat.update('none')
 
   tokenInSeries.push(w1.inputTokensPerSec ?? 0)
-  tokenOutSeries.push(w1.outputTokensPerSec ?? 0)
+  tokenOutSeries.push(-(w1.outputTokensPerSec ?? 0))
   if (tokenInSeries.length > MAX_TICKS) {
     tokenInSeries.shift()
     tokenOutSeries.shift()
   }
   chartTokens.data.datasets[0].data = tokenInSeries
   chartTokens.data.datasets[1].data = tokenOutSeries
+  const peak = Math.max(...tokenInSeries.map(Math.abs), ...tokenOutSeries.map(Math.abs), 0.001)
+  chartTokens.options.scales.y.suggestedMin = -peak
+  chartTokens.options.scales.y.suggestedMax = peak
   chartTokens.update('none')
-
-  const sb = w1.statusBuckets
-  pill2xx.textContent = sb['2xx']
-  pill3xx.textContent = sb['3xx']
-  pill4xx.textContent = sb['4xx']
-  pill5xx.textContent = sb['5xx']
-  pillOther.textContent = sb.other
 }
 
 function rowClass(status, error) {
