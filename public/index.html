@@ -13,9 +13,9 @@
       <div class="brand">
         <h1>AIRelay</h1>
         <nav class="tabs">
-          <button class="tab" data-tab="setup" id="setupTab" hidden><i data-lucide="settings"></i>Setup</button>
-          <button class="tab active" data-tab="logs"><i data-lucide="scroll-text"></i>Logs</button>
-          <button class="tab" data-tab="metrics"><i data-lucide="bar-chart-3"></i>Metrics</button>
+          <button class="tab" data-tab="setup" id="setupTab" hidden><i aria-hidden="true" data-lucide="settings"></i>Setup</button>
+          <button class="tab active" data-tab="logs"><i aria-hidden="true" data-lucide="scroll-text"></i>Logs</button>
+          <button class="tab" data-tab="metrics"><i aria-hidden="true" data-lucide="bar-chart-3"></i>Metrics</button>
         </nav>
       </div>
 
@@ -212,7 +212,7 @@ npm run dev</pre
       </section>
 
       <section class="table-card">
-        <header class="chart-title"><i data-lucide="cpu"></i>Per-model breakdown</header>
+        <header class="chart-title"><i aria-hidden="true" data-lucide="cpu"></i>Per-model breakdown</header>
         <table id="modelsTable">
           <thead>
             <tr>
@@ -238,7 +238,7 @@ npm run dev</pre
       </section>
 
       <section class="table-card">
-        <header class="chart-title"><i data-lucide="trending-up"></i>Top 10 most expensive requests</header>
+        <header class="chart-title"><i aria-hidden="true" data-lucide="trending-up"></i>Top 10 most expensive requests</header>
         <table id="topCostTable">
           <thead>
             <tr>
@@ -255,7 +255,7 @@ npm run dev</pre
       </section>
 
       <section class="table-card">
-        <header class="chart-title recent-header"><i data-lucide="activity"></i>Recent requests</header>
+        <header class="chart-title recent-header"><i aria-hidden="true" data-lucide="activity"></i>Recent requests</header>
         <div id="recentTable-wrap">
           <table id="recentTable">
             <thead>
