@@ -44,6 +44,7 @@ export const config = {
   proxyProvider: process.env.PROXY_PROVIDER ?? 'generic',
   proxyTokenTracking: process.env.PROXY_TOKEN_TRACKING !== 'false',
   pricingConfigPath: process.env.PRICING_CONFIG_PATH ?? null,
+  proxyTokenTeeMaxBytes: int('PROXY_TOKEN_TEE_MAX_BYTES', 2_097_152),
 
   // Metrics
   maxMetricEvents: int('MAX_METRIC_EVENTS', 10_000),

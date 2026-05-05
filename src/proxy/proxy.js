@@ -2,6 +2,13 @@ import httpProxy from 'http-proxy'
 import { config } from '../config.js'
 import { pickAgent } from './agent.js'
 import { record, incInFlight, decInFlight } from '../metrics/collector.js'
+import { loadProvider } from '../providers/registry.js'
+
+// Provider singleton — constructed once at module load. Null when token tracking
+// is disabled, which short-circuits all per-request buffering for zero overhead.
+const provider = config.proxyTokenTracking
+  ? loadProvider(config.proxyProvider, config.pricingConfigPath)
+  : null
 
 const proxy = httpProxy.createProxyServer({
   target: config.upstreamUrl,
@@ -22,6 +29,8 @@ const proxy = httpProxy.createProxyServer({
 
 // Count outbound bytes via a passive listener — no body is buffered, the chunks
 // flow straight through to the client. Same idea inbound on `req`.
+// When token tracking is enabled, an additional passive listener tees chunks
+// into a per-request array for post-response extraction.
 proxy.on('proxyRes', (proxyRes, req) => {
   const m = req._metrics
   if (!m) return
@@ -29,6 +38,21 @@ proxy.on('proxyRes', (proxyRes, req) => {
   proxyRes.on('data', (chunk) => {
     m.bytesOut += chunk.length
   })
+  if (provider && proxyRes.statusCode < 400) {
+    m.chunks = []
+    m.teeBytes = 0
+    const cap = config.proxyTokenTeeMaxBytes
+    proxyRes.on('data', (chunk) => {
+      if (m.teeAborted) return
+      m.teeBytes += chunk.length
+      if (m.teeBytes > cap) {
+        m.chunks = null
+        m.teeAborted = true
+        return
+      }
+      m.chunks.push(chunk)
+    })
+  }
 })
 
 proxy.on('error', (err, req, res) => {
@@ -50,10 +74,8 @@ proxy.on('error', (err, req, res) => {
   }
 })
 
-function finalize(m) {
-  if (!m || m.recorded) return
-  m.recorded = true
-  record({
+function baseEvent(m) {
+  return {
     ts: m.ts,
     method: m.method,
     path: m.path,
@@ -63,7 +85,54 @@ function finalize(m) {
     bytesOut: m.bytesOut,
     upstream: config.upstreamUrl,
     error: m.error ?? null,
-  })
+    provider: null,
+    model: null,
+    inputTokens: null,
+    outputTokens: null,
+    cacheReadTokens: null,
+    cacheWriteTokens: null,
+    totalTokens: null,
+    costUsd: null,
+  }
+}
+
+function finalize(m) {
+  if (!m || m.recorded) return
+  m.recorded = true
+  const event = baseEvent(m)
+
+  if (provider && m.chunks && m.chunks.length > 0) {
+    const chunks = m.chunks
+    m.chunks = null // release ref before microtask queue settles
+    queueMicrotask(() => {
+      try {
+        const body = Buffer.concat(chunks)
+        const tokens = provider.extractTokens(body)
+        if (tokens) {
+          event.provider = provider.name
+          event.model = tokens.model ?? null
+          event.inputTokens = tokens.inputTokens ?? null
+          event.outputTokens = tokens.outputTokens ?? null
+          event.cacheReadTokens = tokens.cacheReadTokens ?? null
+          event.cacheWriteTokens = tokens.cacheWriteTokens ?? null
+          event.totalTokens = tokens.totalTokens ?? null
+          try {
+            event.costUsd = provider.calculateCost(tokens)
+          } catch {
+            event.costUsd = null
+          }
+        } else {
+          event.provider = provider.name
+        }
+      } catch {
+        // Provider errors must never crash the proxy. Record the base event.
+      } finally {
+        record(event)
+      }
+    })
+  } else {
+    record(event)
+  }
   decInFlight()
 }
 
@@ -90,6 +159,7 @@ export function createProxyHandler() {
       bytesOut: 0,
       error: null,
       recorded: false,
+      chunks: null,
     }
     req._metrics = m
     incInFlight()

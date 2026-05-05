@@ -311,6 +311,42 @@ button.active {
   font-weight: 600;
 }
 
+#modelsTable,
+#topCostTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+#modelsTable th,
+#modelsTable td,
+#topCostTable th,
+#topCostTable td {
+  text-align: left;
+  padding: 4px 14px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+#modelsTable th,
+#topCostTable th {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+#modelsTable th.num,
+#modelsTable td.num,
+#topCostTable th.num,
+#topCostTable td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+#modelsTable tfoot td {
+  border-top: 1px solid var(--border);
+  border-bottom: none;
+  color: var(--text);
+  font-weight: 600;
+}
+
 /* ── Setup panel ───────────────────────────────────────────── */
 #setupPanel {
   padding: 24px;

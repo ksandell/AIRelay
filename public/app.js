@@ -290,6 +290,19 @@ const kpiErr = document.getElementById('kpiErr')
 const kpiTotal = document.getElementById('kpiTotal')
 const kpiBytes = document.getElementById('kpiBytes')
 const recentTbody = document.querySelector('#recentTable tbody')
+const kpiCostTotal = document.getElementById('kpiCostTotal')
+const kpiCostPerMin = document.getElementById('kpiCostPerMin')
+const kpiCostPerHr = document.getElementById('kpiCostPerHr')
+const kpiTokensPerSec = document.getElementById('kpiTokensPerSec')
+const modelsTbody = document.querySelector('#modelsTable tbody')
+const modelsTotalReq = document.getElementById('modelsTotalReq')
+const modelsTotalIn = document.getElementById('modelsTotalIn')
+const modelsTotalOut = document.getElementById('modelsTotalOut')
+const modelsTotalCost = document.getElementById('modelsTotalCost')
+const topCostTbody = document.querySelector('#topCostTable tbody')
+
+let totalCostSinceBoot = 0
+let totalCostSeeded = false
 
 const MAX_TICKS = 300 // 5 minutes at 1Hz
 const MAX_TABLE_ROWS = 200
@@ -297,6 +310,18 @@ const MAX_TABLE_ROWS = 200
 const tickLabels = []
 const rpsSeries = []
 const p95Series = []
+
+function fmtCost(n) {
+  if (n == null || isNaN(n)) return '—'
+  if (n === 0) return '$0.00'
+  if (n >= 0.01) return `$${n.toFixed(2)}`
+  return `$${n.toFixed(6)}`
+}
+
+function fmtTokens(n) {
+  if (n == null || isNaN(n)) return '—'
+  return Math.round(n).toLocaleString()
+}
 
 function fmtBytes(n) {
   if (n < 1024) return `${n} B`
@@ -379,6 +404,12 @@ function pushTick(tick) {
 
   inFlightPill.textContent = `in-flight: ${tick.inFlight}`
 
+  const costPerMin = w1.totalCostUsd ?? 0
+  kpiCostPerMin.textContent = fmtCost(costPerMin)
+  kpiCostPerHr.textContent = fmtCost(costPerMin * 60)
+  kpiTokensPerSec.textContent = (w1.tokensPerSec ?? 0).toFixed(2)
+  kpiCostTotal.textContent = fmtCost(totalCostSinceBoot)
+
   const t = new Date(tick.ts).toLocaleTimeString()
   tickLabels.push(t)
   rpsSeries.push(w1.rps)
@@ -434,6 +465,76 @@ async function loadRecent() {
   } catch {}
 }
 
+async function seedTotalCost() {
+  try {
+    const r = await fetch('/api/metrics/recent?limit=5000')
+    if (!r.ok) return
+    const events = await r.json()
+    let sum = 0
+    for (const ev of events) {
+      if (ev && typeof ev.costUsd === 'number') sum += ev.costUsd
+    }
+    totalCostSinceBoot = sum
+    totalCostSeeded = true
+    kpiCostTotal.textContent = fmtCost(totalCostSinceBoot)
+  } catch {}
+}
+
+async function loadModels() {
+  const r = await fetch('/api/metrics/models')
+  if (!r.ok) return
+  const rows = await r.json()
+  modelsTbody.innerHTML = ''
+  let totReq = 0,
+    totIn = 0,
+    totOut = 0,
+    totCost = 0
+  for (const row of rows) {
+    const tr = document.createElement('tr')
+    tr.innerHTML = `
+      <td>${escHtml(row.model)}</td>
+      <td>${escHtml(row.provider ?? '—')}</td>
+      <td class="num">${row.requests.toLocaleString()}</td>
+      <td class="num">${fmtTokens(row.inputTokens)}</td>
+      <td class="num">${fmtTokens(row.outputTokens)}</td>
+      <td class="num">${fmtCost(row.costUsd)}</td>
+    `
+    modelsTbody.appendChild(tr)
+    totReq += row.requests
+    totIn += row.inputTokens
+    totOut += row.outputTokens
+    totCost += row.costUsd
+  }
+  modelsTotalReq.textContent = totReq.toLocaleString()
+  modelsTotalIn.textContent = fmtTokens(totIn)
+  modelsTotalOut.textContent = fmtTokens(totOut)
+  modelsTotalCost.textContent = fmtCost(totCost)
+}
+
+async function loadTopCost() {
+  const r = await fetch('/api/metrics/recent?limit=200')
+  if (!r.ok) return
+  const events = await r.json()
+  const top = events
+    .filter((ev) => ev && typeof ev.costUsd === 'number' && ev.costUsd > 0)
+    .sort((a, b) => b.costUsd - a.costUsd)
+    .slice(0, 10)
+  topCostTbody.innerHTML = ''
+  for (const ev of top) {
+    const tr = document.createElement('tr')
+    const time = new Date(ev.ts).toLocaleTimeString()
+    tr.innerHTML = `
+      <td>${time}</td>
+      <td>${escHtml(ev.model ?? '—')}</td>
+      <td class="num">${fmtTokens(ev.inputTokens ?? 0)}</td>
+      <td class="num">${fmtTokens(ev.outputTokens ?? 0)}</td>
+      <td class="num">${fmtCost(ev.costUsd)}</td>
+      <td class="num">${ev.durationMs ?? '—'}</td>
+    `
+    topCostTbody.appendChild(tr)
+  }
+}
+
 function connectMetricsSSE() {
   const es = new EventSource('/api/metrics/stream')
   es.onopen = () => {
@@ -451,8 +552,17 @@ function connectMetricsSSE() {
   })
   es.addEventListener('request', (e) => {
     try {
-      appendRequest(JSON.parse(e.data))
+      const ev = JSON.parse(e.data)
+      appendRequest(ev)
+      if (ev && typeof ev.costUsd === 'number') {
+        totalCostSinceBoot += ev.costUsd
+        kpiCostTotal.textContent = fmtCost(totalCostSinceBoot)
+      }
     } catch {}
+  })
+  es.addEventListener('tick', () => {
+    loadModels().catch(() => {})
+    loadTopCost().catch(() => {})
   })
   es.addEventListener('evicted', () => {
     metricsStatus.textContent = 'Evicted (cap)'
@@ -473,6 +583,13 @@ loadAvailable()
 loadLive()
 loadHealth()
 loadRecent()
+seedTotalCost().catch(() => {})
+loadModels().catch(() => {})
+loadTopCost().catch(() => {})
 connectLogsSSE()
 connectMetricsSSE()
 setInterval(loadHealth, 10_000)
+setInterval(() => {
+  loadModels().catch(() => {})
+  loadTopCost().catch(() => {})
+}, 5000)

@@ -152,6 +152,25 @@ npm run dev</pre
     </main>
 
     <main id="metricsPanel" class="panel hidden">
+      <section class="kpis cost-kpis">
+        <div class="kpi">
+          <span class="kpi-label">Total cost (since boot)</span
+          ><span class="kpi-val" id="kpiCostTotal">—</span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Cost / min (1m)</span
+          ><span class="kpi-val" id="kpiCostPerMin">—</span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Est. cost / hr</span
+          ><span class="kpi-val" id="kpiCostPerHr">—</span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Tokens / sec (1m)</span
+          ><span class="kpi-val" id="kpiTokensPerSec">—</span>
+        </div>
+      </section>
+
       <section class="kpis">
         <div class="kpi">
           <span class="kpi-label">RPS (1m)</span><span class="kpi-val" id="kpiRps">—</span>
@@ -189,6 +208,49 @@ npm run dev</pre
           <header class="chart-title">Status mix (1m)</header>
           <canvas id="chartStatus"></canvas>
         </div>
+      </section>
+
+      <section class="table-card">
+        <header class="chart-title">Per-model breakdown</header>
+        <table id="modelsTable">
+          <thead>
+            <tr>
+              <th>model</th>
+              <th>provider</th>
+              <th class="num">requests</th>
+              <th class="num">input</th>
+              <th class="num">output</th>
+              <th class="num">cost</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2"><strong>Total</strong></td>
+              <td class="num" id="modelsTotalReq">0</td>
+              <td class="num" id="modelsTotalIn">0</td>
+              <td class="num" id="modelsTotalOut">0</td>
+              <td class="num" id="modelsTotalCost">$0.00</td>
+            </tr>
+          </tfoot>
+        </table>
+      </section>
+
+      <section class="table-card">
+        <header class="chart-title">Top 10 most expensive requests</header>
+        <table id="topCostTable">
+          <thead>
+            <tr>
+              <th>time</th>
+              <th>model</th>
+              <th class="num">input</th>
+              <th class="num">output</th>
+              <th class="num">cost</th>
+              <th class="num">ms</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
       </section>
 
       <section class="table-card">

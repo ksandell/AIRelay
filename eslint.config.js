@@ -16,6 +16,7 @@ export default [
         console: 'readonly',
         global: 'readonly',
         process: 'readonly',
+        queueMicrotask: 'readonly',
         setImmediate: 'readonly',
         setInterval: 'readonly',
         setTimeout: 'readonly',
