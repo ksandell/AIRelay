@@ -14,7 +14,12 @@ export function addMetricsClient(res) {
   while (clients.size >= config.maxSseClients) {
     const oldest = clients.values().next().value
     if (!oldest) break
-    try { oldest.write('event: evicted\ndata: "cap"\n\n'); oldest.end() } catch {}
+    try {
+      oldest.write('event: evicted\ndata: "cap"\n\n')
+      oldest.end()
+    } catch {
+      // ignore write errors
+    }
     clients.delete(oldest)
   }
   clients.add(res)
@@ -27,6 +32,7 @@ function safeWrite(res, payload) {
   try {
     return res.write(payload)
   } catch {
+    // write failed; drop this frame
     return false
   }
 }
@@ -51,30 +57,45 @@ export function startMetricsBroadcaster() {
   })
 
   tickHandle = setInterval(() => {
-    broadcast({
-      ts: new Date().toISOString(),
-      windows: {
-        '1m': aggregate(60),
-        '5m': aggregate(300),
+    broadcast(
+      {
+        ts: new Date().toISOString(),
+        windows: {
+          '1m': aggregate(60),
+          '5m': aggregate(300),
+        },
+        inFlight: getInFlight(),
+        sseClients: clients.size,
       },
-      inFlight: getInFlight(),
-      sseClients: clients.size,
-    }, 'tick')
+      'tick',
+    )
   }, config.metricsTickMs)
 
   return stopMetricsBroadcaster
 }
 
 export function stopMetricsBroadcaster() {
-  if (unsubscribe) { unsubscribe(); unsubscribe = null }
-  if (tickHandle) { clearInterval(tickHandle); tickHandle = null }
+  if (unsubscribe) {
+    unsubscribe()
+    unsubscribe = null
+  }
+  if (tickHandle) {
+    clearInterval(tickHandle)
+    tickHandle = null
+  }
 }
 
-export function metricsClientCount() { return clients.size }
+export function metricsClientCount() {
+  return clients.size
+}
 
 export function closeAllMetricsClients() {
   for (const res of clients) {
-    try { res.end() } catch {}
+    try {
+      res.end()
+    } catch {
+      // ignore close errors
+    }
   }
   clients.clear()
 }

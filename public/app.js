@@ -169,7 +169,11 @@ function renderEntry(entry) {
   if (levelFilter.value && level !== levelFilter.value) return
   const el = document.createElement('div')
   el.className = `log-entry level-${level}`
-  const meta = entry.meta ? Object.entries(entry.meta).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ') : ''
+  const meta = entry.meta
+    ? Object.entries(entry.meta)
+        .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
+        .join(' ')
+    : ''
   el.innerHTML = `
     <span class="log-ts">${entry.ts ?? ''}</span>
     <span class="log-level ${level}">${level}</span>
@@ -180,7 +184,9 @@ function renderEntry(entry) {
   entryCount.textContent = `${count} entries`
 }
 
-const scrollLogs = () => { logsPanel.scrollTop = logsPanel.scrollHeight }
+const scrollLogs = () => {
+  logsPanel.scrollTop = logsPanel.scrollHeight
+}
 
 async function loadHistory(date) {
   const r = await fetch(`/api/logs/history?date=${date}`)
@@ -235,21 +241,39 @@ async function loadHealth() {
 
 function connectLogsSSE() {
   const es = new EventSource('/api/logs/stream')
-  es.onopen = () => { statusEl.textContent = 'Live'; statusEl.className = 'status connected' }
+  es.onopen = () => {
+    statusEl.textContent = 'Live'
+    statusEl.className = 'status connected'
+  }
   es.onmessage = (e) => {
     if (paused || dateSelect.value) return
-    try { renderEntry(JSON.parse(e.data)); scrollLogs() } catch {}
+    try {
+      renderEntry(JSON.parse(e.data))
+      scrollLogs()
+    } catch {}
   }
-  es.onerror = () => { statusEl.textContent = 'Reconnecting…'; statusEl.className = 'status disconnected' }
+  es.onerror = () => {
+    statusEl.textContent = 'Reconnecting…'
+    statusEl.className = 'status disconnected'
+  }
 }
 
 dateSelect.addEventListener('change', () => {
-  if (dateSelect.value) loadHistory(dateSelect.value); else { loadLive(); scrollLogs() }
+  if (dateSelect.value) loadHistory(dateSelect.value)
+  else {
+    loadLive()
+    scrollLogs()
+  }
 })
 levelFilter.addEventListener('change', () => {
-  if (dateSelect.value) loadHistory(dateSelect.value); else loadLive()
+  if (dateSelect.value) loadHistory(dateSelect.value)
+  else loadLive()
 })
-clearBtn.addEventListener('click', () => { logList.innerHTML = ''; count = 0; entryCount.textContent = '0 entries' })
+clearBtn.addEventListener('click', () => {
+  logList.innerHTML = ''
+  count = 0
+  entryCount.textContent = '0 entries'
+})
 pauseBtn.addEventListener('click', () => {
   paused = !paused
   pauseBtn.textContent = paused ? 'Resume' : 'Pause'
@@ -266,13 +290,38 @@ const kpiErr = document.getElementById('kpiErr')
 const kpiTotal = document.getElementById('kpiTotal')
 const kpiBytes = document.getElementById('kpiBytes')
 const recentTbody = document.querySelector('#recentTable tbody')
+const kpiCostTotal = document.getElementById('kpiCostTotal')
+const kpiCostPerMin = document.getElementById('kpiCostPerMin')
+const kpiCostPerHr = document.getElementById('kpiCostPerHr')
+const kpiTokensPerSec = document.getElementById('kpiTokensPerSec')
+const modelsTbody = document.querySelector('#modelsTable tbody')
+const modelsTotalReq = document.getElementById('modelsTotalReq')
+const modelsTotalIn = document.getElementById('modelsTotalIn')
+const modelsTotalOut = document.getElementById('modelsTotalOut')
+const modelsTotalCost = document.getElementById('modelsTotalCost')
+const topCostTbody = document.querySelector('#topCostTable tbody')
 
-const MAX_TICKS = 300       // 5 minutes at 1Hz
+let totalCostSinceBoot = 0
+let totalCostSeeded = false
+
+const MAX_TICKS = 300 // 5 minutes at 1Hz
 const MAX_TABLE_ROWS = 200
 
 const tickLabels = []
 const rpsSeries = []
 const p95Series = []
+
+function fmtCost(n) {
+  if (n == null || isNaN(n)) return '—'
+  if (n === 0) return '$0.00'
+  if (n >= 0.01) return `$${n.toFixed(2)}`
+  return `$${n.toFixed(6)}`
+}
+
+function fmtTokens(n) {
+  if (n == null || isNaN(n)) return '—'
+  return Math.round(n).toLocaleString()
+}
 
 function fmtBytes(n) {
   if (n < 1024) return `${n} B`
@@ -284,21 +333,35 @@ function fmtBytes(n) {
 function makeLineChart(canvasId, color) {
   return new Chart(document.getElementById(canvasId), {
     type: 'line',
-    data: { labels: tickLabels, datasets: [{
-      data: [],
-      borderColor: color,
-      backgroundColor: color + '22',
-      fill: true,
-      tension: 0.25,
-      pointRadius: 0,
-      borderWidth: 1.5,
-    }] },
+    data: {
+      labels: tickLabels,
+      datasets: [
+        {
+          data: [],
+          borderColor: color,
+          backgroundColor: color + '22',
+          fill: true,
+          tension: 0.25,
+          pointRadius: 0,
+          borderWidth: 1.5,
+        },
+      ],
+    },
     options: {
-      responsive: true, maintainAspectRatio: false, animation: false,
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
       plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
       scales: {
-        x: { ticks: { color: '#8b949e', maxTicksLimit: 6, font: { size: 10 } }, grid: { color: '#21262d' } },
-        y: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' }, beginAtZero: true },
+        x: {
+          ticks: { color: '#8b949e', maxTicksLimit: 6, font: { size: 10 } },
+          grid: { color: '#21262d' },
+        },
+        y: {
+          ticks: { color: '#8b949e', font: { size: 10 } },
+          grid: { color: '#21262d' },
+          beginAtZero: true,
+        },
       },
     },
   })
@@ -311,15 +374,19 @@ const chartStatus = new Chart(document.getElementById('chartStatus'), {
   type: 'doughnut',
   data: {
     labels: ['2xx', '3xx', '4xx', '5xx', 'other'],
-    datasets: [{
-      data: [0, 0, 0, 0, 0],
-      backgroundColor: ['#3fb950', '#58a6ff', '#d29922', '#f85149', '#8b949e'],
-      borderColor: '#161b22',
-      borderWidth: 1,
-    }],
+    datasets: [
+      {
+        data: [0, 0, 0, 0, 0],
+        backgroundColor: ['#3fb950', '#58a6ff', '#d29922', '#f85149', '#8b949e'],
+        borderColor: '#161b22',
+        borderWidth: 1,
+      },
+    ],
   },
   options: {
-    responsive: true, maintainAspectRatio: false, animation: false,
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
     plugins: { legend: { position: 'right', labels: { color: '#e6edf3', font: { size: 11 } } } },
   },
 })
@@ -337,12 +404,20 @@ function pushTick(tick) {
 
   inFlightPill.textContent = `in-flight: ${tick.inFlight}`
 
+  const costPerMin = w1.totalCostUsd ?? 0
+  kpiCostPerMin.textContent = fmtCost(costPerMin)
+  kpiCostPerHr.textContent = fmtCost(costPerMin * 60)
+  kpiTokensPerSec.textContent = (w1.tokensPerSec ?? 0).toFixed(2)
+  kpiCostTotal.textContent = fmtCost(totalCostSinceBoot)
+
   const t = new Date(tick.ts).toLocaleTimeString()
   tickLabels.push(t)
   rpsSeries.push(w1.rps)
   p95Series.push(w1.p95)
   if (tickLabels.length > MAX_TICKS) {
-    tickLabels.shift(); rpsSeries.shift(); p95Series.shift()
+    tickLabels.shift()
+    rpsSeries.shift()
+    p95Series.shift()
   }
   chartRps.data.datasets[0].data = rpsSeries
   chartRps.update('none')
@@ -390,27 +465,131 @@ async function loadRecent() {
   } catch {}
 }
 
-function connectMetricsSSE() {
-  const es = new EventSource('/api/metrics/stream')
-  es.onopen = () => { metricsStatus.textContent = 'Live'; metricsStatus.className = 'status connected' }
-  es.onerror = () => { metricsStatus.textContent = 'Reconnecting…'; metricsStatus.className = 'status disconnected' }
-  es.addEventListener('tick', (e) => { try { pushTick(JSON.parse(e.data)) } catch {} })
-  es.addEventListener('request', (e) => { try { appendRequest(JSON.parse(e.data)) } catch {} })
-  es.addEventListener('evicted', () => { metricsStatus.textContent = 'Evicted (cap)'; metricsStatus.className = 'status disconnected' })
+async function seedTotalCost() {
+  try {
+    const r = await fetch('/api/metrics/recent?limit=5000')
+    if (!r.ok) return
+    const events = await r.json()
+    let sum = 0
+    for (const ev of events) {
+      if (ev && typeof ev.costUsd === 'number') sum += ev.costUsd
+    }
+    totalCostSinceBoot = sum
+    totalCostSeeded = true
+    kpiCostTotal.textContent = fmtCost(totalCostSinceBoot)
+  } catch {}
 }
 
-document.getElementById('metricsClearBtn').addEventListener('click', () => { recentTbody.innerHTML = '' })
+async function loadModels() {
+  const r = await fetch('/api/metrics/models')
+  if (!r.ok) return
+  const rows = await r.json()
+  modelsTbody.innerHTML = ''
+  let totReq = 0,
+    totIn = 0,
+    totOut = 0,
+    totCost = 0
+  for (const row of rows) {
+    const tr = document.createElement('tr')
+    tr.innerHTML = `
+      <td>${escHtml(row.model)}</td>
+      <td>${escHtml(row.provider ?? '—')}</td>
+      <td class="num">${row.requests.toLocaleString()}</td>
+      <td class="num">${fmtTokens(row.inputTokens)}</td>
+      <td class="num">${fmtTokens(row.outputTokens)}</td>
+      <td class="num">${fmtCost(row.costUsd)}</td>
+    `
+    modelsTbody.appendChild(tr)
+    totReq += row.requests
+    totIn += row.inputTokens
+    totOut += row.outputTokens
+    totCost += row.costUsd
+  }
+  modelsTotalReq.textContent = totReq.toLocaleString()
+  modelsTotalIn.textContent = fmtTokens(totIn)
+  modelsTotalOut.textContent = fmtTokens(totOut)
+  modelsTotalCost.textContent = fmtCost(totCost)
+}
+
+async function loadTopCost() {
+  const r = await fetch('/api/metrics/recent?limit=200')
+  if (!r.ok) return
+  const events = await r.json()
+  const top = events
+    .filter((ev) => ev && typeof ev.costUsd === 'number' && ev.costUsd > 0)
+    .sort((a, b) => b.costUsd - a.costUsd)
+    .slice(0, 10)
+  topCostTbody.innerHTML = ''
+  for (const ev of top) {
+    const tr = document.createElement('tr')
+    const time = new Date(ev.ts).toLocaleTimeString()
+    tr.innerHTML = `
+      <td>${time}</td>
+      <td>${escHtml(ev.model ?? '—')}</td>
+      <td class="num">${fmtTokens(ev.inputTokens ?? 0)}</td>
+      <td class="num">${fmtTokens(ev.outputTokens ?? 0)}</td>
+      <td class="num">${fmtCost(ev.costUsd)}</td>
+      <td class="num">${ev.durationMs ?? '—'}</td>
+    `
+    topCostTbody.appendChild(tr)
+  }
+}
+
+function connectMetricsSSE() {
+  const es = new EventSource('/api/metrics/stream')
+  es.onopen = () => {
+    metricsStatus.textContent = 'Live'
+    metricsStatus.className = 'status connected'
+  }
+  es.onerror = () => {
+    metricsStatus.textContent = 'Reconnecting…'
+    metricsStatus.className = 'status disconnected'
+  }
+  es.addEventListener('tick', (e) => {
+    try {
+      pushTick(JSON.parse(e.data))
+    } catch {}
+  })
+  es.addEventListener('request', (e) => {
+    try {
+      const ev = JSON.parse(e.data)
+      appendRequest(ev)
+      if (ev && typeof ev.costUsd === 'number') {
+        totalCostSinceBoot += ev.costUsd
+        kpiCostTotal.textContent = fmtCost(totalCostSinceBoot)
+      }
+    } catch {}
+  })
+  es.addEventListener('tick', () => {
+    loadModels().catch(() => {})
+    loadTopCost().catch(() => {})
+  })
+  es.addEventListener('evicted', () => {
+    metricsStatus.textContent = 'Evicted (cap)'
+    metricsStatus.className = 'status disconnected'
+  })
+}
+
+document.getElementById('metricsClearBtn').addEventListener('click', () => {
+  recentTbody.innerHTML = ''
+})
 
 // ─── Boot ────────────────────────────────────────────────────
-const initialTab = location.hash === '#metrics' ? 'metrics'
-  : location.hash === '#setup' ? 'setup'
-  : 'logs'
+const initialTab =
+  location.hash === '#metrics' ? 'metrics' : location.hash === '#setup' ? 'setup' : 'logs'
 activateTab(initialTab)
 
 loadAvailable()
 loadLive()
 loadHealth()
 loadRecent()
+seedTotalCost().catch(() => {})
+loadModels().catch(() => {})
+loadTopCost().catch(() => {})
 connectLogsSSE()
 connectMetricsSSE()
 setInterval(loadHealth, 10_000)
+setInterval(() => {
+  loadModels().catch(() => {})
+  loadTopCost().catch(() => {})
+}, 5000)

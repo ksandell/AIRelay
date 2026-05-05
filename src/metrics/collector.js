@@ -1,5 +1,31 @@
 import { config } from '../config.js'
 
+/**
+ * Canonical metric event shape (all fields except `ts` may be null/undefined):
+ *
+ *   ts             ISO-8601 string  — request completion timestamp (required)
+ *   method         string           — HTTP method
+ *   path           string           — request path (post-prefix)
+ *   status         number           — upstream response status code
+ *   durationMs     number           — total request duration in ms
+ *   bytesIn        number           — request body bytes forwarded upstream
+ *   bytesOut       number           — response body bytes returned to client
+ *   upstream       string           — resolved upstream URL
+ *   error          string|null      — error message if proxy failed, else null
+ *
+ *   v0.2.0 token & cost fields (all nullable — populated by provider parsers):
+ *   provider          string|null   — e.g. 'anthropic', 'openai', 'gemini'
+ *   model             string|null   — e.g. 'claude-sonnet-4-5'
+ *   inputTokens       number|null   — prompt tokens
+ *   outputTokens      number|null   — completion tokens
+ *   cacheReadTokens   number|null   — cached prompt tokens read
+ *   cacheWriteTokens  number|null   — cached prompt tokens written
+ *   totalTokens       number|null   — sum of all token classes
+ *   costUsd           number|null   — computed USD cost from pricing config
+ *
+ * Events are stored by reference; record() does not copy or validate.
+ */
+
 // Pre-allocated ring buffer. record() is O(1), no allocations on the hot path
 // beyond the event object the caller already created.
 const SIZE = config.maxMetricEvents
@@ -14,7 +40,11 @@ export function record(event) {
   head = (head + 1) % SIZE
   if (count < SIZE) count++
   for (const l of listeners) {
-    try { l(event) } catch {}
+    try {
+      l(event)
+    } catch {
+      // ignore listener errors
+    }
   }
 }
 
@@ -51,9 +81,15 @@ export function onEvent(fn) {
   return () => listeners.delete(fn)
 }
 
-export function incInFlight() { inFlight++ }
-export function decInFlight() { if (inFlight > 0) inFlight-- }
-export function getInFlight() { return inFlight }
+export function incInFlight() {
+  inFlight++
+}
+export function decInFlight() {
+  if (inFlight > 0) inFlight--
+}
+export function getInFlight() {
+  return inFlight
+}
 
 // Test-only: reset all state between vitest runs.
 export function _reset() {

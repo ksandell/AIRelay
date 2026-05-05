@@ -34,9 +34,10 @@ describe('readTail', () => {
   it('respects the limit', async () => {
     const { readTail } = await import('../../src/logs/reader.js')
     const active = path.join(tmpDir, 'app.log')
-    const lines = Array.from({ length: 10 }, (_, i) =>
-      JSON.stringify({ ts: '2026-04-29T00:00:00.000Z', level: 'info', msg: `line ${i}` }),
-    ).join('\n') + '\n'
+    const lines =
+      Array.from({ length: 10 }, (_, i) =>
+        JSON.stringify({ ts: '2026-04-29T00:00:00.000Z', level: 'info', msg: `line ${i}` }),
+      ).join('\n') + '\n'
     fs.writeFileSync(active, lines)
 
     expect(readTail(3)).toHaveLength(3)

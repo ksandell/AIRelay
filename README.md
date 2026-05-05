@@ -73,6 +73,32 @@ That's it. Every request now flows through the proxy and shows up on the dashboa
 
 ---
 
+## Supported Providers
+
+Token & cost tracking is built in for 14 providers. Set `PROXY_PROVIDER` to enable per-request token extraction and cost calculation.
+
+| Provider | `PROXY_PROVIDER` | Tokens | Cost |
+|---|---|---|---|
+| Anthropic Claude | `anthropic` | ✓ | ✓ |
+| OpenAI | `openai` | ✓ | ✓ |
+| Google Gemini | `google` | ✓ | ✓ |
+| Mistral | `mistral` | ✓ | ✓ |
+| Groq | `groq` | ✓ | ✓ |
+| Microsoft Azure OpenAI | `microsoft` | ✓ | ✓ |
+| OpenRouter | `openrouter` | ✓ | ✓ |
+| Together AI | `together` | ✓ | ✓ |
+| Fireworks | `fireworks` | ✓ | ✓ |
+| DeepSeek | `deepseek` | ✓ | ✓ |
+| xAI Grok | `xai` | ✓ | ✓ |
+| Perplexity | `perplexity` | ✓ | ✓ |
+| Ollama | `ollama` | ✓ | $0 (local) |
+| Nvidia NIM | `nvidia` | ✓ | ✓ |
+| _other_ | `generic` | — | — |
+
+`generic` falls back to no extraction — bytes still pass through, but no token or cost data is recorded.
+
+---
+
 ## Tech stack
 
 Node.js 22+ · Express · `http-proxy` · vanilla JS dashboard with Chart.js · Vitest · Docker multi-stage (`node:22-alpine`).

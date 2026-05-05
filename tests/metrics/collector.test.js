@@ -1,5 +1,14 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { record, recent, iterRecent, snapshot, _reset, incInFlight, decInFlight, getInFlight } from '../../src/metrics/collector.js'
+import {
+  record,
+  recent,
+  iterRecent,
+  snapshot,
+  _reset,
+  incInFlight,
+  decInFlight,
+  getInFlight,
+} from '../../src/metrics/collector.js'
 
 function makeEvent(overrides = {}) {
   return {
@@ -42,11 +51,13 @@ describe('collector', () => {
 
   it('tracks in-flight count', () => {
     expect(getInFlight()).toBe(0)
-    incInFlight(); incInFlight()
+    incInFlight()
+    incInFlight()
     expect(getInFlight()).toBe(2)
     decInFlight()
     expect(getInFlight()).toBe(1)
-    decInFlight(); decInFlight() // should not go negative
+    decInFlight()
+    decInFlight() // should not go negative
     expect(getInFlight()).toBe(0)
   })
 
