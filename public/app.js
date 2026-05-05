@@ -179,13 +179,9 @@ function renderEntry(entry) {
     <span class="log-level ${level}">${level}</span>
     <span class="log-msg">${escHtml(entry.msg ?? '')}${meta ? `<span class="log-meta"> ${escHtml(meta)}</span>` : ''}</span>
   `
-  logList.appendChild(el)
+  logList.prepend(el)
   count++
   entryCount.textContent = `${count} entries`
-}
-
-const scrollLogs = () => {
-  logsPanel.scrollTop = logsPanel.scrollHeight
 }
 
 async function loadHistory(date) {
@@ -194,8 +190,7 @@ async function loadHistory(date) {
   const entries = await r.json()
   logList.innerHTML = ''
   count = 0
-  entries.forEach(renderEntry)
-  scrollLogs()
+  entries.slice().reverse().forEach(renderEntry)
 }
 
 async function loadLive() {
@@ -204,8 +199,7 @@ async function loadLive() {
   const entries = await r.json()
   logList.innerHTML = ''
   count = 0
-  entries.forEach(renderEntry)
-  scrollLogs()
+  entries.slice().reverse().forEach(renderEntry)
 }
 
 async function loadAvailable() {
@@ -249,7 +243,6 @@ function connectLogsSSE() {
     if (paused || dateSelect.value) return
     try {
       renderEntry(JSON.parse(e.data))
-      scrollLogs()
     } catch {}
   }
   es.onerror = () => {
@@ -260,10 +253,7 @@ function connectLogsSSE() {
 
 dateSelect.addEventListener('change', () => {
   if (dateSelect.value) loadHistory(dateSelect.value)
-  else {
-    loadLive()
-    scrollLogs()
-  }
+  else loadLive()
 })
 levelFilter.addEventListener('change', () => {
   if (dateSelect.value) loadHistory(dateSelect.value)
