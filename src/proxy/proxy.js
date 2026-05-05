@@ -93,6 +93,9 @@ function baseEvent(m) {
     cacheWriteTokens: null,
     totalTokens: null,
     costUsd: null,
+    toolCalls: null,
+    toolBytesIn: null,
+    toolBytesOut: null,
   }
 }
 
@@ -103,10 +106,13 @@ function finalize(m) {
 
   if (provider && m.chunks && m.chunks.length > 0) {
     const chunks = m.chunks
+    const reqChunks = m.reqChunks
     m.chunks = null // release ref before microtask queue settles
+    m.reqChunks = null
     queueMicrotask(() => {
       try {
         const body = Buffer.concat(chunks)
+        const reqBody = reqChunks ? Buffer.concat(reqChunks) : null
         const tokens = provider.extractTokens(body)
         if (tokens) {
           event.provider = provider.name
@@ -123,6 +129,16 @@ function finalize(m) {
           }
         } else {
           event.provider = provider.name
+        }
+        try {
+          const tools = provider.extractToolCalls(reqBody, body)
+          if (tools) {
+            event.toolCalls = tools.toolCalls ?? null
+            event.toolBytesIn = tools.toolBytesIn ?? null
+            event.toolBytesOut = tools.toolBytesOut ?? null
+          }
+        } catch {
+          // ignore tool extraction errors
         }
       } catch {
         // Provider errors must never crash the proxy. Record the base event.
@@ -166,6 +182,19 @@ export function createProxyHandler() {
 
     req.on('data', (chunk) => {
       m.bytesIn += chunk.length
+      if (provider && !m.reqTeeAborted) {
+        if (!m.reqChunks) {
+          m.reqChunks = []
+          m.reqTeeBytes = 0
+        }
+        m.reqTeeBytes += chunk.length
+        if (m.reqTeeBytes > config.proxyTokenTeeMaxBytes) {
+          m.reqChunks = null
+          m.reqTeeAborted = true
+        } else {
+          m.reqChunks.push(chunk)
+        }
+      }
     })
     req.on('aborted', () => {
       m.error = m.error || 'client_aborted'

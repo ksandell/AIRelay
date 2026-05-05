@@ -23,6 +23,11 @@ import { config } from '../config.js'
  *   totalTokens       number|null   — sum of all token classes
  *   costUsd           number|null   — computed USD cost from pricing config
  *
+ *   v0.2.2 tool-call fields (nullable — populated by provider parsers):
+ *   toolCalls         number|null   — count of tool invocation blocks (request + response)
+ *   toolBytesIn       number|null   — bytes of tool_result / role:tool / functionResponse blocks (req)
+ *   toolBytesOut      number|null   — bytes of tool_use / tool_calls / functionCall blocks (resp)
+ *
  * Events are stored by reference; record() does not copy or validate.
  */
 

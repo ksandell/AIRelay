@@ -180,7 +180,9 @@ npm run dev</pre
       <section class="kpis cost-kpis">
         <div class="kpi">
           <span class="kpi-label">Total cost (since boot)</span>
-          <span class="kpi-help" title="Accumulated estimated cost since the proxy process started">?</span>
+          <span class="kpi-help" title="Accumulated estimated cost since the proxy process started"
+            >?</span
+          >
           <span class="kpi-val" id="kpiCostTotal">—</span>
         </div>
         <div class="kpi">
@@ -194,18 +196,16 @@ npm run dev</pre
           <span class="kpi-val" id="kpiCostPerHr">—</span>
         </div>
         <div class="kpi">
-          <span class="kpi-label">Tokens / s (1 min)</span>
-          <span class="kpi-help" title="Prompt and completion tokens per second — 1-minute rolling window">?</span>
-          <div class="kpi-split">
-            <div class="kpi-split-item">
-              <span class="kpi-split-label">↓ Prompt</span>
-              <span class="kpi-val" id="kpiTokensIn">—</span>
-            </div>
-            <div class="kpi-split-item">
-              <span class="kpi-split-label">↑ Completion</span>
-              <span class="kpi-val" id="kpiTokensOut">—</span>
-            </div>
-          </div>
+          <span class="kpi-label">Prompt tok/s (1 min)</span>
+          <span class="kpi-help" title="Prompt tokens per second — 1-minute rolling window">?</span>
+          <span class="kpi-val" id="kpiTokensIn">—</span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Completion tok/s (1 min)</span>
+          <span class="kpi-help" title="Completion tokens per second — 1-minute rolling window"
+            >?</span
+          >
+          <span class="kpi-val" id="kpiTokensOut">—</span>
         </div>
       </section>
 
@@ -231,7 +231,11 @@ npm run dev</pre
         </div>
         <div class="kpi">
           <span class="kpi-label">Errors (1 min)</span>
-          <span class="kpi-help" title="Requests with status ≥ 400 or a network error — 1-minute window">?</span>
+          <span
+            class="kpi-help"
+            title="Requests with status ≥ 400 or a network error — 1-minute window"
+            >?</span
+          >
           <div class="kpi-val-row">
             <span class="kpi-val" id="kpiErr">—</span><span class="kpi-unit">%</span>
           </div>
@@ -242,18 +246,23 @@ npm run dev</pre
           <span class="kpi-val" id="kpiTotal">—</span>
         </div>
         <div class="kpi">
-          <span class="kpi-label">Network (5 min)</span>
-          <span class="kpi-help" title="Bytes received from / sent to upstream — 5-minute window">?</span>
-          <div class="kpi-split">
-            <div class="kpi-split-item">
-              <span class="kpi-split-label">↓ In</span>
-              <span class="kpi-val" id="kpiBytesIn">—</span>
-            </div>
-            <div class="kpi-split-item">
-              <span class="kpi-split-label">↑ Out</span>
-              <span class="kpi-val" id="kpiBytesOut">—</span>
-            </div>
-          </div>
+          <span class="kpi-label">Bytes in (5 min)</span>
+          <span class="kpi-help" title="Bytes received from upstream — 5-minute window">?</span>
+          <span class="kpi-val" id="kpiBytesIn">—</span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Bytes out (5 min)</span>
+          <span class="kpi-help" title="Bytes sent to upstream — 5-minute window">?</span>
+          <span class="kpi-val" id="kpiBytesOut">—</span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Tool calls (1 min)</span>
+          <span
+            class="kpi-help"
+            title="Tool invocations per minute — counts tool_use (Anthropic), tool_calls (OpenAI/Mistral), functionCall (Google)"
+            >?</span
+          >
+          <span class="kpi-val" id="kpiToolCalls">—</span>
         </div>
       </section>
 
@@ -275,7 +284,7 @@ npm run dev</pre
           <canvas id="chartLat"></canvas>
         </div>
         <div class="chart-card">
-          <header class="chart-title">Tokens / sec — last 5 min</header>
+          <header class="chart-title">Tokens — last 5 min</header>
           <canvas id="chartTokens"></canvas>
         </div>
       </section>

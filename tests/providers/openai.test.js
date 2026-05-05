@@ -56,4 +56,52 @@ describe('OpenAIProvider', () => {
     )
     expect(p.extractTokens(noUsage)).toBeNull()
   })
+
+  describe('extractToolCalls', () => {
+    it('counts tool_calls in sync response', () => {
+      const resp = Buffer.from(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                tool_calls: [
+                  {
+                    id: 't1',
+                    type: 'function',
+                    function: { name: 'get_weather', arguments: '{}' },
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      )
+      const out = p.extractToolCalls(null, resp)
+      expect(out).toMatchObject({ toolCalls: 1, toolBytesIn: 0 })
+      expect(out.toolBytesOut).toBeGreaterThan(0)
+    })
+
+    it('counts role:tool messages in request', () => {
+      const req = Buffer.from(
+        JSON.stringify({
+          messages: [
+            { role: 'user', content: 'hi' },
+            { role: 'tool', tool_call_id: 't1', content: '72F' },
+          ],
+        }),
+      )
+      const out = p.extractToolCalls(req, null)
+      expect(out).toMatchObject({ toolCalls: 1 })
+      expect(out.toolBytesIn).toBeGreaterThan(0)
+    })
+
+    it('returns null when neither side has tools', () => {
+      expect(
+        p.extractToolCalls(
+          Buffer.from('{"messages":[{"role":"user","content":"hi"}]}'),
+          Buffer.from('{"choices":[{"message":{"content":"hi"}}]}'),
+        ),
+      ).toBeNull()
+    })
+  })
 })

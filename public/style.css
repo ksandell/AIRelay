@@ -678,24 +678,6 @@ footer {
   margin-right: 0.35rem;
 }
 
-/* ─── KPI split (IN / OUT) ───────────────────────────────────── */
-.kpi-split {
-  display: flex;
-  gap: 1rem;
-  margin-top: 0.15rem;
-}
-.kpi-split-item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.1rem;
-}
-.kpi-split-label {
-  font-size: 0.68rem;
-  color: #8b949e;
-  line-height: 1;
-}
-
 /* ─── KPI help tooltip (?) ───────────────────────────────────── */
 .kpi-help {
   position: absolute;
@@ -732,7 +714,9 @@ footer {
   font-weight: 400;
 }
 /* Make .kpi position:relative so the (?) can be absolute-positioned */
-.kpi { position: relative; }
+.kpi {
+  position: relative;
+}
 
 /* ─── Status pill row ────────────────────────────────────────── */
 .status-pills {
@@ -748,8 +732,28 @@ footer {
   font-weight: 600;
   letter-spacing: 0.02em;
 }
-.status-pill.s2 { background: rgba(63, 185, 80, 0.15); color: #3fb950; border: 1px solid rgba(63,185,80,0.3); }
-.status-pill.s3 { background: rgba(88, 166, 255, 0.15); color: #58a6ff; border: 1px solid rgba(88,166,255,0.3); }
-.status-pill.s4 { background: rgba(210, 153, 34, 0.15); color: #d29922; border: 1px solid rgba(210,153,34,0.3); }
-.status-pill.s5 { background: rgba(248, 81, 73, 0.15); color: #f85149; border: 1px solid rgba(248,81,73,0.3); }
-.status-pill.so { background: rgba(139,148,158, 0.15); color: #8b949e; border: 1px solid rgba(139,148,158,0.3); }
+.status-pill.s2 {
+  background: rgba(63, 185, 80, 0.15);
+  color: #3fb950;
+  border: 1px solid rgba(63, 185, 80, 0.3);
+}
+.status-pill.s3 {
+  background: rgba(88, 166, 255, 0.15);
+  color: #58a6ff;
+  border: 1px solid rgba(88, 166, 255, 0.3);
+}
+.status-pill.s4 {
+  background: rgba(210, 153, 34, 0.15);
+  color: #d29922;
+  border: 1px solid rgba(210, 153, 34, 0.3);
+}
+.status-pill.s5 {
+  background: rgba(248, 81, 73, 0.15);
+  color: #f85149;
+  border: 1px solid rgba(248, 81, 73, 0.3);
+}
+.status-pill.so {
+  background: rgba(139, 148, 158, 0.15);
+  color: #8b949e;
+  border: 1px solid rgba(139, 148, 158, 0.3);
+}

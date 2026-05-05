@@ -184,12 +184,15 @@ function loadFilterState() {
 function saveFilterState() {
   localStorage.setItem(
     'logFilters',
-    JSON.stringify({ proxy: filterProxy.checked, internal: filterInternal.checked, system: filterSystem.checked })
+    JSON.stringify({
+      proxy: filterProxy.checked,
+      internal: filterInternal.checked,
+      system: filterSystem.checked,
+    }),
   )
 }
 
 loadFilterState()
-
 ;[filterProxy, filterInternal, filterSystem].forEach((cb) => {
   cb.addEventListener('change', () => {
     saveFilterState()
@@ -216,7 +219,8 @@ function renderProxyRow(ev) {
     ev.inputTokens || ev.outputTokens
       ? ` <span class="log-meta">${fmtTokens(ev.inputTokens)}↓ ${fmtTokens(ev.outputTokens)}↑ tok</span>`
       : ''
-  const cost = typeof ev.costUsd === 'number' ? ` <span class="log-meta">${fmtCost(ev.costUsd)}</span>` : ''
+  const cost =
+    typeof ev.costUsd === 'number' ? ` <span class="log-meta">${fmtCost(ev.costUsd)}</span>` : ''
   const model = ev.model ? ` <span class="log-meta">${escHtml(ev.model)}</span>` : ''
   el.innerHTML = `
     <span class="log-ts">${fmtTime(ev.ts)}</span>
@@ -403,6 +407,7 @@ const kpiCostPerMin = document.getElementById('kpiCostPerMin')
 const kpiCostPerHr = document.getElementById('kpiCostPerHr')
 const kpiTokensIn = document.getElementById('kpiTokensIn')
 const kpiTokensOut = document.getElementById('kpiTokensOut')
+const kpiToolCalls = document.getElementById('kpiToolCalls')
 const pill2xx = document.getElementById('pill2xx').querySelector('span')
 const pill3xx = document.getElementById('pill3xx').querySelector('span')
 const pill4xx = document.getElementById('pill4xx').querySelector('span')
@@ -535,7 +540,11 @@ function makeDualLineChart(canvasId, color1, color2, label1, label2) {
       maintainAspectRatio: false,
       animation: false,
       plugins: {
-        legend: { display: true, position: 'top', labels: { color: '#8b949e', font: { size: 10 }, boxWidth: 12 } },
+        legend: {
+          display: true,
+          position: 'top',
+          labels: { color: '#8b949e', font: { size: 10 }, boxWidth: 12 },
+        },
         tooltip: { mode: 'index', intersect: false },
       },
       scales: {
@@ -574,6 +583,7 @@ function pushTick(tick) {
   kpiCostPerHr.textContent = fmtCost(costPerMin * 60)
   kpiTokensIn.textContent = fmtNum(w1.inputTokensPerSec ?? 0, 2)
   kpiTokensOut.textContent = fmtNum(w1.outputTokensPerSec ?? 0, 2)
+  kpiToolCalls.textContent = fmtNum(w1.toolCalls ?? 0)
   kpiCostTotal.textContent = fmtCost(totalCostSinceBoot)
 
   const t = fmtTime(tick.ts)
@@ -592,7 +602,10 @@ function pushTick(tick) {
 
   tokenInSeries.push(w1.inputTokensPerSec ?? 0)
   tokenOutSeries.push(w1.outputTokensPerSec ?? 0)
-  if (tokenInSeries.length > MAX_TICKS) { tokenInSeries.shift(); tokenOutSeries.shift() }
+  if (tokenInSeries.length > MAX_TICKS) {
+    tokenInSeries.shift()
+    tokenOutSeries.shift()
+  }
   chartTokens.data.datasets[0].data = tokenInSeries
   chartTokens.data.datasets[1].data = tokenOutSeries
   chartTokens.update('none')

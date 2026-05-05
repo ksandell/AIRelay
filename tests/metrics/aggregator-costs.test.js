@@ -108,7 +108,6 @@ describe('aggregator cost + token rollups', () => {
     expect(a.tokensPerSec).toBeCloseTo(10, 3)
   })
 
-
   it('inputTokensPerSec equals totalInputTokens / seconds', () => {
     record(ev({ model: 'm1', provider: 'p', inputTokens: 600 }))
     const a = aggregate(60)

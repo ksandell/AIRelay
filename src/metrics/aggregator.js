@@ -17,6 +17,9 @@ export function aggregate(seconds) {
   let totalTokens = 0
   let totalInputTokens = 0
   let totalOutputTokens = 0
+  let toolCalls = 0
+  let toolBytesIn = 0
+  let toolBytesOut = 0
   const byModel = {}
 
   for (const ev of iterRecent(seconds)) {
@@ -31,6 +34,9 @@ export function aggregate(seconds) {
     totalTokens += toks
     totalInputTokens += ev.inputTokens ?? 0
     totalOutputTokens += ev.outputTokens ?? 0
+    toolCalls += ev.toolCalls ?? 0
+    toolBytesIn += ev.toolBytesIn ?? 0
+    toolBytesOut += ev.toolBytesOut ?? 0
 
     if (ev.model != null) {
       let m = byModel[ev.model]
@@ -86,6 +92,10 @@ export function aggregate(seconds) {
     tokensPerSec: +(totalTokens / seconds).toFixed(3),
     inputTokensPerSec: +(totalInputTokens / seconds).toFixed(3),
     outputTokensPerSec: +(totalOutputTokens / seconds).toFixed(3),
+    toolCalls,
+    toolCallsPerMin: +((toolCalls * 60) / seconds).toFixed(3),
+    toolBytesIn,
+    toolBytesOut,
     byModel,
   }
 }
