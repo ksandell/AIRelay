@@ -4,7 +4,7 @@ import { logger } from '../logs/logger.js'
 const SKIP_PATHS = ['/health', '/api/metrics/', '/api/logs/']
 
 export function requestLogger(req, res, next) {
-  if (SKIP_PATHS.some(p => req.url.startsWith(p))) {
+  if (SKIP_PATHS.some((p) => req.url.startsWith(p))) {
     return next()
   }
 

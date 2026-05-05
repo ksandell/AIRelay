@@ -317,7 +317,10 @@ function fmtNum(n, decimals = 0) {
 
 function fmtTime(ts) {
   return new Intl.DateTimeFormat(undefined, {
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
   }).format(new Date(ts))
 }
 

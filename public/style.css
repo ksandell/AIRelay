@@ -141,8 +141,13 @@ button.active {
 }
 
 @keyframes live-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(63,185,80,0.7); }
-  50%       { box-shadow: 0 0 0 6px rgba(63,185,80,0); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(63, 185, 80, 0);
+  }
 }
 .status::before {
   content: '';
@@ -250,7 +255,9 @@ button.active {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 1px 8px rgba(0,0,0,0.2);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.4),
+    0 1px 8px rgba(0, 0, 0, 0.2);
 }
 .kpi-label {
   color: var(--muted);
@@ -290,7 +297,9 @@ button.active {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px 14px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 1px 8px rgba(0,0,0,0.2);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.4),
+    0 1px 8px rgba(0, 0, 0, 0.2);
 }
 .chart-title {
   font-size: 11px;
@@ -615,8 +624,12 @@ footer {
   stroke: currentColor;
 }
 @keyframes icon-spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 .icon-live [data-lucide] {
   animation: icon-spin 3s linear infinite;
