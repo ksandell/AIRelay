@@ -6,7 +6,6 @@ async function buildApp(err) {
   const { errorHandler } = await import('../../src/middleware/errorHandler.js')
   const app = express()
   app.get('/boom', (_req, _res, next) => next(err))
-  // eslint-disable-next-line no-unused-vars
   app.use((error, req, res, next) => errorHandler(error, req, res, next))
   return app
 }
@@ -45,7 +44,6 @@ describe('errorHandler', () => {
       req.requestId = 'test-id-123'
       next(err)
     })
-    // eslint-disable-next-line no-unused-vars
     app.use((error, req, res, next) => errorHandler(error, req, res, next))
     const res = await request(app).get('/boom')
     expect(res.status).toBe(500)

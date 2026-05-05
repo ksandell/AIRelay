@@ -28,7 +28,11 @@ function getStream() {
   const target = activeLogPath()
   if (!_stream || _streamPath !== target) {
     if (_stream) {
-      try { _stream.end() } catch { /* ignore */ }
+      try {
+        _stream.end()
+      } catch {
+        /* ignore */
+      }
     }
     fs.mkdirSync(config.logDir, { recursive: true })
     _stream = openStream(target)
@@ -47,7 +51,11 @@ export function redirectStream(newPath) {
   // Drain old stream before closing — any in-flight cork/uncork completes first.
   if (old) {
     setImmediate(() => {
-      try { old.end() } catch { /* ignore */ }
+      try {
+        old.end()
+      } catch {
+        /* ignore */
+      }
       _rotating = false
     })
   } else {
@@ -57,7 +65,11 @@ export function redirectStream(newPath) {
 
 export function closeStream() {
   if (_stream) {
-    try { _stream.end() } catch { /* ignore */ }
+    try {
+      _stream.end()
+    } catch {
+      /* ignore */
+    }
     _stream = null
     _streamPath = null
   }

@@ -1,5 +1,4 @@
-import fs from 'node:fs'
-import { readFile, readdir, stat } from 'node:fs/promises'
+import { open, readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { config } from '../config.js'
 
@@ -20,10 +19,24 @@ function parseLines(text) {
     })
 }
 
+async function readFileCapped(filePath) {
+  const fh = await open(filePath, 'r')
+  try {
+    const { size } = await fh.stat()
+    const readSize = Math.min(size, MAX_READ_BYTES)
+    const offset = size > MAX_READ_BYTES ? size - MAX_READ_BYTES : 0
+    const buf = Buffer.allocUnsafe(readSize)
+    const { bytesRead } = await fh.read(buf, 0, readSize, offset)
+    return buf.slice(0, bytesRead).toString('utf8')
+  } finally {
+    await fh.close()
+  }
+}
+
 export async function readTail(limit = 500) {
   const filePath = activeLog()
   try {
-    const content = await readFile(filePath, 'utf8')
+    const content = await readFileCapped(filePath)
     const lines = parseLines(content)
     return lines.slice(-limit)
   } catch (err) {
@@ -39,7 +52,7 @@ export async function readHistoricLog(date) {
 
   const filePath = path.join(config.logDir, `app-${date}.log`)
   try {
-    const content = await readFile(filePath, 'utf8')
+    const content = await readFileCapped(filePath)
     return parseLines(content)
   } catch (err) {
     if (err.code === 'ENOENT') return null

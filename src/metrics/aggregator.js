@@ -49,7 +49,13 @@ function accumulateEvent(acc, ev) {
   if (ev.model != null) {
     let m = acc.byModel[ev.model]
     if (!m) {
-      m = { provider: ev.provider ?? null, requests: 0, inputTokens: 0, outputTokens: 0, costUsd: 0 }
+      m = {
+        provider: ev.provider ?? null,
+        requests: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsd: 0,
+      }
       acc.byModel[ev.model] = m
     }
     m.requests++
@@ -61,9 +67,13 @@ function accumulateEvent(acc, ev) {
   const s = ev.status | 0
   if (s >= 200 && s < 300) acc.statusBuckets['2xx']++
   else if (s >= 300 && s < 400) acc.statusBuckets['3xx']++
-  else if (s >= 400 && s < 500) { acc.statusBuckets['4xx']++; acc.errors++ }
-  else if (s >= 500) { acc.statusBuckets['5xx']++; acc.errors++ }
-  else acc.statusBuckets.other++
+  else if (s >= 400 && s < 500) {
+    acc.statusBuckets['4xx']++
+    acc.errors++
+  } else if (s >= 500) {
+    acc.statusBuckets['5xx']++
+    acc.errors++
+  } else acc.statusBuckets.other++
 
   if (ev.error && (ev.status | 0) < 400) acc.errors++
 }
@@ -73,9 +83,24 @@ function finalizeAcc(acc, seconds) {
   for (const k of Object.keys(acc.byModel)) {
     acc.byModel[k].costUsd = +acc.byModel[k].costUsd.toFixed(6)
   }
-  const { total, errors, durations, bytesIn, bytesOut, totalCostUsd, totalTokens,
-    totalInputTokens, totalOutputTokens, toolCalls, toolBytesIn, toolBytesOut,
-    toolInputTokens, toolOutputTokens, statusBuckets, byModel } = acc
+  const {
+    total,
+    errors,
+    durations,
+    bytesIn,
+    bytesOut,
+    totalCostUsd,
+    totalTokens,
+    totalInputTokens,
+    totalOutputTokens,
+    toolCalls,
+    toolBytesIn,
+    toolBytesOut,
+    toolInputTokens,
+    toolOutputTokens,
+    statusBuckets,
+    byModel,
+  } = acc
   return {
     windowSec: seconds,
     total,

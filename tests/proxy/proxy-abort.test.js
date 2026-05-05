@@ -77,9 +77,7 @@ describe('client abort (smoke)', () => {
     const socket = net.createConnection({ host: '127.0.0.1', port: proxyPort })
     await once(socket, 'connect')
 
-    socket.write(
-      'POST /proxy/stream HTTP/1.1\r\nHost: localhost\r\nContent-Length: 1000\r\n\r\n',
-    )
+    socket.write('POST /proxy/stream HTTP/1.1\r\nHost: localhost\r\nContent-Length: 1000\r\n\r\n')
     // Destroy before sending body — simulates client abort.
     await new Promise((r) => setTimeout(r, 30))
     socket.destroy()

@@ -82,7 +82,11 @@ proxy.on('error', (err, req, res) => {
     res.setHeader('Content-Type', 'application/json')
     res.end(JSON.stringify({ error: 'bad gateway', code: err.code ?? null }))
   } else if (res && res.writable) {
-    try { res.end() } catch { /* ignore */ }
+    try {
+      res.end()
+    } catch {
+      /* ignore */
+    }
   }
 })
 
@@ -201,13 +205,26 @@ export function createProxyHandler() {
           m.status = m.status || 504
           finalize(m)
         }
-        try { req.destroy() } catch { /* ignore */ }
-        try { res.destroy() } catch { /* ignore */ }
+        try {
+          req.destroy()
+        } catch {
+          /* ignore */
+        }
+        try {
+          res.destroy()
+        } catch {
+          /* ignore */
+        }
       }, config.proxyRequestIdleTimeoutMs)
       idleTimer.unref()
     }
 
-    const clearIdle = () => { if (idleTimer) { clearTimeout(idleTimer); idleTimer = null } }
+    const clearIdle = () => {
+      if (idleTimer) {
+        clearTimeout(idleTimer)
+        idleTimer = null
+      }
+    }
     res.on('finish', clearIdle)
     res.on('close', clearIdle)
 

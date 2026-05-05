@@ -5,6 +5,31 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] — 2026-05-06 — Stability
+
+### Added
+- Per-request idle watchdog (`PROXY_REQUEST_IDLE_TIMEOUT_MS`, default 120 s) — hung upstream connections no longer accumulate indefinitely (#65).
+- Discrete error labels in proxy metrics: `upstream_timeout`, `upstream_refused`, `client_abort`, `tls`, etc. (#70).
+- Performance & Limits section in `docs/ARCHITECTURE.md` (#84).
+- Vitest coverage thresholds: 80% statements, 75% branches (#72).
+- Tests for `errorHandler` and `requestLogger` middleware (#73).
+- Tests for SSE broadcaster: eviction, double-start guard, stop/restart (#74).
+- Tests for idle watchdog and client abort (#75).
+- Docker log driver caps: `max-size=10m`, `max-file=5` (#89).
+
+### Changed
+- Log writer switched from `appendFileSync` to async `WriteStream` with `cork`/`uncork` batching — zero sync I/O on app routes (#61).
+- Log reader switched to `fs.promises`; 10 MB read cap; 5-second cache on available-listing endpoint (#62).
+- Aggregator `summary()` performs a single ring-buffer scan for all three windows (was 3×); result memoized 1 second (#63).
+
+### Fixed
+- Log rotation race: write stream redirected to new path before `renameSync` so no writes land in the renamed file (#64).
+- `startMetricsBroadcaster` double-start no longer leaks `tickHandle` (#71).
+- Tee buffer nulled immediately on overflow, not deferred (#66).
+
+### Removed
+- Known Limitations footnote from v0.2.1 (all listed issues now fixed in this release).
+
 ## [0.2.1] — 2026-05-06 — E2E bug fixes + UI/UX polish + docs overhaul
 
 ### Added

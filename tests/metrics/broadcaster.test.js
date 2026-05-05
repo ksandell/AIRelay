@@ -5,7 +5,10 @@ function mockRes() {
   const closeCallbacks = []
   return {
     _writes: writes,
-    write: vi.fn((data) => { writes.push(data); return true }),
+    write: vi.fn((data) => {
+      writes.push(data)
+      return true
+    }),
     end: vi.fn(),
     on: vi.fn((event, cb) => {
       if (event === 'close') closeCallbacks.push(cb)
@@ -58,7 +61,9 @@ describe('addMetricsClient + eviction', () => {
 })
 
 describe('startMetricsBroadcaster double-start guard', () => {
-  beforeEach(() => { vi.resetModules() })
+  beforeEach(() => {
+    vi.resetModules()
+  })
 
   it('returns the same stop fn on double-start without leaking', async () => {
     const { config } = await import('../../src/config.js')
@@ -75,7 +80,9 @@ describe('startMetricsBroadcaster double-start guard', () => {
 })
 
 describe('stopMetricsBroadcaster', () => {
-  beforeEach(() => { vi.resetModules() })
+  beforeEach(() => {
+    vi.resetModules()
+  })
 
   it('can be restarted cleanly after stop', async () => {
     const { config } = await import('../../src/config.js')
