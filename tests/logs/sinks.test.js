@@ -2,7 +2,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import { createFileSink, createStdoutSink, createNoopSink, createSink } from '../../src/logs/sinks.js'
+import {
+  createFileSink,
+  createStdoutSink,
+  createNoopSink,
+  createSink,
+} from '../../src/logs/sinks.js'
 
 let tmpDir
 
@@ -48,7 +53,11 @@ describe('createFileSink', () => {
     sink.write('after\n', redirected)
     if (old) {
       await new Promise((resolve) => setImmediate(resolve))
-      try { old.end() } catch { /* ignore */ }
+      try {
+        old.end()
+      } catch {
+        /* ignore */
+      }
     }
     sink.close()
 
