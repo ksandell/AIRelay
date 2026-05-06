@@ -1,8 +1,19 @@
+/**
+ * Metrics SSE facade.
+ * Delegates to the shared hub on channel 'metrics'.
+ * External API is unchanged.
+ */
+import {
+  addClient as hubAddClient,
+  broadcast as hubBroadcast,
+  closeAll as hubCloseAll,
+  clientCount as hubClientCount,
+} from '../sse/hub.js'
 import { config } from '../config.js'
 import { aggregate } from './aggregator.js'
 import { onEvent, getInFlight } from './collector.js'
 
-const clients = new Set()
+const CHANNEL = 'metrics'
 
 let perSecondBudget = config.sseEventRate
 let lastReset = Date.now()
@@ -10,36 +21,7 @@ let tickHandle = null
 let unsubscribe = null
 
 export function addMetricsClient(res) {
-  // Hard cap — evict oldest before accepting new.
-  while (clients.size >= config.maxSseClients) {
-    const oldest = clients.values().next().value
-    if (!oldest) break
-    try {
-      oldest.write('event: evicted\ndata: "cap"\n\n')
-      oldest.end()
-    } catch {
-      // ignore write errors
-    }
-    clients.delete(oldest)
-  }
-  clients.add(res)
-  res.on('close', () => clients.delete(res))
-}
-
-function safeWrite(res, payload) {
-  // Non-blocking: if the kernel buffer is full we drop this frame for this
-  // client rather than queueing — they'll catch up on the next aggregate tick.
-  try {
-    return res.write(payload)
-  } catch {
-    // write failed; drop this frame
-    return false
-  }
-}
-
-function broadcast(payload, eventName) {
-  const data = (eventName ? `event: ${eventName}\n` : '') + `data: ${JSON.stringify(payload)}\n\n`
-  for (const res of clients) safeWrite(res, data)
+  hubAddClient(res, CHANNEL)
 }
 
 export function startMetricsBroadcaster() {
@@ -53,11 +35,12 @@ export function startMetricsBroadcaster() {
     }
     if (perSecondBudget <= 0) return
     perSecondBudget--
-    broadcast(ev, 'request')
+    hubBroadcast(CHANNEL, ev, 'request')
   })
 
   tickHandle = setInterval(() => {
-    broadcast(
+    hubBroadcast(
+      CHANNEL,
       {
         ts: new Date().toISOString(),
         windows: {
@@ -65,7 +48,7 @@ export function startMetricsBroadcaster() {
           '5m': aggregate(300),
         },
         inFlight: getInFlight(),
-        sseClients: clients.size,
+        sseClients: hubClientCount(),
       },
       'tick',
     )
@@ -86,16 +69,9 @@ export function stopMetricsBroadcaster() {
 }
 
 export function metricsClientCount() {
-  return clients.size
+  return hubClientCount()
 }
 
 export function closeAllMetricsClients() {
-  for (const res of clients) {
-    try {
-      res.end()
-    } catch {
-      // ignore close errors
-    }
-  }
-  clients.clear()
+  hubCloseAll()
 }
