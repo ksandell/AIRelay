@@ -32,7 +32,7 @@ run_group() {
       -H "Authorization: Bearer $MISTRAL_API_KEY" \
       -H "Content-Type: application/json" \
       -d "$BODY")
-    if [[ "$STATUS" == "200" ]]; then ((PASS++)); else ((FAIL++)); fi
+    if [[ "$STATUS" == "200" ]]; then ((PASS++)) || true; else ((FAIL++)) || true; fi
     DELAY=$(awk -v min=1 -v max=2 'BEGIN{srand(PROCINFO["pid"]+ENVIRON["i"]); printf "%.2f\n", min+rand()*(max-min)}')
     sleep "$DELAY"
   done
