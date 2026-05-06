@@ -75,7 +75,6 @@ describe('proxy backpressure / large-payload (T5)', () => {
     const heapBefore = process.memoryUsage().heapUsed
 
     let totalReceived = 0
-    let req_metrics = null
 
     await new Promise((resolve, reject) => {
       const req = http.request(
@@ -108,7 +107,6 @@ describe('proxy backpressure / large-payload (T5)', () => {
     // Access internal metrics to verify m.chunks = null after request completes.
     // We do this by importing the collector and checking the last recorded event
     // does NOT have a chunks reference leaking — and by patching req._metrics.
-    let capturedMetrics = null
 
     // Spin up a one-shot upstream that records the metrics ref.
     const miniUpstream = http.createServer((req, res) => {
@@ -174,8 +172,7 @@ describe('proxy backpressure / large-payload (T5)', () => {
     // The running proxyServer still points to the original upstream via the
     // singleton proxy instance — we cannot re-target it without a new server.
     // Use a raw http request directly to mini upstream through a new proxy server.
-    const { createApp } = await import('../../src/server.js')
-    // createApp re-reads config which is already cached. Instead create a raw
+    // createApp would re-read config which is already cached. Instead create a raw
     // HTTP request to the already-running proxy; it forwards to original upstream.
     // For this sub-test, just verify the original large upstream response integrity
     // (already covered above) and confirm status 200.
@@ -187,7 +184,9 @@ describe('proxy backpressure / large-payload (T5)', () => {
         { host: '127.0.0.1', port: proxyPort, method: 'GET', path: '/proxy/large' },
         (res) => {
           let total = 0
-          res.on('data', (c) => { total += c.length })
+          res.on('data', (c) => {
+            total += c.length
+          })
           res.on('end', () => resolve({ status: res.statusCode, total }))
           res.on('error', reject)
         },
