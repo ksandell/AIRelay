@@ -31,13 +31,27 @@ const proxy = httpProxy.createProxyServer({
 // flow straight through to the client. Same idea inbound on `req`.
 // When token tracking is enabled, an additional passive listener tees chunks
 // into a per-request array for post-response extraction.
-proxy.on('proxyRes', (proxyRes, req) => {
+proxy.on('proxyRes', (proxyRes, req, res) => {
   const m = req._metrics
   if (!m) return
   m.status = proxyRes.statusCode
+
+  // Backpressure (H3): http-proxy pipes proxyRes → res (selfHandleResponse: false).
+  // When the client socket's write buffer fills, res.writableNeedDrain becomes true
+  // (the internal pipe's write() returned false). We check this flag after each
+  // data chunk and pause proxyRes so upstream stops pushing; resume on drain.
+  // Zero sync I/O — only event listener registration on the hot path.
+  res.on('drain', () => {
+    if (!proxyRes.destroyed && proxyRes.isPaused()) proxyRes.resume()
+  })
+
   proxyRes.on('data', (chunk) => {
     m.bytesOut += chunk.length
+    if (res.writableNeedDrain && !proxyRes.isPaused()) {
+      proxyRes.pause()
+    }
   })
+
   if (provider && proxyRes.statusCode < 400) {
     m.chunks = []
     m.teeBytes = 0

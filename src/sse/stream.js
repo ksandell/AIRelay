@@ -1,60 +1,40 @@
-import { config } from '../config.js'
+/**
+ * Log-stream SSE facade.
+ * Delegates to the shared hub on channel 'logs'.
+ * External API is unchanged.
+ */
+import {
+  addClient as hubAddClient,
+  broadcast as hubBroadcast,
+  broadcastRaw,
+  startHeartbeat as hubStartHeartbeat,
+  closeAll as hubCloseAll,
+  clientCount as hubClientCount,
+} from './hub.js'
 
-const clients = new Set()
+const CHANNEL = 'logs'
 
 export function addClient(res) {
-  while (clients.size >= config.maxSseClients) {
-    const oldest = clients.values().next().value
-    if (!oldest) break
-    try {
-      oldest.write('event: evicted\ndata: "cap"\n\n')
-      oldest.end()
-    } catch {
-      // ignore write errors
-    }
-    clients.delete(oldest)
-  }
-  clients.add(res)
-  res.on('close', () => clients.delete(res))
-}
-
-function safeWrite(res, payload) {
-  try {
-    return res.write(payload)
-  } catch {
-    // write failed; drop this frame
-    return false
-  }
+  hubAddClient(res, CHANNEL)
 }
 
 export function broadcast(entry) {
-  const data = `data: ${JSON.stringify(entry)}\n\n`
-  for (const res of clients) safeWrite(res, data)
+  hubBroadcast(CHANNEL, entry)
 }
 
 export function broadcastRetry(ms = 5000) {
-  const msg = `retry: ${ms}\n\n`
-  for (const res of clients) safeWrite(res, msg)
+  broadcastRaw(CHANNEL, `retry: ${ms}\n\n`)
 }
 
 export function closeAll() {
   broadcastRetry(5000)
-  for (const res of clients) {
-    try {
-      res.end()
-    } catch {
-      // ignore close errors
-    }
-  }
-  clients.clear()
+  hubCloseAll()
 }
 
 export function startHeartbeat() {
-  return setInterval(() => {
-    for (const res of clients) safeWrite(res, ': heartbeat\n\n')
-  }, config.sseHeartbeatMs)
+  return hubStartHeartbeat()
 }
 
 export function clientCount() {
-  return clients.size
+  return hubClientCount()
 }

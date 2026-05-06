@@ -23,6 +23,7 @@ export const config = {
   logRetentionDays: int('LOG_RETENTION_DAYS', 7),
   maxLogSizeMb: int('MAX_LOG_SIZE_MB', 50),
   logLevel: process.env.LOG_LEVEL ?? 'info',
+  logSink: process.env.LOG_SINK ?? 'file', // 'file' | 'stdout' | 'noop'
 
   cronSchedule: process.env.CRON_SCHEDULE ?? '0 0 * * *',
   enableCompression: process.env.ENABLE_COMPRESSION === 'true',
