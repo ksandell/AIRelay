@@ -4,22 +4,6 @@ import { pickAgent } from './agent.js'
 import { record, incInFlight, decInFlight } from '../metrics/collector.js'
 import { loadProvider } from '../providers/registry.js'
 
-// Maps Node.js error codes to discrete dashboard labels (H6).
-const ERROR_LABELS = {
-  ECONNREFUSED: 'upstream_refused',
-  ECONNRESET: 'upstream_reset',
-  ETIMEDOUT: 'upstream_timeout',
-  ENOTFOUND: 'upstream_dns',
-  CERT_HAS_EXPIRED: 'tls',
-  UNABLE_TO_VERIFY_LEAF_SIGNATURE: 'tls',
-  ERR_TLS_CERT_ALTNAME_INVALID: 'tls',
-}
-
-function errorLabel(err) {
-  if (err.code === 'ECONNABORTED' || err.message?.includes('client abort')) return 'client_abort'
-  return ERROR_LABELS[err.code] ?? err.code ?? 'error'
-}
-
 // Provider singleton — constructed once at module load. Null when token tracking
 // is disabled, which short-circuits all per-request buffering for zero overhead.
 const provider = config.proxyTokenTracking
@@ -71,10 +55,23 @@ proxy.on('proxyRes', (proxyRes, req) => {
   }
 })
 
+// Map low-level errors to a stable taxonomy so the dashboard can group
+// timeouts vs. refused connections vs. TLS failures distinctly.
+function classifyError(err) {
+  const code = err?.code || ''
+  if (code === 'ECONNABORTED' || err?.message?.includes('client abort')) return 'client_abort'
+  if (code === 'ETIMEDOUT' || code === 'ESOCKETTIMEDOUT') return 'upstream_timeout'
+  if (code === 'ECONNREFUSED') return 'upstream_refused'
+  if (code === 'ECONNRESET' || code === 'EPIPE') return 'upstream_reset'
+  if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') return 'upstream_dns'
+  if (code.startsWith('ERR_TLS_') || code.startsWith('CERT_')) return 'tls'
+  return code || err?.message || 'upstream_error'
+}
+
 proxy.on('error', (err, req, res) => {
   const m = req?._metrics
   if (m) {
-    m.error = errorLabel(err)
+    m.error = classifyError(err)
     m.status = m.status || 502
   }
   if (res && !res.headersSent) {
@@ -257,7 +254,7 @@ export function createProxyHandler() {
     proxy.web(req, res, {}, (err) => {
       // Fallback for the err callback variant (rare — error event usually fires first).
       if (err && !m.recorded) {
-        m.error = errorLabel(err)
+        m.error = classifyError(err)
         m.status = m.status || 502
         finalize(m)
         if (!res.headersSent) {
