@@ -102,7 +102,7 @@ The proxy can extract token usage from upstream responses and compute per-reques
 
 | Var | Default | Notes |
 |---|---|---|
-| `PROXY_PROVIDER` | `generic` | Named providers (14): `anthropic`, `openai`, `google`, `mistral`, `groq`, `microsoft`, `openrouter`, `together`, `fireworks`, `deepseek`, `xai`, `perplexity`, `ollama`, `nvidia`. Fallback: `generic` (records bytes only — no token/cost fields). Selects the response parser and pricing table key. |
+| `PROXY_PROVIDER` | `generic` | Named providers (15): `anthropic`, `openai`, `google`, `mistral`, `groq`, `microsoft`, `openrouter`, `together`, `fireworks`, `deepseek`, `xai`, `perplexity`, `ollama`, `nvidia`, `anlinkai`. Fallback: `generic` (records bytes only — no token/cost fields). Selects the response parser and pricing table key. |
 | `PROXY_TOKEN_TRACKING` | `true` | Set `false` to disable body inspection entirely (zero-overhead passthrough). |
 | `PRICING_CONFIG_PATH` | _(unset)_ | Optional path to a JSON file that **deep-merges** over the bundled `config/pricing.json`. Use this to add models or override prices without forking. |
 | `PROXY_TOKEN_TEE_MAX_BYTES` | `2097152` | Per-request body buffer cap (2 MiB) for token extraction. Larger responses skip extraction so big SSE streams don't pin memory. |
@@ -129,6 +129,10 @@ PROXY_PROVIDER=mistral
 # Ollama (local, $0 cost — pricing table has "*": {input:0, output:0})
 UPSTREAM_URL=http://ollama-host:11434
 PROXY_PROVIDER=ollama
+
+# AnLinkAI (private-beta SEA/MENA aggregator — Qwen + DeepSeek)
+UPSTREAM_URL=https://api.anlinkai.com/api/v1
+PROXY_PROVIDER=anlinkai
 ```
 
 > **OpenAI-compatible ≠ `PROXY_PROVIDER=openai`.** Mistral, Groq, Together,
@@ -197,9 +201,25 @@ Gemini accepts the API key as `?key=…` query string or the `x-goog-api-key` he
 ```env
 UPSTREAM_URL=https://openrouter.ai/api/v1
 PROXY_PATH_PREFIX=/proxy
+PROXY_PROVIDER=openrouter
 ```
 
 OpenRouter is OpenAI-compatible — point any OpenAI SDK at it.
+
+### AnLinkAI (private beta)
+
+```env
+UPSTREAM_URL=https://api.anlinkai.com/api/v1
+PROXY_PATH_PREFIX=/proxy
+PROXY_PROVIDER=anlinkai
+```
+
+[AnLinkAI](https://anlinkai.com/) is a SEA/MENA aggregator fronting Qwen and
+DeepSeek models. Wire format is OpenAI-compatible (`Authorization: Bearer ak_...`),
+so any OpenAI SDK works. The service is in **private beta** — model IDs and
+pricing may shift; the bundled `config/pricing.json` ships best-effort entries
+for `qwen-flash`, `qwen-3.5-flash`, `deepseek-chat`. Override via
+`PRICING_CONFIG_PATH` once you have your own contract pricing.
 
 ### Self-hosted upstream (HTTP)
 

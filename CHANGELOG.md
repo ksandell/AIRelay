@@ -5,6 +5,17 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] — 2026-05-06 — Provider visibility
+
+### Added
+- **AnLinkAI** as the 15th named provider (`PROXY_PROVIDER=anlinkai`). Private-beta SEA/MENA aggregator fronting Qwen + DeepSeek; OpenAI-compatible wire format, so it reuses the OpenAI parser and only carries its own pricing entries (`qwen-flash`, `qwen-3.5-flash`, `deepseek-chat`).
+- Setup tab now surfaces **all 15 supported providers** (was 5), grouped Frontier / Aggregators / Fast inference / Self-hosted. Generated `.env` snippet now includes the matching `PROXY_PROVIDER` line so cost reporting works on first start.
+- README provider-compatibility table expanded with `PROXY_PROVIDER` column for every supported upstream.
+- `CONFIGURATION.md` recipe block for AnLinkAI with private-beta caveat and pricing override pointer.
+
+### Changed
+- `pricing-completeness` test now asserts 15 required providers (was 14).
+
 ## [0.2.2] — 2026-05-06 — Stability
 
 ### Added

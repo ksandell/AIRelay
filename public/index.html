@@ -74,11 +74,30 @@
           <div class="field">
             <label for="setupProvider">Provider</label>
             <select id="setupProvider">
-              <option value="anthropic">Anthropic (Claude API)</option>
-              <option value="openai">OpenAI</option>
-              <option value="gemini">Google Gemini</option>
-              <option value="openrouter">OpenRouter</option>
-              <option value="custom">Custom / self-hosted</option>
+              <optgroup label="Frontier">
+                <option value="anthropic">Anthropic (Claude API)</option>
+                <option value="openai">OpenAI</option>
+                <option value="gemini">Google Gemini</option>
+                <option value="xai">xAI (Grok)</option>
+              </optgroup>
+              <optgroup label="Aggregators">
+                <option value="openrouter">OpenRouter</option>
+                <option value="together">Together AI</option>
+                <option value="fireworks">Fireworks AI</option>
+                <option value="anlinkai">AnLinkAI (private beta)</option>
+              </optgroup>
+              <optgroup label="Fast inference">
+                <option value="groq">Groq</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="perplexity">Perplexity</option>
+                <option value="mistral">Mistral</option>
+                <option value="nvidia">NVIDIA NIM</option>
+                <option value="microsoft">Microsoft</option>
+              </optgroup>
+              <optgroup label="Self-hosted">
+                <option value="ollama">Ollama</option>
+                <option value="custom">Custom / self-hosted</option>
+              </optgroup>
             </select>
             <p class="hint" id="providerHint">https://api.anthropic.com</p>
           </div>

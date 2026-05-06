@@ -25,10 +25,47 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.2.0 | ✅ Done | Token & cost tracking (14 providers) |
 | v0.2.1 | ✅ Done | E2E bug fixes + UI/UX polish |
 | v0.2.2 | ✅ Done | Stability — async I/O, proxy hardening, test coverage |
+| v0.2.3 | ✅ Done | Provider visibility — AnLinkAI added, Setup tab expanded to all 15 |
+| v0.2.4 | ⚪ Planned | Cerebras provider (OAI-compat, pricing entry only) |
+| v0.2.5 | ⚪ Planned | Azure OpenAI adapter (api-key header + api-version query param) |
 | v0.3.0 | ⚪ Planned | Persistence + multi-upstream |
 | v0.4.0+ | ⚪ Speculative | Caching, retries, routing intelligence |
 
 Per-release detail in [CHANGELOG.md](CHANGELOG.md).
+
+---
+
+## v0.2.4 — Cerebras provider  ⚪
+
+**Theme:** "One more zero-effort provider while the catalog is hot."
+
+- Add `cerebras` to `src/providers/registry.js` as a thin `OpenAIProvider` subclass.
+- `config/pricing.json` entry for `llama-3.3-70b`, `qwen-3-32b` (rates per Cerebras pricing page).
+- Setup-tab entry under **Fast inference** group.
+- README + CONFIGURATION recipe.
+
+**Effort:** ~1 hour. Pure addition, no parser work.
+
+---
+
+## v0.2.5 — Azure OpenAI adapter  ⚪
+
+**Theme:** "First non-trivial provider — header + query rewrite hook."
+
+OpenAI-compatible body schema, but:
+- Auth header is `api-key: <key>` (not `Authorization: Bearer ...`).
+- Requires `?api-version=YYYY-MM-DD` query param on every request.
+- URL pattern is per-deployment: `https://<resource>.openai.azure.com/openai/deployments/<deployment>/chat/completions`.
+
+### Approach
+- Small header-rewrite hook in `src/proxy/proxy.js` (kept off the byte-streaming hot path — only mutates request headers before `http-proxy` forwards).
+- New env knob `AZURE_OPENAI_API_VERSION` (auto-appended if absent).
+- `azure` entry in registry, pricing, and Setup tab.
+
+**Effort:** ~½ day. First time we touch outbound headers; needs care to keep the "no body modification" invariant intact.
+
+### Deferred to v0.3.0+
+- **Cohere** — custom `/v2/chat` schema. Real parser work; better to land alongside multi-upstream so it shares route-level provider profiles.
 
 ---
 

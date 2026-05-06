@@ -18,7 +18,7 @@
 - **Transparent passthrough.** Streaming AI responses (SSE / chunked) flow through unmodified — your SDK doesn't know the proxy is there.
 - **Live dashboard.** RPS, p50/p95/p99, error rate, status pills, network + token throughput (In/Out), tokens/sec, recent-requests feed — updated in real time.
 - **Guided setup.** First time you open the dashboard, a Setup tab walks you through generating the right `.env` for your provider.
-- **Token & cost tracking** — per-request input/output tokens + USD cost for 14 providers ([full list in CONFIGURATION.md](CONFIGURATION.md#token--cost-tracking)).
+- **Token & cost tracking** — per-request input/output tokens + USD cost for 15 providers ([full list in CONFIGURATION.md](CONFIGURATION.md#token--cost-tracking)).
 - **Per-model breakdown** — cost/token aggregates via `/api/metrics/models`, sortable by spend.
 - **Single Docker container.** No DB, no Redis, no system cron. Bring `UPSTREAM_URL` and go.
 - **Cross-platform.** Identical on Windows Docker Desktop, macOS, and Linux.
@@ -83,13 +83,24 @@ Full instructions: [docs/e2e-test-plan.md](docs/e2e-test-plan.md)
 
 ## Provider compatibility
 
-| Provider | `UPSTREAM_URL` |
-|---|---|
-| Anthropic | `https://api.anthropic.com` |
-| OpenAI | `https://api.openai.com/v1` |
-| Google Gemini | `https://generativelanguage.googleapis.com` |
-| OpenRouter | `https://openrouter.ai/api/v1` |
-| Self-hosted | any HTTP/HTTPS endpoint |
+| Provider | `UPSTREAM_URL` | `PROXY_PROVIDER` |
+|---|---|---|
+| Anthropic | `https://api.anthropic.com` | `anthropic` |
+| OpenAI | `https://api.openai.com/v1` | `openai` |
+| Google Gemini | `https://generativelanguage.googleapis.com` | `google` |
+| xAI (Grok) | `https://api.x.ai/v1` | `xai` |
+| OpenRouter | `https://openrouter.ai/api/v1` | `openrouter` |
+| Together AI | `https://api.together.xyz/v1` | `together` |
+| Fireworks AI | `https://api.fireworks.ai/inference/v1` | `fireworks` |
+| AnLinkAI (beta) | `https://api.anlinkai.com/api/v1` | `anlinkai` |
+| Groq | `https://api.groq.com/openai/v1` | `groq` |
+| DeepSeek | `https://api.deepseek.com/v1` | `deepseek` |
+| Perplexity | `https://api.perplexity.ai` | `perplexity` |
+| Mistral | `https://api.mistral.ai` | `mistral` |
+| NVIDIA NIM | `https://integrate.api.nvidia.com/v1` | `nvidia` |
+| Microsoft | (per Azure deployment) | `microsoft` |
+| Ollama (self-hosted) | `http://<host>:11434` | `ollama` |
+| Custom / other | any HTTP/HTTPS endpoint | `generic` |
 
 **Not compatible:** AWS Bedrock and other SigV4-signed APIs (the proxy rewrites the `Host` header, which invalidates SigV4 signatures). See [CONFIGURATION.md](CONFIGURATION.md#not-supported-aws-bedrock).
 
