@@ -1,14 +1,6 @@
 import { BaseProvider } from './base.js'
 import { lookupModelPrice } from './pricing.js'
 
-function parseSync(buffer) {
-  try {
-    return JSON.parse(buffer.toString('utf8'))
-  } catch {
-    return null
-  }
-}
-
 function parseStreaming(buffer) {
   const text = buffer.toString('utf8')
   let model = null,

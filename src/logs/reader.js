@@ -22,7 +22,8 @@ async function readFileCapped(filePath) {
   try {
     const { size } = await fh.stat()
     const readSize = Math.min(size, config.maxLogReadMb * 1024 * 1024)
-    const offset = size > config.maxLogReadMb * 1024 * 1024 ? size - config.maxLogReadMb * 1024 * 1024 : 0
+    const offset =
+      size > config.maxLogReadMb * 1024 * 1024 ? size - config.maxLogReadMb * 1024 * 1024 : 0
     const buf = Buffer.allocUnsafe(readSize)
     const { bytesRead } = await fh.read(buf, 0, readSize, offset)
     return buf.slice(0, bytesRead).toString('utf8')
