@@ -46,7 +46,7 @@ export class AnthropicProvider extends BaseProvider {
   }
 
   extractTokens(buffer) {
-    const sync = parseSync(buffer)
+    const sync = this._parseJson(buffer)
     if (sync?.usage) {
       return {
         model: sync.model ?? null,
@@ -72,7 +72,7 @@ export class AnthropicProvider extends BaseProvider {
     let toolBytesIn = 0
     let toolBytesOut = 0
 
-    const req = reqBuffer ? parseSync(reqBuffer) : null
+    const req = reqBuffer ? this._parseJson(reqBuffer) : null
     if (req?.messages && Array.isArray(req.messages)) {
       for (const m of req.messages) {
         if (!Array.isArray(m.content)) continue
@@ -85,7 +85,7 @@ export class AnthropicProvider extends BaseProvider {
       }
     }
 
-    const resp = respBuffer ? parseSync(respBuffer) : null
+    const resp = respBuffer ? this._parseJson(respBuffer) : null
     if (resp?.content && Array.isArray(resp.content)) {
       for (const block of resp.content) {
         if (block?.type === 'tool_use') {
