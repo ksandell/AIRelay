@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Log rotation race: write stream redirected to new path before `renameSync` so no writes land in the renamed file (#64).
 - `startMetricsBroadcaster` double-start no longer leaks `tickHandle` (#71).
 - Tee buffer nulled immediately on overflow, not deferred (#66).
+- Load-test script: renamed `GROUPS`/`REQUESTS` variables to avoid collision with bash built-ins.
+
+### Docs
+- Metrics dashboard screenshot embedded in README.
 
 ### Known Limitations (v0.2.2)
 
