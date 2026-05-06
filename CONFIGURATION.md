@@ -384,6 +384,26 @@ Before pointing real production traffic at the proxy:
 
 ---
 
+## Capacity & Limits
+
+These knobs control memory usage and throughput ceilings. All have safe defaults for homelab use.
+
+| Env var | Default | What it limits |
+|---------|---------|----------------|
+| `MAX_METRIC_EVENTS` | `10000` | Ring buffer depth; oldest events evicted when full |
+| `LOG_READ_MAX_MB` | `10` | Max bytes read per `/api/logs` or `/api/logs/history` call |
+| `MAX_API_RESULT_ROWS` | `5000` | Max rows returned by `/api/logs` and `/api/metrics/recent` |
+| `PROXY_MAX_BODY_PARSE_MB` | `10` | Request/response body size cap before token extraction is skipped |
+| `MAX_SSE_CLIENTS` | `50` | Max concurrent SSE connections per hub (metrics + logs each) |
+| `PROXY_REQUEST_IDLE_TIMEOUT_MS` | `120000` | Idle timeout for hung upstream connections (ms) |
+| `SHUTDOWN_TIMEOUT_MS` | `30000` | Graceful shutdown drain timeout (ms) |
+
+**Memory estimate:** `MAX_METRIC_EVENTS × ~500 bytes ≈ 5 MB` at defaults. Increase `MAX_METRIC_EVENTS` for longer in-memory history.
+
+**Tuning for high traffic:** Lower `PROXY_REQUEST_IDLE_TIMEOUT_MS` to reclaim connections faster; raise `MAX_METRIC_EVENTS` only if you have headroom. See [docs/OPERATIONS.md](docs/OPERATIONS.md) for a runbook.
+
+---
+
 ## See also
 
 - [INSTALL.md](INSTALL.md) — first-time setup
