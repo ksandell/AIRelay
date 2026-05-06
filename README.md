@@ -50,6 +50,20 @@ const client = new Anthropic({
 
 That's it. Every request now flows through the proxy and shows up on the dashboard.
 
+### Smoke-test with mock upstream
+
+Verify the proxy end-to-end without a real API key using the Mistral-based E2E playbook:
+
+```bash
+# Quick health check (requires a running proxy):
+curl -s http://localhost:3000/health
+
+# Full E2E walkthrough:
+# See docs/e2e-test-plan.md
+```
+
+Full instructions: [docs/e2e-test-plan.md](docs/e2e-test-plan.md)
+
 ---
 
 ## Going further
