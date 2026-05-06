@@ -7,12 +7,8 @@ export class GoogleProvider extends BaseProvider {
   }
 
   extractTokens(buffer) {
-    let parsed
-    try {
-      parsed = JSON.parse(buffer.toString('utf8'))
-    } catch {
-      return null
-    }
+    const parsed = this._parseJson(buffer)
+    if (!parsed) return null
 
     const usage = parsed.usageMetadata
     if (!usage) return null
@@ -35,15 +31,7 @@ export class GoogleProvider extends BaseProvider {
     let toolCalls = 0
     let toolBytesIn = 0
     let toolBytesOut = 0
-    const safe = (b) => {
-      try {
-        return JSON.parse(b.toString('utf8'))
-      } catch {
-        return null
-      }
-    }
-
-    const req = reqBuffer ? safe(reqBuffer) : null
+    const req = reqBuffer ? this._parseJson(reqBuffer) : null
     if (req?.contents && Array.isArray(req.contents)) {
       for (const c of req.contents) {
         if (!Array.isArray(c.parts)) continue
@@ -56,7 +44,7 @@ export class GoogleProvider extends BaseProvider {
       }
     }
 
-    const resp = respBuffer ? safe(respBuffer) : null
+    const resp = respBuffer ? this._parseJson(respBuffer) : null
     if (resp?.candidates && Array.isArray(resp.candidates)) {
       for (const cand of resp.candidates) {
         const parts = cand.content?.parts

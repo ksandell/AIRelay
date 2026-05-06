@@ -2,8 +2,6 @@ import { open, readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { config } from '../config.js'
 
-const MAX_READ_BYTES = 10 * 1024 * 1024 // 10 MB cap
-
 const activeLog = () => path.join(config.logDir, 'app.log')
 
 function parseLines(text) {
@@ -23,8 +21,9 @@ async function readFileCapped(filePath) {
   const fh = await open(filePath, 'r')
   try {
     const { size } = await fh.stat()
-    const readSize = Math.min(size, MAX_READ_BYTES)
-    const offset = size > MAX_READ_BYTES ? size - MAX_READ_BYTES : 0
+    const readSize = Math.min(size, config.maxLogReadMb * 1024 * 1024)
+    const offset =
+      size > config.maxLogReadMb * 1024 * 1024 ? size - config.maxLogReadMb * 1024 * 1024 : 0
     const buf = Buffer.allocUnsafe(readSize)
     const { bytesRead } = await fh.read(buf, 0, readSize, offset)
     return buf.slice(0, bytesRead).toString('utf8')

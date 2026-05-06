@@ -16,7 +16,7 @@ router.get('/api/metrics/summary', (req, res) => {
 })
 
 router.get('/api/metrics/recent', (req, res) => {
-  const limit = Math.min(parseInt(req.query.limit ?? '200', 10), 5000)
+  const limit = Math.min(parseInt(req.query.limit ?? '200', 10), config.maxApiResultRows)
   res.json(recent(limit))
 })
 

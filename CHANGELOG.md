@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `startMetricsBroadcaster` double-start no longer leaks `tickHandle` (#71).
 - Tee buffer nulled immediately on overflow, not deferred (#66).
 
+### Known Limitations (v0.2.2)
+
+- **H3 — No proxy backpressure:** A fast upstream feeding a stalled SSE client will accumulate data in Node.js write buffers. No `drain`/`pause`/`resume` flow control is applied on the downstream side. Planned for a future release.
+- **H4 — Dual SSE eviction policies:** Metrics and log hubs use identical but separate eviction implementations. Consolidation into a single hub is deferred to v0.3.0.
+
 ## [0.2.1] — 2026-05-06 — E2E bug fixes + UI/UX polish + docs overhaul
 
 ### Added
