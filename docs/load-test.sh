@@ -6,8 +6,8 @@
 set -euo pipefail
 
 ENDPOINT="${AIRELAY_URL:-http://localhost:3000}/proxy/v1/chat/completions"
-GROUPS="${GROUPS:-10}"
-REQUESTS="${REQUESTS:-100}"
+NUM_GROUPS="${NUM_GROUPS:-10}"
+NUM_REQUESTS="${NUM_REQUESTS:-100}"
 
 if [[ -z "${MISTRAL_API_KEY:-}" ]]; then
   echo "ERROR: MISTRAL_API_KEY is not set" >&2
@@ -25,7 +25,7 @@ MESSAGES=(
 run_group() {
   local GROUP=$1
   local PASS=0 FAIL=0
-  for i in $(seq 1 "$REQUESTS"); do
+  for i in $(seq 1 "$NUM_REQUESTS"); do
     BODY="${MESSAGES[$((RANDOM % ${#MESSAGES[@]}))]}"
     STATUS=$(curl -sS -o /dev/null -w "%{http_code}" \
       -X POST "$ENDPOINT" \
@@ -40,10 +40,10 @@ run_group() {
 }
 
 export -f run_group
-export MISTRAL_API_KEY ENDPOINT REQUESTS MESSAGES
+export MISTRAL_API_KEY ENDPOINT NUM_REQUESTS MESSAGES
 
-echo "Starting $GROUPS groups × $REQUESTS requests against $ENDPOINT"
-for g in $(seq 1 "$GROUPS"); do
+echo "Starting $NUM_GROUPS groups × $NUM_REQUESTS requests against $ENDPOINT"
+for g in $(seq 1 "$NUM_GROUPS"); do
   run_group "$g" &
 done
 
