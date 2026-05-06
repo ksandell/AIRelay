@@ -35,16 +35,13 @@ Per-release detail in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
-## v0.2.4 — Cerebras provider  ⚪
+## v0.2.4 — Cerebras provider  ✅
 
-**Theme:** "One more zero-effort provider while the catalog is hot."
-
-- Add `cerebras` to `src/providers/registry.js` as a thin `OpenAIProvider` subclass.
-- `config/pricing.json` entry for `llama-3.3-70b`, `qwen-3-32b` (rates per Cerebras pricing page).
-- Setup-tab entry under **Fast inference** group.
-- README + CONFIGURATION recipe.
-
-**Effort:** ~1 hour. Pure addition, no parser work.
+**Shipped:** Cerebras as the 16th named provider. `CerebrasProvider` extends
+`OpenAIProvider` (5-line subclass). Pricing: `llama3.1-8b` ($0.10/$0.10) and
+`qwen-3-235b-a22b` ($0.60/$1.20). Setup tab under Fast inference, CONFIGURATION
+recipe, README row. `pricing-completeness` test bumped to 16 required providers.
+263 tests pass.
 
 ---
 
