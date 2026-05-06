@@ -21,10 +21,23 @@ function activateTab(name) {
 tabs.forEach((t) => t.addEventListener('click', () => activateTab(t.dataset.tab)))
 
 // ─── Setup panel ─────────────────────────────────────────────
+// `proxyProvider` is the value of PROXY_PROVIDER for pricing/parser dispatch.
+// Most aggregators speak the OpenAI wire format but are priced under their own
+// key (see CONFIGURATION.md "OpenAI-compatible ≠ PROXY_PROVIDER=openai").
+const oaiSdk = (envVar) => (host, prefix) => `// OpenAI-compatible SDK
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: process.env.${envVar},
+  baseURL: "${host}${prefix}",
+});`
+
 const PROVIDERS = {
+  // Frontier
   anthropic: {
     label: 'Anthropic (Claude API)',
     upstream: 'https://api.anthropic.com',
+    proxyProvider: 'anthropic',
     sdk: (host, prefix) => `// Anthropic SDK
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -36,17 +49,13 @@ const client = new Anthropic({
   openai: {
     label: 'OpenAI',
     upstream: 'https://api.openai.com/v1',
-    sdk: (host, prefix) => `// OpenAI SDK
-import OpenAI from "openai";
-
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  baseURL: "${host}${prefix}",
-});`,
+    proxyProvider: 'openai',
+    sdk: oaiSdk('OPENAI_API_KEY'),
   },
   gemini: {
     label: 'Google Gemini',
     upstream: 'https://generativelanguage.googleapis.com',
+    proxyProvider: 'google',
     sdk: (host, prefix) => `// Plain HTTP — Gemini accepts ?key=… or x-goog-api-key
 fetch("${host}${prefix}/v1beta/models/gemini-2.0-flash:generateContent?key=" + process.env.GEMINI_API_KEY, {
   method: "POST",
@@ -54,20 +63,94 @@ fetch("${host}${prefix}/v1beta/models/gemini-2.0-flash:generateContent?key=" + p
   body: JSON.stringify({ contents: [{ parts: [{ text: "hi" }] }] }),
 });`,
   },
+  xai: {
+    label: 'xAI (Grok)',
+    upstream: 'https://api.x.ai/v1',
+    proxyProvider: 'xai',
+    sdk: oaiSdk('XAI_API_KEY'),
+  },
+
+  // Aggregators / multi-model
   openrouter: {
     label: 'OpenRouter',
     upstream: 'https://openrouter.ai/api/v1',
-    sdk: (host, prefix) => `// OpenRouter is OpenAI-compatible
-import OpenAI from "openai";
+    proxyProvider: 'openrouter',
+    sdk: oaiSdk('OPENROUTER_API_KEY'),
+  },
+  together: {
+    label: 'Together AI',
+    upstream: 'https://api.together.xyz/v1',
+    proxyProvider: 'together',
+    sdk: oaiSdk('TOGETHER_API_KEY'),
+  },
+  fireworks: {
+    label: 'Fireworks AI',
+    upstream: 'https://api.fireworks.ai/inference/v1',
+    proxyProvider: 'fireworks',
+    sdk: oaiSdk('FIREWORKS_API_KEY'),
+  },
+  anlinkai: {
+    label: 'AnLinkAI (private beta — Qwen / DeepSeek)',
+    upstream: 'https://api.anlinkai.com/api/v1',
+    proxyProvider: 'anlinkai',
+    sdk: oaiSdk('ANLINKAI_API_KEY'),
+  },
 
-const client = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: "${host}${prefix}",
-});`,
+  // Fast / inference-focused
+  groq: {
+    label: 'Groq',
+    upstream: 'https://api.groq.com/openai/v1',
+    proxyProvider: 'groq',
+    sdk: oaiSdk('GROQ_API_KEY'),
+  },
+  cerebras: {
+    label: 'Cerebras',
+    upstream: 'https://api.cerebras.ai/v1',
+    proxyProvider: 'cerebras',
+    sdk: oaiSdk('CEREBRAS_API_KEY'),
+  },
+  deepseek: {
+    label: 'DeepSeek',
+    upstream: 'https://api.deepseek.com/v1',
+    proxyProvider: 'deepseek',
+    sdk: oaiSdk('DEEPSEEK_API_KEY'),
+  },
+  perplexity: {
+    label: 'Perplexity',
+    upstream: 'https://api.perplexity.ai',
+    proxyProvider: 'perplexity',
+    sdk: oaiSdk('PERPLEXITY_API_KEY'),
+  },
+  mistral: {
+    label: 'Mistral',
+    upstream: 'https://api.mistral.ai',
+    proxyProvider: 'mistral',
+    sdk: oaiSdk('MISTRAL_API_KEY'),
+  },
+  nvidia: {
+    label: 'NVIDIA NIM',
+    upstream: 'https://integrate.api.nvidia.com/v1',
+    proxyProvider: 'nvidia',
+    sdk: oaiSdk('NVIDIA_API_KEY'),
+  },
+  microsoft: {
+    label: 'Microsoft (Azure OpenAI-compatible)',
+    upstream: 'https://api.openai.com/v1',
+    proxyProvider: 'microsoft',
+    sdk: oaiSdk('AZURE_OPENAI_API_KEY'),
+  },
+
+  // Self-host / fallback
+  ollama: {
+    label: 'Ollama (self-hosted)',
+    upstream: 'http://ollama-host:11434',
+    proxyProvider: 'ollama',
+    sdk: oaiSdk('OLLAMA_API_KEY'),
   },
   custom: {
     label: 'Custom / self-hosted',
     upstream: '',
+    proxyProvider: 'generic',
     sdk: (host, prefix) => `// Point your SDK or HTTP client at:
 //   ${host}${prefix}
 // Auth headers from your client are forwarded unchanged.`,
@@ -119,6 +202,7 @@ function renderSetup() {
     `UPSTREAM_URL=${upstream}`,
     `PROXY_PATH_PREFIX=${prefix}`,
     `PROXY_INSECURE_TLS=${tls ? 'false' : 'true'}`,
+    `PROXY_PROVIDER=${PROVIDERS[provider].proxyProvider ?? 'generic'}`,
   ]
   if (host) lines.push(`PUBLIC_BASE_URL=${publicHostBase()}`)
   setupEnvBlockEl.textContent = lines.join('\n') + '\n'

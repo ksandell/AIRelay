@@ -12,6 +12,8 @@ import { XAIProvider } from './xai.js'
 import { PerplexityProvider } from './perplexity.js'
 import { OllamaProvider } from './ollama.js'
 import { NvidiaProvider } from './nvidia.js'
+import { AnLinkAIProvider } from './anlinkai.js'
+import { CerebrasProvider } from './cerebras.js'
 import { GenericProvider } from './generic.js'
 import { loadPricing } from './pricing.js'
 
@@ -30,6 +32,8 @@ const PROVIDER_CLASSES = {
   perplexity: PerplexityProvider,
   ollama: OllamaProvider,
   nvidia: NvidiaProvider,
+  anlinkai: AnLinkAIProvider,
+  cerebras: CerebrasProvider,
   generic: GenericProvider,
 }
 
