@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { config } from '../config.js'
 import { readTail, readHistoricLog, listAvailableLogs } from '../logs/reader.js'
 import { addClient } from '../sse/stream.js'
 
@@ -6,7 +7,7 @@ const router = Router()
 
 router.get('/api/logs', async (req, res, next) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit ?? '500', 10), 5000)
+    const limit = Math.min(parseInt(req.query.limit ?? '500', 10), config.maxApiResultRows)
     const entries = await readTail(limit)
     res.json(entries)
   } catch (err) {
