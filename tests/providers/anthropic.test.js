@@ -125,3 +125,37 @@ describe('AnthropicProvider', () => {
     })
   })
 })
+
+describe('AnthropicProvider — malformed SSE robustness', () => {
+  const provider = new AnthropicProvider()
+
+  it('does not throw on truncated streaming response', () => {
+    const partial = Buffer.from(
+      'event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":10',
+    )
+    expect(() => provider.extractTokens(partial)).not.toThrow()
+  })
+
+  it('does not throw on non-JSON data line', () => {
+    const bad = Buffer.from('event: message_start\ndata: NOT_JSON\n\n')
+    expect(() => provider.extractTokens(bad)).not.toThrow()
+  })
+
+  it('does not throw on garbage lines', () => {
+    const garbage = Buffer.from('garbage line\nevent: foo\n')
+    expect(() => provider.extractTokens(garbage)).not.toThrow()
+  })
+
+  it('extracts tokens correctly despite leading garbage', () => {
+    const mixed = Buffer.from(
+      'garbage\n' +
+        'event: message_start\n' +
+        'data: {"type":"message_start","message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":10,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}\n\n' +
+        'event: message_delta\n' +
+        'data: {"type":"message_delta","usage":{"output_tokens":5}}\n\n',
+    )
+    const result = provider.extractTokens(mixed)
+    expect(result?.inputTokens).toBe(10)
+    expect(result?.outputTokens).toBe(5)
+  })
+})

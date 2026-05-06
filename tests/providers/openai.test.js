@@ -105,3 +105,19 @@ describe('OpenAIProvider', () => {
     })
   })
 })
+
+describe('OpenAIProvider — malformed SSE robustness', () => {
+  const provider = new OpenAIProvider(loadPricing('openai'))
+
+  it('does not throw on truncated streaming chunk', () => {
+    const truncated = Buffer.from(
+      'data: {"object":"chat.completion.chunk","choices":[{"delta":{"content":"hel"}}',
+    )
+    expect(() => provider.extractTokens(truncated)).not.toThrow()
+  })
+
+  it('does not throw on data: [DONE]', () => {
+    const done = Buffer.from('data: [DONE]\n\n')
+    expect(() => provider.extractTokens(done)).not.toThrow()
+  })
+})
