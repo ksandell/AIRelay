@@ -103,6 +103,12 @@ fetch("${host}${prefix}/v1beta/models/gemini-2.0-flash:generateContent?key=" + p
     proxyProvider: 'groq',
     sdk: oaiSdk('GROQ_API_KEY'),
   },
+  cerebras: {
+    label: 'Cerebras',
+    upstream: 'https://api.cerebras.ai/v1',
+    proxyProvider: 'cerebras',
+    sdk: oaiSdk('CEREBRAS_API_KEY'),
+  },
   deepseek: {
     label: 'DeepSeek',
     upstream: 'https://api.deepseek.com/v1',

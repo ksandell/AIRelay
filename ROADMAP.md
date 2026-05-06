@@ -26,7 +26,7 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.2.1 | ✅ Done | E2E bug fixes + UI/UX polish |
 | v0.2.2 | ✅ Done | Stability — async I/O, proxy hardening, test coverage |
 | v0.2.3 | ✅ Done | Provider visibility — AnLinkAI added, Setup tab expanded to all 15 |
-| v0.2.4 | ⚪ Planned | Cerebras provider (OAI-compat, pricing entry only) |
+| v0.2.4 | ✅ Done | Cerebras provider — wafer-scale inference, 16th provider |
 | v0.2.5 | ⚪ Planned | Azure OpenAI adapter (api-key header + api-version query param) |
 | v0.3.0 | ⚪ Planned | Persistence + multi-upstream |
 | v0.4.0+ | ⚪ Speculative | Caching, retries, routing intelligence |

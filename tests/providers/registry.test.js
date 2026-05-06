@@ -29,6 +29,11 @@ describe('loadProvider', () => {
     expect(loadProvider('anlinkai')).toBeInstanceOf(AnLinkAIProvider)
   })
 
+  it('returns CerebrasProvider for "cerebras"', async () => {
+    const { CerebrasProvider } = await import('../../src/providers/cerebras.js')
+    expect(loadProvider('cerebras')).toBeInstanceOf(CerebrasProvider)
+  })
+
   it('returns GenericProvider for unknown name', async () => {
     const { GenericProvider } = await import('../../src/providers/generic.js')
     expect(loadProvider('unknown-xyz')).toBeInstanceOf(GenericProvider)

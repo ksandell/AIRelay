@@ -5,6 +5,17 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.4] — 2026-05-06 — Cerebras provider
+
+### Added
+- **Cerebras** as the 16th named provider (`PROXY_PROVIDER=cerebras`). Wafer-scale inference platform; OpenAI-compatible wire format, reuses the OpenAI parser. Pricing entries for `llama3.1-8b` and `qwen-3-235b-a22b`.
+- `CONFIGURATION.md` recipe block for Cerebras.
+- README provider-compatibility table row for Cerebras.
+- Setup tab now lists Cerebras under the Fast inference optgroup.
+
+### Changed
+- `pricing-completeness` test now asserts 16 required providers (was 15).
+
 ## [0.2.3] — 2026-05-06 — Provider visibility
 
 ### Added

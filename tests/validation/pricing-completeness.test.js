@@ -17,10 +17,11 @@ const REQUIRED_PROVIDERS = [
   'nvidia',
   'openrouter',
   'anlinkai',
+  'cerebras',
 ]
 
 describe('pricing.json completeness', () => {
-  it('contains all 15 required providers', () => {
+  it('contains all 16 required providers', () => {
     const present = Object.keys(pricing.providers)
     for (const name of REQUIRED_PROVIDERS) {
       expect(present, `missing provider "${name}"`).toContain(name)

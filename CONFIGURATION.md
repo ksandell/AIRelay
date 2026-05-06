@@ -206,6 +206,19 @@ PROXY_PROVIDER=openrouter
 
 OpenRouter is OpenAI-compatible — point any OpenAI SDK at it.
 
+### Cerebras
+
+```env
+UPSTREAM_URL=https://api.cerebras.ai/v1
+PROXY_PATH_PREFIX=/proxy
+PROXY_PROVIDER=cerebras
+CEREBRAS_API_KEY=your-key-here
+```
+
+[Cerebras](https://cerebras.ai/) runs inference on dedicated wafer-scale hardware.
+Wire format is OpenAI-compatible (`Authorization: Bearer ...`), so any OpenAI SDK works.
+Pricing is per-model; bundled entries cover `llama3.1-8b` and `qwen-3-235b-a22b`.
+
 ### AnLinkAI (private beta)
 
 ```env

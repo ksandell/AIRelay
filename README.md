@@ -93,6 +93,7 @@ Full instructions: [docs/e2e-test-plan.md](docs/e2e-test-plan.md)
 | Together AI | `https://api.together.xyz/v1` | `together` |
 | Fireworks AI | `https://api.fireworks.ai/inference/v1` | `fireworks` |
 | AnLinkAI (beta) | `https://api.anlinkai.com/api/v1` | `anlinkai` |
+| Cerebras | `https://api.cerebras.ai/v1` | `cerebras` |
 | Groq | `https://api.groq.com/openai/v1` | `groq` |
 | DeepSeek | `https://api.deepseek.com/v1` | `deepseek` |
 | Perplexity | `https://api.perplexity.ai` | `perplexity` |
