@@ -200,7 +200,26 @@ loadFilterState()
   })
 })
 
-const escHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+const escHtml = (s) =>
+  String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+
+const ERROR_LABELS = {
+  client_abort: 'ABORT',
+  upstream_timeout: 'TIMEOUT',
+  upstream_refused: 'REFUSED',
+  upstream_reset: 'RESET',
+  upstream_dns: 'DNS',
+  tls: 'TLS',
+}
+
+function errorLabel(err) {
+  if (!err) return null
+  return ERROR_LABELS[err] ?? 'ERR'
+}
 
 function typeForAppEntry(entry) {
   const path = entry.meta?.path ?? entry.meta?.url ?? ''
@@ -211,8 +230,9 @@ function typeForAppEntry(entry) {
 function renderProxyRow(ev) {
   const el = document.createElement('div')
   el.className = 'log-entry type-proxy'
-  const status = ev.status || (ev.error ? 'ERR' : '—')
-  const statusClass = ev.error ? 'err' : `s${(ev.status / 100) | 0}`
+  const label = errorLabel(ev.error)
+  const status = label ?? ev.status ?? '—'
+  const statusClass = label ? 'err' : `s${(ev.status / 100) | 0}`
   const rawPath = ev.path ?? '—'
   const path = rawPath.length > 45 ? rawPath.slice(0, 44) + '…' : rawPath
   const tokens =
@@ -222,7 +242,8 @@ function renderProxyRow(ev) {
   const cost =
     typeof ev.costUsd === 'number' ? ` <span class="log-meta">${fmtCost(ev.costUsd)}</span>` : ''
   const model = ev.model ? ` <span class="log-meta">${escHtml(ev.model)}</span>` : ''
-  el.innerHTML = `<span class="log-ts">${fmtTime(ev.ts)}</span><span class="log-level ${statusClass}">${escHtml(String(status))}</span><span class="log-msg"><span class="log-method">${escHtml(ev.method ?? '—')}</span> ${escHtml(path)} <span class="log-meta">${ev.durationMs ?? '—'}ms</span> <span class="log-meta">↓${fmtBytes(ev.bytesIn ?? 0)} ↑${fmtBytes(ev.bytesOut ?? 0)}</span>${model}${tokens}${cost}</span>`
+  const titleAttr = ev.error ? ` title="${escHtml(String(ev.error))}"` : ''
+  el.innerHTML = `<span class="log-ts">${fmtTime(ev.ts)}</span><span class="log-level ${statusClass}"${titleAttr}>${escHtml(String(status))}</span><span class="log-msg"><span class="log-method">${escHtml(ev.method ?? '—')}</span> ${escHtml(path)} <span class="log-meta">${ev.durationMs ?? '—'}ms</span> <span class="log-meta">↓${fmtBytes(ev.bytesIn ?? 0)} ↑${fmtBytes(ev.bytesOut ?? 0)}</span>${model}${tokens}${cost}</span>`
   return el
 }
 
@@ -828,7 +849,7 @@ function appendRequest(ev) {
     <td>${time}</td>
     <td>${escHtml(ev.method)}</td>
     <td>${escHtml(ev.path)}</td>
-    <td class="status num">${ev.status || (ev.error ? 'ERR' : '—')}</td>
+    <td class="status num" title="${ev.error ? escHtml(String(ev.error)) : ''}">${errorLabel(ev.error) ?? ev.status ?? '—'}</td>
     <td class="num">${ev.durationMs}</td>
     <td class="num">${fmtBytes(ev.bytesIn)}</td>
     <td class="num">${fmtBytes(ev.bytesOut)}</td>
