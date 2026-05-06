@@ -46,8 +46,8 @@ proxy.on('proxyRes', (proxyRes, req) => {
       if (m.teeAborted) return
       m.teeBytes += chunk.length
       if (m.teeBytes > cap) {
-        m.chunks = null
         m.teeAborted = true
+        m.chunks = null
         return
       }
       m.chunks.push(chunk)
@@ -59,6 +59,7 @@ proxy.on('proxyRes', (proxyRes, req) => {
 // timeouts vs. refused connections vs. TLS failures distinctly.
 function classifyError(err) {
   const code = err?.code || ''
+  if (code === 'ECONNABORTED' || err?.message?.includes('client abort')) return 'client_abort'
   if (code === 'ETIMEDOUT' || code === 'ESOCKETTIMEDOUT') return 'upstream_timeout'
   if (code === 'ECONNREFUSED') return 'upstream_refused'
   if (code === 'ECONNRESET' || code === 'EPIPE') return 'upstream_reset'
@@ -81,7 +82,7 @@ proxy.on('error', (err, req, res) => {
     try {
       res.end()
     } catch {
-      // ignore close errors
+      /* ignore */
     }
   }
 })
@@ -192,6 +193,38 @@ export function createProxyHandler() {
     req._metrics = m
     incInFlight()
 
+    // Idle watchdog — destroy hung connections after proxyRequestIdleTimeoutMs.
+    let idleTimer = null
+    if (config.proxyRequestIdleTimeoutMs > 0) {
+      idleTimer = setTimeout(() => {
+        if (!m.recorded) {
+          m.error = 'upstream_timeout'
+          m.status = m.status || 504
+          finalize(m)
+        }
+        try {
+          req.destroy()
+        } catch {
+          /* ignore */
+        }
+        try {
+          res.destroy()
+        } catch {
+          /* ignore */
+        }
+      }, config.proxyRequestIdleTimeoutMs)
+      idleTimer.unref()
+    }
+
+    const clearIdle = () => {
+      if (idleTimer) {
+        clearTimeout(idleTimer)
+        idleTimer = null
+      }
+    }
+    res.on('finish', clearIdle)
+    res.on('close', clearIdle)
+
     req.on('data', (chunk) => {
       m.bytesIn += chunk.length
       if (provider && !m.reqTeeAborted) {
@@ -209,7 +242,7 @@ export function createProxyHandler() {
       }
     })
     req.on('aborted', () => {
-      m.error = m.error || 'client_aborted'
+      m.error = m.error || 'client_abort'
     })
 
     // 'finish' fires when the response body has been flushed to the kernel —

@@ -46,6 +46,10 @@ export const config = {
   pricingConfigPath: process.env.PRICING_CONFIG_PATH ?? null,
   proxyTokenTeeMaxBytes: int('PROXY_TOKEN_TEE_MAX_BYTES', 2_097_152),
 
+  // Per-request idle timeout: destroy hung upstream + client after N ms (H1).
+  // 0 = disabled (v0.1 behaviour). Default 120 s.
+  proxyRequestIdleTimeoutMs: int('PROXY_REQUEST_IDLE_TIMEOUT_MS', 120_000),
+
   // Metrics
   maxMetricEvents: int('MAX_METRIC_EVENTS', 10_000),
   metricsTickMs: int('METRICS_TICK_MS', 1000),

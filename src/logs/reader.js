@@ -1,6 +1,8 @@
-import fs from 'node:fs'
+import { open, readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { config } from '../config.js'
+
+const MAX_READ_BYTES = 10 * 1024 * 1024 // 10 MB cap
 
 const activeLog = () => path.join(config.logDir, 'app.log')
 
@@ -17,45 +19,100 @@ function parseLines(text) {
     })
 }
 
-export function readTail(limit = 500) {
-  const filePath = activeLog()
-  if (!fs.existsSync(filePath)) return []
-
-  const content = fs.readFileSync(filePath, 'utf8')
-  const lines = parseLines(content)
-  return lines.slice(-limit)
+async function readFileCapped(filePath) {
+  const fh = await open(filePath, 'r')
+  try {
+    const { size } = await fh.stat()
+    const readSize = Math.min(size, MAX_READ_BYTES)
+    const offset = size > MAX_READ_BYTES ? size - MAX_READ_BYTES : 0
+    const buf = Buffer.allocUnsafe(readSize)
+    const { bytesRead } = await fh.read(buf, 0, readSize, offset)
+    return buf.slice(0, bytesRead).toString('utf8')
+  } finally {
+    await fh.close()
+  }
 }
 
-export function readHistoricLog(date) {
+export async function readTail(limit = 500) {
+  const filePath = activeLog()
+  try {
+    const content = await readFileCapped(filePath)
+    const lines = parseLines(content)
+    return lines.slice(-limit)
+  } catch (err) {
+    if (err.code === 'ENOENT') return []
+    throw err
+  }
+}
+
+export async function readHistoricLog(date) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     throw new Error(`Invalid date format: ${date}`)
   }
 
   const filePath = path.join(config.logDir, `app-${date}.log`)
-  if (!fs.existsSync(filePath)) return null
-
-  const content = fs.readFileSync(filePath, 'utf8')
-  return parseLines(content)
+  try {
+    const content = await readFileCapped(filePath)
+    return parseLines(content)
+  } catch (err) {
+    if (err.code === 'ENOENT') return null
+    throw err
+  }
 }
 
-export function listAvailableLogs() {
+// 5-second cache for the available-logs listing (O(N) directory scan).
+let availableCache = null
+let availableCacheTs = 0
+const AVAILABLE_TTL_MS = 5000
+
+export async function listAvailableLogs() {
+  const now = Date.now()
+  if (availableCache && now - availableCacheTs < AVAILABLE_TTL_MS) {
+    return availableCache
+  }
+
   const logDir = config.logDir
-  if (!fs.existsSync(logDir)) return { active: null, rotated: [] }
+  let entries
+  try {
+    entries = await readdir(logDir)
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      availableCache = { active: null, rotated: [] }
+      availableCacheTs = now
+      return availableCache
+    }
+    throw err
+  }
 
   const active = activeLog()
-  const activeInfo = fs.existsSync(active)
-    ? { date: 'today', sizeBytes: fs.statSync(active).size }
-    : null
+  let activeInfo = null
+  try {
+    const s = await stat(active)
+    activeInfo = { date: 'today', sizeBytes: s.size }
+  } catch {
+    // file absent — leave null
+  }
 
-  const rotated = fs
-    .readdirSync(logDir)
-    .filter((f) => /^app-\d{4}-\d{2}-\d{2}\.log$/.test(f))
-    .map((f) => {
+  const rotatedFiles = entries.filter((f) => /^app-\d{4}-\d{2}-\d{2}\.log$/.test(f))
+  const rotated = await Promise.all(
+    rotatedFiles.map(async (f) => {
       const date = f.slice(4, 14)
-      const sizeBytes = fs.statSync(path.join(logDir, f)).size
-      return { date, sizeBytes }
-    })
-    .sort((a, b) => b.date.localeCompare(a.date))
+      try {
+        const s = await stat(path.join(logDir, f))
+        return { date, sizeBytes: s.size }
+      } catch {
+        return { date, sizeBytes: 0 }
+      }
+    }),
+  )
+  rotated.sort((a, b) => b.date.localeCompare(a.date))
 
-  return { active: activeInfo, rotated }
+  availableCache = { active: activeInfo, rotated }
+  availableCacheTs = now
+  return availableCache
+}
+
+export function _resetAvailableCache() {
+  availableCache = null
+  availableCacheTs = 0
 }

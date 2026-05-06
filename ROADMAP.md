@@ -24,6 +24,7 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.1.0 | ✅ Done | Passthrough proxy + observability |
 | v0.2.0 | ✅ Done | Token & cost tracking (14 providers) |
 | v0.2.1 | ✅ Done | E2E bug fixes + UI/UX polish |
+| v0.2.2 | ✅ Done | Stability — async I/O, proxy hardening, test coverage |
 | v0.3.0 | ⚪ Planned | Persistence + multi-upstream |
 | v0.4.0+ | ⚪ Speculative | Caching, retries, routing intelligence |
 

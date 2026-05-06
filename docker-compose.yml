@@ -25,6 +25,7 @@ services:
       PROXY_PROVIDER: ${PROXY_PROVIDER:-generic}
       PROXY_TOKEN_TRACKING: ${PROXY_TOKEN_TRACKING:-true}
       PROXY_TOKEN_TEE_MAX_BYTES: ${PROXY_TOKEN_TEE_MAX_BYTES:-2097152}
+      PROXY_REQUEST_IDLE_TIMEOUT_MS: ${PROXY_REQUEST_IDLE_TIMEOUT_MS:-120000}
       PROXY_INSECURE_TLS: ${PROXY_INSECURE_TLS:-false}
       PRICING_CONFIG_PATH: ${PRICING_CONFIG_PATH:-}
 
@@ -48,6 +49,11 @@ services:
         max-size: "10m"
         max-file: "5"
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
 
 volumes:
   log-data:

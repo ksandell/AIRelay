@@ -43,7 +43,7 @@ function broadcast(payload, eventName) {
 }
 
 export function startMetricsBroadcaster() {
-  if (tickHandle) return stopMetricsBroadcaster
+  if (tickHandle || unsubscribe) return stopMetricsBroadcaster
 
   unsubscribe = onEvent((ev) => {
     const now = Date.now()
