@@ -21,14 +21,14 @@ describe('readTail', () => {
     const active = path.join(tmpDir, 'app.log')
     fs.writeFileSync(active, '{"ts":"2026-04-29T00:00:00.000Z","level":"info","msg":"hello"}\n')
 
-    const entries = readTail(10)
+    const entries = await readTail(10)
     expect(entries).toHaveLength(1)
     expect(entries[0].msg).toBe('hello')
   })
 
   it('returns empty array when log file missing', async () => {
     const { readTail } = await import('../../src/logs/reader.js')
-    expect(readTail()).toEqual([])
+    expect(await readTail()).toEqual([])
   })
 
   it('respects the limit', async () => {
@@ -40,30 +40,31 @@ describe('readTail', () => {
       ).join('\n') + '\n'
     fs.writeFileSync(active, lines)
 
-    expect(readTail(3)).toHaveLength(3)
+    expect(await readTail(3)).toHaveLength(3)
   })
 })
 
 describe('readHistoricLog', () => {
   it('returns null when file not found', async () => {
     const { readHistoricLog } = await import('../../src/logs/reader.js')
-    expect(readHistoricLog('2026-01-01')).toBeNull()
+    expect(await readHistoricLog('2026-01-01')).toBeNull()
   })
 
   it('throws on invalid date format', async () => {
     const { readHistoricLog } = await import('../../src/logs/reader.js')
-    expect(() => readHistoricLog('not-a-date')).toThrow()
+    await expect(readHistoricLog('not-a-date')).rejects.toThrow()
   })
 })
 
 describe('listAvailableLogs', () => {
   it('lists rotated files sorted newest first', async () => {
-    const { listAvailableLogs } = await import('../../src/logs/reader.js')
+    const { listAvailableLogs, _resetAvailableCache } = await import('../../src/logs/reader.js')
+    _resetAvailableCache()
     fs.writeFileSync(path.join(tmpDir, 'app.log'), '')
     fs.writeFileSync(path.join(tmpDir, 'app-2026-04-28.log'), 'x')
     fs.writeFileSync(path.join(tmpDir, 'app-2026-04-27.log'), 'xx')
 
-    const { rotated } = listAvailableLogs()
+    const { rotated } = await listAvailableLogs()
     expect(rotated[0].date).toBe('2026-04-28')
     expect(rotated[1].date).toBe('2026-04-27')
   })

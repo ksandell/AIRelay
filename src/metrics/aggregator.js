@@ -6,82 +6,101 @@ function percentile(sorted, p) {
   return sorted[idx]
 }
 
-export function aggregate(seconds) {
-  const durations = []
-  const statusBuckets = { '2xx': 0, '3xx': 0, '4xx': 0, '5xx': 0, other: 0 }
-  let total = 0
-  let errors = 0
-  let bytesIn = 0
-  let bytesOut = 0
-  let totalCostUsd = 0
-  let totalTokens = 0
-  let totalInputTokens = 0
-  let totalOutputTokens = 0
-  let toolCalls = 0
-  let toolBytesIn = 0
-  let toolBytesOut = 0
-  let toolInputTokens = 0
-  let toolOutputTokens = 0
-  const byModel = {}
+function makeAcc() {
+  return {
+    durations: [],
+    statusBuckets: { '2xx': 0, '3xx': 0, '4xx': 0, '5xx': 0, other: 0 },
+    total: 0,
+    errors: 0,
+    bytesIn: 0,
+    bytesOut: 0,
+    totalCostUsd: 0,
+    totalTokens: 0,
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+    toolCalls: 0,
+    toolBytesIn: 0,
+    toolBytesOut: 0,
+    toolInputTokens: 0,
+    toolOutputTokens: 0,
+    byModel: {},
+  }
+}
 
-  for (const ev of iterRecent(seconds)) {
-    total++
-    durations.push(ev.durationMs ?? 0)
-    bytesIn += ev.bytesIn ?? 0
-    bytesOut += ev.bytesOut ?? 0
+function accumulateEvent(acc, ev) {
+  acc.total++
+  acc.durations.push(ev.durationMs ?? 0)
+  acc.bytesIn += ev.bytesIn ?? 0
+  acc.bytesOut += ev.bytesOut ?? 0
 
-    const cost = ev.costUsd ?? 0
-    const toks = ev.totalTokens ?? 0
-    totalCostUsd += cost
-    totalTokens += toks
-    totalInputTokens += ev.inputTokens ?? 0
-    totalOutputTokens += ev.outputTokens ?? 0
-    toolCalls += ev.toolCalls ?? 0
-    toolBytesIn += ev.toolBytesIn ?? 0
-    toolBytesOut += ev.toolBytesOut ?? 0
-    if ((ev.toolCalls ?? 0) > 0) {
-      toolInputTokens += ev.inputTokens ?? 0
-      toolOutputTokens += ev.outputTokens ?? 0
-    }
+  const cost = ev.costUsd ?? 0
+  acc.totalCostUsd += cost
+  acc.totalTokens += ev.totalTokens ?? 0
+  acc.totalInputTokens += ev.inputTokens ?? 0
+  acc.totalOutputTokens += ev.outputTokens ?? 0
+  acc.toolCalls += ev.toolCalls ?? 0
+  acc.toolBytesIn += ev.toolBytesIn ?? 0
+  acc.toolBytesOut += ev.toolBytesOut ?? 0
+  if ((ev.toolCalls ?? 0) > 0) {
+    acc.toolInputTokens += ev.inputTokens ?? 0
+    acc.toolOutputTokens += ev.outputTokens ?? 0
+  }
 
-    if (ev.model != null) {
-      let m = byModel[ev.model]
-      if (!m) {
-        m = {
-          provider: ev.provider ?? null,
-          requests: 0,
-          inputTokens: 0,
-          outputTokens: 0,
-          costUsd: 0,
-        }
-        byModel[ev.model] = m
+  if (ev.model != null) {
+    let m = acc.byModel[ev.model]
+    if (!m) {
+      m = {
+        provider: ev.provider ?? null,
+        requests: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsd: 0,
       }
-      m.requests++
-      m.inputTokens += ev.inputTokens ?? 0
-      m.outputTokens += ev.outputTokens ?? 0
-      m.costUsd += ev.costUsd ?? 0
+      acc.byModel[ev.model] = m
     }
-
-    const s = ev.status | 0
-    if (s >= 200 && s < 300) statusBuckets['2xx']++
-    else if (s >= 300 && s < 400) statusBuckets['3xx']++
-    else if (s >= 400 && s < 500) {
-      statusBuckets['4xx']++
-      errors++
-    } else if (s >= 500) {
-      statusBuckets['5xx']++
-      errors++
-    } else statusBuckets.other++
-
-    if (ev.error && s < 400) errors++
+    m.requests++
+    m.inputTokens += ev.inputTokens ?? 0
+    m.outputTokens += ev.outputTokens ?? 0
+    m.costUsd += ev.costUsd ?? 0
   }
 
-  durations.sort((a, b) => a - b)
+  const s = ev.status | 0
+  if (s >= 200 && s < 300) acc.statusBuckets['2xx']++
+  else if (s >= 300 && s < 400) acc.statusBuckets['3xx']++
+  else if (s >= 400 && s < 500) {
+    acc.statusBuckets['4xx']++
+    acc.errors++
+  } else if (s >= 500) {
+    acc.statusBuckets['5xx']++
+    acc.errors++
+  } else acc.statusBuckets.other++
 
-  for (const k of Object.keys(byModel)) {
-    byModel[k].costUsd = +byModel[k].costUsd.toFixed(6)
+  if (ev.error && (ev.status | 0) < 400) acc.errors++
+}
+
+function finalizeAcc(acc, seconds) {
+  acc.durations.sort((a, b) => a - b)
+  for (const k of Object.keys(acc.byModel)) {
+    acc.byModel[k].costUsd = +acc.byModel[k].costUsd.toFixed(6)
   }
-
+  const {
+    total,
+    errors,
+    durations,
+    bytesIn,
+    bytesOut,
+    totalCostUsd,
+    totalTokens,
+    totalInputTokens,
+    totalOutputTokens,
+    toolCalls,
+    toolBytesIn,
+    toolBytesOut,
+    toolInputTokens,
+    toolOutputTokens,
+    statusBuckets,
+    byModel,
+  } = acc
   return {
     windowSec: seconds,
     total,
@@ -108,10 +127,47 @@ export function aggregate(seconds) {
   }
 }
 
+// 1-second memoize: /api/metrics/summary is polled by SSE tick — no need to
+// re-scan the ring buffer more than once per second.
+let summaryCache = null
+let summaryCacheTs = 0
+
 export function summary() {
-  return {
-    '1m': aggregate(60),
-    '5m': aggregate(300),
-    '15m': aggregate(900),
+  const now = Date.now()
+  if (summaryCache && now - summaryCacheTs < 1000) return summaryCache
+
+  const WINDOWS = [60, 300, 900]
+  const accs = WINDOWS.map(makeAcc)
+  const nowSec = now / 1000
+
+  for (const ev of iterRecent(900)) {
+    const age = nowSec - new Date(ev.ts).getTime() / 1000
+    for (let i = 0; i < WINDOWS.length; i++) {
+      if (age <= WINDOWS[i]) accumulateEvent(accs[i], ev)
+    }
   }
+
+  summaryCache = {
+    '1m': finalizeAcc(accs[0], 60),
+    '5m': finalizeAcc(accs[1], 300),
+    '15m': finalizeAcc(accs[2], 900),
+  }
+  summaryCacheTs = now
+  return summaryCache
+}
+
+// Keep aggregate() for any callers that use a single window (broadcaster tick uses aggregate).
+export function aggregate(seconds) {
+  const acc = makeAcc()
+  const nowSec = Date.now() / 1000
+  for (const ev of iterRecent(seconds)) {
+    const age = nowSec - new Date(ev.ts).getTime() / 1000
+    if (age <= seconds) accumulateEvent(acc, ev)
+  }
+  return finalizeAcc(acc, seconds)
+}
+
+export function _resetSummaryCache() {
+  summaryCache = null
+  summaryCacheTs = 0
 }

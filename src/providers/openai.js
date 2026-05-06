@@ -1,14 +1,6 @@
 import { BaseProvider } from './base.js'
 import { lookupModelPrice } from './pricing.js'
 
-function parseSync(buffer) {
-  try {
-    return JSON.parse(buffer.toString('utf8'))
-  } catch {
-    return null
-  }
-}
-
 function parseStreaming(buffer) {
   const text = buffer.toString('utf8')
   let model = null,
@@ -41,7 +33,7 @@ export class OpenAIProvider extends BaseProvider {
   }
 
   extractTokens(buffer) {
-    const sync = parseSync(buffer)
+    const sync = this._parseJson(buffer)
     if (sync?.usage?.prompt_tokens !== undefined) {
       return {
         model: sync.model ?? null,
@@ -73,7 +65,7 @@ export class OpenAIProvider extends BaseProvider {
     let toolBytesIn = 0
     let toolBytesOut = 0
 
-    const req = reqBuffer ? parseSync(reqBuffer) : null
+    const req = reqBuffer ? this._parseJson(reqBuffer) : null
     if (req?.messages && Array.isArray(req.messages)) {
       for (const m of req.messages) {
         if (m.role === 'tool') {
@@ -89,7 +81,7 @@ export class OpenAIProvider extends BaseProvider {
       }
     }
 
-    const resp = respBuffer ? parseSync(respBuffer) : null
+    const resp = respBuffer ? this._parseJson(respBuffer) : null
     if (resp?.choices && Array.isArray(resp.choices)) {
       for (const c of resp.choices) {
         const tcs = c.message?.tool_calls
