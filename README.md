@@ -25,6 +25,8 @@
 
 What shipped in each release: [CHANGELOG.md](CHANGELOG.md). What's coming next: [ROADMAP.md](ROADMAP.md).
 
+![AIRelay metrics dashboard](docs/screenshots/metrics.png)
+
 ---
 
 ## 60-second quickstart
