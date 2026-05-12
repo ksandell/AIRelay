@@ -5,6 +5,24 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.7] — 2026-05-12 — Azure OpenAI adapter
+
+### Added
+- **Azure OpenAI Service** as the 17th named provider (`PROXY_PROVIDER=azure`). Speaks the OpenAI wire format and is parsed by the OpenAI extractor; pricing is keyed under `azure` so cost reporting is distinct from raw OpenAI. Bundled pricing covers `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`, `o1`, `o3-mini`.
+- **`AZURE_OPENAI_API_VERSION` env var** (default `2024-10-21`). When `PROXY_PROVIDER=azure` and a request omits the `api-version` query param, the proxy appends it from this value before forwarding. Caller-supplied `api-version` is preserved verbatim (no double-append). Set the env var empty to disable auto-append. Implemented as a single null-comparison branch on the proxy hot path — zero overhead for every other provider.
+- **`scripts/e2e-real-prompts.py`** — reusable real-traffic harness that fires 15 deliberate Mistral calls (5 short factual + 5 medium explanations + 5 tool-call prompts using `get_weather` and `calculate` tools). Drives the dashboard's tool-call KPIs, per-model breakdown, and cost extraction with authentic data.
+- **Setup tab** lists Azure OpenAI Service under Frontier with a tailored SDK snippet (api-key header, auto-append note).
+- **`pricing-completeness` test** now asserts 17 required providers (was 16).
+
+### Fixed
+- **Chart y-axis float-precision noise** in the dashboard. Tokens chart had been showing labels like `0.6000000000000001` and `0.39999999999999991` — IEEE-754 binary-float artifacts because the y-tick callback returned the raw number. New `fmtAxis` helper picks decimals from magnitude (≥10 integer, ≥1 → 1 decimal, ≥0.1 → 2 decimals, sub-0.1 → 2 significant figures so 0.0006 stays readable instead of collapsing to "0.00"). Applied to all three Metrics-tab charts.
+- **Logs tab shows proxied-request history on first render.** The file-backed app log skips proxied traffic by design (zero sync I/O on the proxy hot path — see `CLAUDE.md`); proxied requests live in the metrics ring buffer instead. `loadLive()` now backfills from both `/api/logs` and `/api/metrics/recent`, merging by timestamp so historical proxy events appear immediately rather than only via live SSE arriving after the page loads. Also corrects a pre-existing ordering bug — the initial buffer was oldest-first while live `bufferAndRender` prepends newest-first; both paths now consistently put newest at the top of the DOM. Frontend-only change; no impact on the hot-path invariant.
+- **Consistent timestamp format across Logs rows.** App-log rows had been rendering the raw ISO string (`2026-05-12T13:06:59.799Z`) while proxy rows used a short `HH:MM:SS`. `fmtTime()` is now the single helper for both, and it emits `YYYY-MM-DD HH:MM:SS.mmm` in the browser's local timezone via native `Date` getters (no external library) — sortable, copy-pasteable, ms-precise. Same format propagates to the recent-requests + top-cost tables that share the helper. Malformed timestamps fall back to an empty string so a bad event can't break the row.
+
+### Docs
+- `CONFIGURATION.md` provider count bumped to 17, env-var row for `AZURE_OPENAI_API_VERSION`, full Azure recipe, directory row with `azure` ↔ `microsoft` disambiguation note (the legacy `microsoft` alias remains for back-compat).
+- `README.md` provider count 17, Azure row in the compat table.
+
 ## [0.2.6] — 2026-05-12 — v0.2.5 cleanup
 
 ### Fixed

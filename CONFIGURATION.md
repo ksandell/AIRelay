@@ -102,8 +102,9 @@ The proxy can extract token usage from upstream responses and compute per-reques
 
 | Var | Default | Notes |
 |---|---|---|
-| `PROXY_PROVIDER` | `generic` | Named providers (16): `anthropic`, `openai`, `google`, `mistral`, `groq`, `microsoft`, `openrouter`, `together`, `fireworks`, `deepseek`, `xai`, `perplexity`, `ollama`, `nvidia`, `anlinkai`, `cerebras`. Fallback: `generic` (records bytes only — no token/cost fields). Selects the response parser and pricing table key. |
+| `PROXY_PROVIDER` | `generic` | Named providers (17): `anthropic`, `openai`, `azure`, `google`, `mistral`, `groq`, `microsoft`, `openrouter`, `together`, `fireworks`, `deepseek`, `xai`, `perplexity`, `ollama`, `nvidia`, `anlinkai`, `cerebras`. Fallback: `generic` (records bytes only — no token/cost fields). Selects the response parser and pricing table key. |
 | `PROXY_TOKEN_TRACKING` | `true` | Set `false` to disable body inspection entirely (zero-overhead passthrough). |
+| `AZURE_OPENAI_API_VERSION` | `2024-10-21` | Only consulted when `PROXY_PROVIDER=azure`. Auto-appended as `?api-version=…` to any proxied request that omits it. Set empty to disable auto-append. |
 | `PRICING_CONFIG_PATH` | _(unset)_ | Optional path to a JSON file that **deep-merges** over the bundled `config/pricing.json`. Use this to add models or override prices without forking. |
 | `PROXY_TOKEN_TEE_MAX_BYTES` | `2097152` | Per-request body buffer cap (2 MiB) for token extraction. Larger responses skip extraction so big SSE streams don't pin memory. |
 
@@ -190,6 +191,12 @@ Quick links for every named provider the proxy recognises (`PROXY_PROVIDER` valu
 | Ollama (`ollama`) | [ollama.com](https://ollama.com/) | local — $0 | [docs](https://github.com/ollama/ollama/blob/main/docs/api.md) |
 | NVIDIA NIM (`nvidia`) | [build.nvidia.com](https://build.nvidia.com/) | [free tier + credits](https://build.nvidia.com/explore/discover) | [docs](https://docs.api.nvidia.com/) |
 | Cerebras (`cerebras`) | [cerebras.ai](https://cerebras.ai/) | [pricing](https://cerebras.ai/inference) | [docs](https://inference-docs.cerebras.ai/) |
+| Azure OpenAI (`azure`) | [azure.microsoft.com/openai](https://azure.microsoft.com/products/ai-services/openai-service) | [pricing](https://azure.microsoft.com/pricing/details/cognitive-services/openai-service/) | [docs](https://learn.microsoft.com/azure/ai-services/openai/) |
+
+> **`azure` vs `microsoft`**: use `PROXY_PROVIDER=azure` for Azure OpenAI Service
+> (api-key header, per-deployment URL, `api-version` query — proxy handles all of
+> it). `microsoft` is a legacy alias that uses OpenAI's wire format against
+> `api.openai.com` and is kept only for back-compat.
 | AnLinkAI (`anlinkai`) | [anlinkai.com](https://anlinkai.com/) | private beta | — |
 
 
@@ -250,6 +257,32 @@ CEREBRAS_API_KEY=your-key-here
 [Cerebras](https://cerebras.ai/) runs inference on dedicated wafer-scale hardware.
 Wire format is OpenAI-compatible (`Authorization: Bearer ...`), so any OpenAI SDK works.
 Pricing is per-model; bundled entries cover `llama3.1-8b` and `qwen-3-235b-a22b`.
+
+### Azure OpenAI Service
+
+```env
+UPSTREAM_URL=https://<resource>.openai.azure.com
+PROXY_PATH_PREFIX=/proxy
+PROXY_PROVIDER=azure
+AZURE_OPENAI_API_VERSION=2024-10-21
+```
+
+[Azure OpenAI](https://azure.microsoft.com/products/ai-services/openai-service) speaks
+the OpenAI wire format with two quirks the proxy handles automatically:
+
+1. **Auth header is `api-key: <key>`** (not `Authorization: Bearer …`). Your SDK
+   already sends it — the proxy forwards it untouched.
+2. **`?api-version=YYYY-MM-DD` is mandatory on every request.** AIRelay appends
+   it from `AZURE_OPENAI_API_VERSION` when the request omits it; a caller-supplied
+   `api-version` query is preserved verbatim. Set `AZURE_OPENAI_API_VERSION=` (empty)
+   to disable auto-append.
+
+Per-deployment URL pattern still applies — point your SDK's `baseURL` at
+`<host>/proxy/openai/deployments/<deployment>` and the proxy forwards to
+`<resource>.openai.azure.com/openai/deployments/<deployment>/...?api-version=…`.
+
+Pricing is keyed under `azure` so cost reporting is separate from raw OpenAI;
+bundled entries: `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`, `o1`, `o3-mini`.
 
 ### AnLinkAI (private beta)
 

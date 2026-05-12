@@ -79,6 +79,13 @@
     "cerebras": {
       "llama3.1-8b":       { "input": 0.10, "output": 0.10 },
       "qwen-3-235b-a22b":  { "input": 0.60, "output": 1.20 }
+    },
+    "azure": {
+      "gpt-4o":      { "input": 2.50,  "output": 10.00 },
+      "gpt-4o-mini": { "input": 0.15,  "output": 0.60  },
+      "gpt-4-turbo": { "input": 10.00, "output": 30.00 },
+      "o1":          { "input": 15.00, "output": 60.00 },
+      "o3-mini":     { "input": 1.10,  "output": 4.40  }
     }
   }
 }

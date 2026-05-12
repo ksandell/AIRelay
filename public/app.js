@@ -52,6 +52,23 @@ const client = new Anthropic({
     proxyProvider: 'openai',
     sdk: oaiSdk('OPENAI_API_KEY'),
   },
+  azure: {
+    label: 'Azure OpenAI Service',
+    // Replace <resource> with your Azure OpenAI resource name. AIRelay auto-
+    // appends ?api-version=... when missing — control via AZURE_OPENAI_API_VERSION.
+    upstream: 'https://<resource>.openai.azure.com',
+    proxyProvider: 'azure',
+    sdk: (host, prefix) => `// Azure OpenAI — auth via api-key header.
+// AIRelay auto-appends ?api-version when the SDK omits it.
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: "placeholder",                              // ignored — see defaultHeaders
+  baseURL: "${host}${prefix}/openai/deployments/<deployment>",
+  defaultHeaders: { "api-key": process.env.AZURE_OPENAI_API_KEY },
+  // No defaultQuery — AIRelay auto-appends ?api-version from server config.
+});`,
+  },
   gemini: {
     label: 'Google Gemini',
     upstream: 'https://generativelanguage.googleapis.com',
@@ -342,8 +359,9 @@ function renderLogRow(item) {
         .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
         .join(' ')
     : ''
+  const ts = entry.ts ? fmtTime(entry.ts) : ''
   el.innerHTML = `
-    <span class="log-ts">${entry.ts ?? ''}</span>
+    <span class="log-ts">${ts}</span>
     <span class="log-level ${level}">${level}</span>
     <span class="log-msg">${escHtml(entry.msg ?? '')}${meta ? `<span class="log-meta"> ${escHtml(meta)}</span>` : ''}</span>
   `
@@ -400,13 +418,28 @@ async function loadHistory(date) {
 }
 
 async function loadLive() {
-  const r = await fetch('/api/logs?limit=500')
-  if (!r.ok) return
-  const entries = await r.json()
+  // Two-source backfill: the file-backed app log captures internal/system
+  // events, but proxied requests never touch the file logger (hot-path
+  // invariant — see CLAUDE.md). They live in the metrics ring buffer. Merge
+  // both sources so the Logs panel shows historical proxy traffic on first
+  // render, not just events that arrive over SSE after the page loads.
+  const [logsR, recentR] = await Promise.all([
+    fetch('/api/logs?limit=500').catch(() => null),
+    fetch('/api/metrics/recent?limit=500').catch(() => null),
+  ])
+  const appEntries = logsR && logsR.ok ? await logsR.json() : []
+  const proxyEntries = recentR && recentR.ok ? await recentR.json() : []
+
+  const merged = []
+  for (const e of appEntries) merged.push({ type: typeForAppEntry(e), entry: e, ts: e.ts })
+  for (const ev of proxyEntries) merged.push({ type: 'proxy', entry: ev, ts: ev.ts })
+  // Newest first — matches the live SSE convention (bufferAndRender unshifts).
+  merged.sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0))
+
   logBuffer.length = 0
   count = 0
-  for (const e of [...entries].reverse()) {
-    logBuffer.push({ type: typeForAppEntry(e), entry: e })
+  for (const item of merged) {
+    logBuffer.push({ type: item.type, entry: item.entry })
     if (logBuffer.length >= LOG_BUFFER_MAX) break
   }
   rebuildLogList()
@@ -592,18 +625,37 @@ function fmtNum(n, decimals = 0) {
   return decimals > 0 ? `${intFormatted}.${dec}` : intFormatted
 }
 
+// Browser-local timestamp with millisecond precision: `YYYY-MM-DD HH:MM:SS.mmm`.
+// The native `Date` getters already return values in the browser's timezone, so
+// there's no need to pull in a library for this — manual zero-padding gives us
+// a stable, sortable, copy-pasteable format for log lines + recent-request rows.
 function fmtTime(ts) {
-  return new Intl.DateTimeFormat(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).format(new Date(ts))
+  const d = new Date(ts)
+  if (isNaN(d.getTime())) return ''
+  const p = (n, w = 2) => String(n).padStart(w, '0')
+  return (
+    `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+    `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`
+  )
 }
 
 function fmtTokens(n) {
   if (n == null || isNaN(n)) return '—'
   return fmtNum(Math.round(n))
+}
+
+// Y-axis tick formatter — kill float-precision noise (e.g. 0.6000000000000001).
+// Auto-picks precision from magnitude. Sub-0.01 values fall back to 2
+// significant figures so tiny token-rate ranges stay readable instead of
+// collapsing to "0.00".
+function fmtAxis(v) {
+  if (v === 0) return '0'
+  const a = Math.abs(v)
+  if (a >= 100) return Math.round(a).toString()
+  if (a >= 10) return a.toFixed(0)
+  if (a >= 1) return a.toFixed(1)
+  if (a >= 0.1) return a.toFixed(2)
+  return Number(a.toPrecision(2)).toString()
 }
 
 function fmtBytes(n) {
@@ -699,7 +751,7 @@ function makeDualLineChart(canvasId, color1, color2, label1, label2) {
           grid: { color: '#21262d' },
         },
         y: {
-          ticks: { color: '#8b949e', font: { size: 10 } },
+          ticks: { color: '#8b949e', font: { size: 10 }, callback: fmtAxis },
           grid: { color: '#21262d' },
           beginAtZero: true,
         },
@@ -788,7 +840,7 @@ function makeDivergingTokensChart(canvasId) {
           ticks: {
             color: '#8b949e',
             font: { size: 10 },
-            callback: (v) => Math.abs(v),
+            callback: fmtAxis,
           },
           grid: {
             color: (ctx) => (ctx.tick.value === 0 ? '#8b949e' : '#21262d'),

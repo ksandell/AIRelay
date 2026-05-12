@@ -14,6 +14,7 @@ import { OllamaProvider } from './ollama.js'
 import { NvidiaProvider } from './nvidia.js'
 import { AnLinkAIProvider } from './anlinkai.js'
 import { CerebrasProvider } from './cerebras.js'
+import { AzureOpenAIProvider } from './azure.js'
 import { GenericProvider } from './generic.js'
 import { loadPricing } from './pricing.js'
 
@@ -34,6 +35,7 @@ const PROVIDER_CLASSES = {
   nvidia: NvidiaProvider,
   anlinkai: AnLinkAIProvider,
   cerebras: CerebrasProvider,
+  azure: AzureOpenAIProvider,
   generic: GenericProvider,
 }
 

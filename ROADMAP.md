@@ -29,7 +29,7 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.2.4 | ✅ Done | Cerebras provider — wafer-scale inference, 16th provider |
 | v0.2.5 | ✅ Done | Log compression (#36) + provider directory (#101) |
 | v0.2.6 | ✅ Done | v0.2.5 cleanup — gzip reader path, Windows rotation, Mistral pricing, docs (#104, #105, #106, #107, #108) |
-| v0.2.7 | ⚪ Planned | Azure OpenAI adapter (api-key header + api-version query param) |
+| v0.2.7 | ✅ Done | Azure OpenAI adapter (api-key header + auto-appended `api-version` query) + tool-call E2E harness + chart y-axis precision fix |
 | v0.3.0 | ⚪ Planned | Persistence + multi-upstream |
 | v0.4.0+ | ⚪ Speculative | Caching, retries, routing intelligence |
 
@@ -59,21 +59,15 @@ recipe, README row. `pricing-completeness` test bumped to 16 required providers.
 
 ---
 
-## v0.2.7 — Azure OpenAI adapter  ⚪
+## v0.2.7 — Azure OpenAI adapter  ✅
 
-**Theme:** "First non-trivial provider — header + query rewrite hook."
-
-OpenAI-compatible body schema, but:
-- Auth header is `api-key: <key>` (not `Authorization: Bearer ...`).
-- Requires `?api-version=YYYY-MM-DD` query param on every request.
-- URL pattern is per-deployment: `https://<resource>.openai.azure.com/openai/deployments/<deployment>/chat/completions`.
-
-### Approach
-- Small header-rewrite hook in `src/proxy/proxy.js` (kept off the byte-streaming hot path — only mutates request headers before `http-proxy` forwards).
-- New env knob `AZURE_OPENAI_API_VERSION` (auto-appended if absent).
-- `azure` entry in registry, pricing, and Setup tab.
-
-**Effort:** ~½ day. First time we touch outbound headers; needs care to keep the "no body modification" invariant intact.
+**Shipped:** `PROXY_PROVIDER=azure` as the 17th named provider — OpenAI wire
+format, distinct pricing block. The proxy auto-appends
+`?api-version=YYYY-MM-DD` (from `AZURE_OPENAI_API_VERSION`, default
+`2024-10-21`) when the SDK omits it; caller-supplied values are preserved
+verbatim. Hot-path overhead: a single null comparison for every non-azure
+deployment. Also ships `scripts/e2e-real-prompts.py` (15-call harness with
+tool-call coverage) and a dashboard y-axis precision fix (`fmtAxis`).
 
 ### Deferred to v0.3.0+
 - **Cohere** — custom `/v2/chat` schema. Real parser work; better to land alongside multi-upstream so it shares route-level provider profiles.
