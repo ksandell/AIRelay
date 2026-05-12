@@ -625,13 +625,18 @@ function fmtNum(n, decimals = 0) {
   return decimals > 0 ? `${intFormatted}.${dec}` : intFormatted
 }
 
+// Browser-local timestamp with millisecond precision: `YYYY-MM-DD HH:MM:SS.mmm`.
+// The native `Date` getters already return values in the browser's timezone, so
+// there's no need to pull in a library for this — manual zero-padding gives us
+// a stable, sortable, copy-pasteable format for log lines + recent-request rows.
 function fmtTime(ts) {
-  return new Intl.DateTimeFormat(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).format(new Date(ts))
+  const d = new Date(ts)
+  if (isNaN(d.getTime())) return ''
+  const p = (n, w = 2) => String(n).padStart(w, '0')
+  return (
+    `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+    `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`
+  )
 }
 
 function fmtTokens(n) {
