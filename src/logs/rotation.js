@@ -1,7 +1,32 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import zlib from 'node:zlib'
+import { pipeline } from 'node:stream'
 import { config } from '../config.js'
 import { redirectStream } from './logger.js'
+
+function compressRotated(src) {
+  const dest = `${src}.gz`
+  const input = fs.createReadStream(src)
+  const gzip = zlib.createGzip()
+  const output = fs.createWriteStream(dest)
+  pipeline(input, gzip, output, (err) => {
+    if (err) {
+      process.stderr.write(`[rotation] gzip failed ${src}: ${err.message}\n`)
+      try {
+        fs.unlinkSync(dest)
+      } catch {
+        /* ignore */
+      }
+      return
+    }
+    try {
+      fs.unlinkSync(src)
+    } catch (e) {
+      process.stderr.write(`[rotation] post-gzip unlink failed ${src}: ${e.message}\n`)
+    }
+  })
+}
 
 const activeLog = () => path.join(config.logDir, 'app.log')
 
@@ -28,6 +53,9 @@ export function rotateLogs() {
 
     if (fs.existsSync(active)) {
       fs.renameSync(active, dest)
+      if (config.enableCompression) {
+        compressRotated(dest)
+      }
     }
     // 2. Create fresh active file (redirectStream already opened a handle to it).
     fs.writeFileSync(active, '', 'utf8')
@@ -42,7 +70,7 @@ export function cleanupOldLogs() {
 
   const files = fs
     .readdirSync(logDir)
-    .filter((f) => /^app-\d{4}-\d{2}-\d{2}\.log$/.test(f))
+    .filter((f) => /^app-\d{4}-\d{2}-\d{2}\.log(\.gz)?$/.test(f))
     .map((f) => ({ name: f, mtime: fs.statSync(path.join(logDir, f)).mtimeMs }))
     .sort((a, b) => b.mtime - a.mtime)
 
