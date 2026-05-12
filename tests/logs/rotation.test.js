@@ -12,6 +12,7 @@ beforeEach(async () => {
   const { config } = await import('../../src/config.js')
   config.logDir = tmpDir
   config.logRetentionDays = 3
+  config.enableCompression = false
 })
 
 afterEach(() => {
@@ -24,7 +25,7 @@ describe('rotateLogs', () => {
     const active = path.join(tmpDir, 'app.log')
     fs.writeFileSync(active, 'old content\n')
 
-    rotateLogs()
+    await rotateLogs()
 
     expect(fs.existsSync(active)).toBe(true)
     expect(fs.readFileSync(active, 'utf8')).toBe('')
@@ -35,7 +36,7 @@ describe('rotateLogs', () => {
 
   it('handles missing app.log gracefully', async () => {
     const { rotateLogs } = await import('../../src/logs/rotation.js')
-    expect(() => rotateLogs()).not.toThrow()
+    await expect(rotateLogs()).resolves.not.toThrow()
   })
 
   it('gzips rotated file when ENABLE_COMPRESSION=true and removes the .log', async () => {

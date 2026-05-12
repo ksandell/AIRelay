@@ -8,7 +8,7 @@ export class OllamaProvider extends OpenAIProvider {
 
   calculateCost(tokens) {
     if (!tokens?.model) return null
-    const price = lookupModelPrice(this._pricing, tokens.model)
+    const price = lookupModelPrice(this._pricing, tokens.model, this._providerName)
     if (!price) return null
     return 0
   }

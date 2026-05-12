@@ -102,7 +102,7 @@ The proxy can extract token usage from upstream responses and compute per-reques
 
 | Var | Default | Notes |
 |---|---|---|
-| `PROXY_PROVIDER` | `generic` | Named providers (15): `anthropic`, `openai`, `google`, `mistral`, `groq`, `microsoft`, `openrouter`, `together`, `fireworks`, `deepseek`, `xai`, `perplexity`, `ollama`, `nvidia`, `anlinkai`. Fallback: `generic` (records bytes only — no token/cost fields). Selects the response parser and pricing table key. |
+| `PROXY_PROVIDER` | `generic` | Named providers (16): `anthropic`, `openai`, `google`, `mistral`, `groq`, `microsoft`, `openrouter`, `together`, `fireworks`, `deepseek`, `xai`, `perplexity`, `ollama`, `nvidia`, `anlinkai`, `cerebras`. Fallback: `generic` (records bytes only — no token/cost fields). Selects the response parser and pricing table key. |
 | `PROXY_TOKEN_TRACKING` | `true` | Set `false` to disable body inspection entirely (zero-overhead passthrough). |
 | `PRICING_CONFIG_PATH` | _(unset)_ | Optional path to a JSON file that **deep-merges** over the bundled `config/pricing.json`. Use this to add models or override prices without forking. |
 | `PROXY_TOKEN_TEE_MAX_BYTES` | `2097152` | Per-request body buffer cap (2 MiB) for token extraction. Larger responses skip extraction so big SSE streams don't pin memory. |

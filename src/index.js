@@ -33,9 +33,13 @@ server.requestTimeout = 0 // proxied uploads can be long; rely on upstream timeo
 
 cron.schedule(
   config.cronSchedule,
-  () => {
+  async () => {
     logger.info('cron: rotating logs')
-    rotateLogs()
+    try {
+      await rotateLogs()
+    } catch (err) {
+      logger.error('cron: rotateLogs failed', { error: err.message })
+    }
   },
   { timezone: 'UTC' },
 )
