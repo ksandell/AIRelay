@@ -43,7 +43,7 @@ function todayUTC() {
 
 // Retention regex matches both plain and gzipped rotated files, including the
 // `.N.log[.gz]` suffix used by uniqueRotatedPath for same-day re-rotation.
-const ROTATED_RE = /^app-\d{4}-\d{2}-\d{2}(?:\.\d+)?\.log(?:\.gz)?$/
+export const ROTATED_RE = /^app-\d{4}-\d{2}-\d{2}(?:\.\d+)?\.log(?:\.gz)?$/
 
 export async function rotateLogs() {
   const logDir = config.logDir

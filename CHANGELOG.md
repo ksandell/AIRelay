@@ -5,6 +5,12 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.6] — unreleased — v0.2.5 cleanup
+
+### Fixed
+- **`/api/logs/available` now lists `.log.gz` rotated files** (#104). The reader's filename filter was tightened to plain `.log` in v0.2.5; it now reuses the canonical `ROTATED_RE` exported from `src/logs/rotation.js`, so both `app-YYYY-MM-DD.log` and `app-YYYY-MM-DD[.N].log.gz` appear in `rotated[]`. Each rotated entry now carries a `compressed: boolean` flag for the dashboard.
+- **`readHistoricLog` can read gzipped historic logs** (#105). On `?date=YYYY-MM-DD`, the reader scans the log directory for every matching part (`app-<date>.log`, `app-<date>.log.gz`, `app-<date>.N.log[.gz]`), streams each `.gz` part through `zlib.createGunzip()`, and enforces `LOG_READ_MAX_MB` against the **decompressed** byte count (aborts the stream early on overflow, so a gzip bomb cannot exhaust memory). Same-day re-rotation policy: all parts for the requested date are merged into one response sorted by mtime ascending — no `&part=N` query param needed.
+
 ## [0.2.5] — 2026-05-12 — Log compression + provider links
 
 ### Added
