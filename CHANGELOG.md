@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Chart y-axis float-precision noise** in the dashboard. Tokens chart had been showing labels like `0.6000000000000001` and `0.39999999999999991` — IEEE-754 binary-float artifacts because the y-tick callback returned the raw number. New `fmtAxis` helper picks decimals from magnitude (≥10 integer, ≥1 → 1 decimal, ≥0.1 → 2 decimals, sub-0.1 → 2 significant figures so 0.0006 stays readable instead of collapsing to "0.00"). Applied to all three Metrics-tab charts.
+- **Logs tab shows proxied-request history on first render.** The file-backed app log skips proxied traffic by design (zero sync I/O on the proxy hot path — see `CLAUDE.md`); proxied requests live in the metrics ring buffer instead. `loadLive()` now backfills from both `/api/logs` and `/api/metrics/recent`, merging by timestamp so historical proxy events appear immediately rather than only via live SSE arriving after the page loads. Also corrects a pre-existing ordering bug — the initial buffer was oldest-first while live `bufferAndRender` prepends newest-first; both paths now consistently put newest at the top of the DOM. Frontend-only change; no impact on the hot-path invariant.
 
 ### Docs
 - `CONFIGURATION.md` provider count bumped to 17, env-var row for `AZURE_OPENAI_API_VERSION`, full Azure recipe, directory row with `azure` ↔ `microsoft` disambiguation note (the legacy `microsoft` alias remains for back-compat).

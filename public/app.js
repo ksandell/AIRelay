@@ -417,13 +417,28 @@ async function loadHistory(date) {
 }
 
 async function loadLive() {
-  const r = await fetch('/api/logs?limit=500')
-  if (!r.ok) return
-  const entries = await r.json()
+  // Two-source backfill: the file-backed app log captures internal/system
+  // events, but proxied requests never touch the file logger (hot-path
+  // invariant — see CLAUDE.md). They live in the metrics ring buffer. Merge
+  // both sources so the Logs panel shows historical proxy traffic on first
+  // render, not just events that arrive over SSE after the page loads.
+  const [logsR, recentR] = await Promise.all([
+    fetch('/api/logs?limit=500').catch(() => null),
+    fetch('/api/metrics/recent?limit=500').catch(() => null),
+  ])
+  const appEntries = logsR && logsR.ok ? await logsR.json() : []
+  const proxyEntries = recentR && recentR.ok ? await recentR.json() : []
+
+  const merged = []
+  for (const e of appEntries) merged.push({ type: typeForAppEntry(e), entry: e, ts: e.ts })
+  for (const ev of proxyEntries) merged.push({ type: 'proxy', entry: ev, ts: ev.ts })
+  // Newest first — matches the live SSE convention (bufferAndRender unshifts).
+  merged.sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0))
+
   logBuffer.length = 0
   count = 0
-  for (const e of [...entries].reverse()) {
-    logBuffer.push({ type: typeForAppEntry(e), entry: e })
+  for (const item of merged) {
+    logBuffer.push({ type: item.type, entry: item.entry })
     if (logBuffer.length >= LOG_BUFFER_MAX) break
   }
   rebuildLogList()
