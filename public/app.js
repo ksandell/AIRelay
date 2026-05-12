@@ -359,8 +359,9 @@ function renderLogRow(item) {
         .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
         .join(' ')
     : ''
+  const ts = entry.ts ? fmtTime(entry.ts) : ''
   el.innerHTML = `
-    <span class="log-ts">${entry.ts ?? ''}</span>
+    <span class="log-ts">${ts}</span>
     <span class="log-level ${level}">${level}</span>
     <span class="log-msg">${escHtml(entry.msg ?? '')}${meta ? `<span class="log-meta"> ${escHtml(meta)}</span>` : ''}</span>
   `
