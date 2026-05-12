@@ -86,7 +86,7 @@ Every variable, what it does, and when you'd touch it. Defaults match `.env.exam
 | `LOG_RETENTION_DAYS` | `7` | Rotated files older than this are deleted. |
 | `MAX_LOG_SIZE_MB` | `50` | If active log exceeds this, rotation triggers (checked every 5 min). |
 | `CRON_SCHEDULE` | `0 0 * * *` | Daily rotation cron. UTC. |
-| `ENABLE_COMPRESSION` | `false` | Future — gzip rotated logs. Currently a no-op. |
+| `ENABLE_COMPRESSION` | `false` | Gzip rotated log files (`app-YYYY-MM-DD.log.gz`). Active log is never compressed. |
 
 ### SSE (live streams)
 
@@ -169,7 +169,33 @@ Prices are expressed in **USD per million tokens** (`$/MTok`). The bundled file 
 
 Drop these into your `.env`:
 
+### Provider directory
+
+Quick links for every named provider the proxy recognises (`PROXY_PROVIDER` value in parentheses):
+
+| Provider | Site | Pricing | Docs |
+|---|---|---|---|
+| Anthropic (`anthropic`) | [anthropic.com](https://www.anthropic.com/) | [pricing](https://www.anthropic.com/pricing) | [docs](https://docs.anthropic.com/) |
+| OpenAI (`openai`) | [openai.com](https://openai.com/) | [pricing](https://openai.com/api/pricing/) | [docs](https://platform.openai.com/docs) |
+| Google Gemini (`google`) | [ai.google.dev](https://ai.google.dev/) | [pricing](https://ai.google.dev/pricing) | [docs](https://ai.google.dev/gemini-api/docs) |
+| Mistral (`mistral`) | [mistral.ai](https://mistral.ai/) | [pricing](https://mistral.ai/pricing) | [docs](https://docs.mistral.ai/) |
+| Groq (`groq`) | [groq.com](https://groq.com/) | [pricing](https://groq.com/pricing/) | [docs](https://console.groq.com/docs) |
+| Microsoft Azure OpenAI (`microsoft`) | [azure.microsoft.com](https://azure.microsoft.com/en-us/products/ai-services/openai-service) | [pricing](https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/) | [docs](https://learn.microsoft.com/en-us/azure/ai-services/openai/) |
+| OpenRouter (`openrouter`) | [openrouter.ai](https://openrouter.ai/) | [models & pricing](https://openrouter.ai/models) | [docs](https://openrouter.ai/docs) |
+| Together AI (`together`) | [together.ai](https://www.together.ai/) | [pricing](https://www.together.ai/pricing) | [docs](https://docs.together.ai/) |
+| Fireworks (`fireworks`) | [fireworks.ai](https://fireworks.ai/) | [pricing](https://fireworks.ai/pricing) | [docs](https://docs.fireworks.ai/) |
+| DeepSeek (`deepseek`) | [deepseek.com](https://www.deepseek.com/) | [pricing](https://api-docs.deepseek.com/quick_start/pricing) | [docs](https://api-docs.deepseek.com/) |
+| xAI (`xai`) | [x.ai](https://x.ai/) | [models & pricing](https://docs.x.ai/docs/models) | [docs](https://docs.x.ai/) |
+| Perplexity (`perplexity`) | [perplexity.ai](https://www.perplexity.ai/) | [pricing](https://docs.perplexity.ai/guides/pricing) | [docs](https://docs.perplexity.ai/) |
+| Ollama (`ollama`) | [ollama.com](https://ollama.com/) | local — $0 | [docs](https://github.com/ollama/ollama/blob/main/docs/api.md) |
+| NVIDIA NIM (`nvidia`) | [build.nvidia.com](https://build.nvidia.com/) | [free tier + credits](https://build.nvidia.com/explore/discover) | [docs](https://docs.api.nvidia.com/) |
+| Cerebras (`cerebras`) | [cerebras.ai](https://cerebras.ai/) | [pricing](https://cerebras.ai/inference) | [docs](https://inference-docs.cerebras.ai/) |
+| AnLinkAI (`anlinkai`) | [anlinkai.com](https://anlinkai.com/) | private beta | — |
+
+
 ### Anthropic (Claude API)
+
+[Anthropic](https://www.anthropic.com/) — [pricing](https://www.anthropic.com/pricing) · [docs](https://docs.anthropic.com/)
 
 ```env
 UPSTREAM_URL=https://api.anthropic.com
@@ -180,6 +206,8 @@ Your SDK keeps sending `x-api-key` and `anthropic-version` — the proxy forward
 
 ### OpenAI
 
+[OpenAI](https://openai.com/) — [pricing](https://openai.com/api/pricing/) · [docs](https://platform.openai.com/docs)
+
 ```env
 UPSTREAM_URL=https://api.openai.com/v1
 PROXY_PATH_PREFIX=/proxy
@@ -189,6 +217,8 @@ The `/v1` is part of the upstream URL so your SDK's `baseURL` ends at `/proxy`. 
 
 ### Google Gemini
 
+[Google AI](https://ai.google.dev/) — [pricing](https://ai.google.dev/pricing) · [docs](https://ai.google.dev/gemini-api/docs)
+
 ```env
 UPSTREAM_URL=https://generativelanguage.googleapis.com
 PROXY_PATH_PREFIX=/proxy
@@ -197,6 +227,8 @@ PROXY_PATH_PREFIX=/proxy
 Gemini accepts the API key as `?key=…` query string or the `x-goog-api-key` header. Both are forwarded.
 
 ### OpenRouter
+
+[OpenRouter](https://openrouter.ai/) — [pricing](https://openrouter.ai/models) · [docs](https://openrouter.ai/docs)
 
 ```env
 UPSTREAM_URL=https://openrouter.ai/api/v1

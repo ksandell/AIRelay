@@ -27,7 +27,8 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.2.2 | ✅ Done | Stability — async I/O, proxy hardening, test coverage |
 | v0.2.3 | ✅ Done | Provider visibility — AnLinkAI added, Setup tab expanded to all 15 |
 | v0.2.4 | ✅ Done | Cerebras provider — wafer-scale inference, 16th provider |
-| v0.2.5 | ⚪ Planned | Azure OpenAI adapter (api-key header + api-version query param) |
+| v0.2.5 | ✅ Done | Log compression (#36) + provider directory (#101) |
+| v0.2.6 | ⚪ Planned | Azure OpenAI adapter (api-key header + api-version query param) |
 | v0.3.0 | ⚪ Planned | Persistence + multi-upstream |
 | v0.4.0+ | ⚪ Speculative | Caching, retries, routing intelligence |
 
@@ -45,7 +46,13 @@ recipe, README row. `pricing-completeness` test bumped to 16 required providers.
 
 ---
 
-## v0.2.5 — Azure OpenAI adapter  ⚪
+## v0.2.5 — Log compression + provider directory  ✅
+
+**Shipped:** `ENABLE_COMPRESSION=true` now streams gzip rotated `app-YYYY-MM-DD.log` → `.log.gz` after rename; retention counts both. Active log never compressed. Added a "Provider directory" table in `CONFIGURATION.md` linking site/pricing/docs for all 16 named providers.
+
+---
+
+## v0.2.6 — Azure OpenAI adapter  ⚪
 
 **Theme:** "First non-trivial provider — header + query rewrite hook."
 

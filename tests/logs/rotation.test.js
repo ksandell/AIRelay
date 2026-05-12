@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import zlib from 'node:zlib'
 
 let tmpDir
 
@@ -35,6 +36,61 @@ describe('rotateLogs', () => {
   it('handles missing app.log gracefully', async () => {
     const { rotateLogs } = await import('../../src/logs/rotation.js')
     expect(() => rotateLogs()).not.toThrow()
+  })
+
+  it('gzips rotated file when ENABLE_COMPRESSION=true and removes the .log', async () => {
+    const { config } = await import('../../src/config.js')
+    config.enableCompression = true
+    try {
+      const { rotateLogs } = await import('../../src/logs/rotation.js')
+      const active = path.join(tmpDir, 'app.log')
+      const payload = 'compressible payload\n'.repeat(50)
+      fs.writeFileSync(active, payload)
+
+      await rotateLogs()
+
+      const files = fs.readdirSync(tmpDir)
+      const gz = files.find((f) => /^app-.*\.log\.gz$/.test(f))
+      const plain = files.find((f) => /^app-.*\.log$/.test(f))
+      expect(gz).toBeDefined()
+      expect(plain).toBeUndefined()
+
+      const decoded = zlib.gunzipSync(fs.readFileSync(path.join(tmpDir, gz))).toString('utf8')
+      expect(decoded).toBe(payload)
+      expect(fs.readFileSync(active, 'utf8')).toBe('')
+    } finally {
+      config.enableCompression = false
+    }
+  })
+
+  it('uniquifies dest on same-day re-rotation (no clobber)', async () => {
+    const { rotateLogs } = await import('../../src/logs/rotation.js')
+    const active = path.join(tmpDir, 'app.log')
+
+    fs.writeFileSync(active, 'first\n')
+    await rotateLogs()
+    fs.writeFileSync(active, 'second\n')
+    await rotateLogs()
+
+    const rotated = fs
+      .readdirSync(tmpDir)
+      .filter((f) => /^app-\d{4}-\d{2}-\d{2}(\.\d+)?\.log$/.test(f))
+    expect(rotated).toHaveLength(2)
+    const contents = rotated.map((f) => fs.readFileSync(path.join(tmpDir, f), 'utf8')).sort()
+    expect(contents).toEqual(['first\n', 'second\n'])
+  })
+})
+
+describe('cleanupOldLogs (gzipped)', () => {
+  it('counts .log.gz files toward retention', async () => {
+    const { cleanupOldLogs } = await import('../../src/logs/rotation.js')
+    for (let i = 1; i <= 5; i++) {
+      const name = `app-2026-04-${String(i).padStart(2, '0')}.log.gz`
+      fs.writeFileSync(path.join(tmpDir, name), '')
+    }
+    cleanupOldLogs()
+    const remaining = fs.readdirSync(tmpDir).filter((f) => f.startsWith('app-'))
+    expect(remaining).toHaveLength(3)
   })
 })
 

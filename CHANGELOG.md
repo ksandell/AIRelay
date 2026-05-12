@@ -5,6 +5,15 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.5] — 2026-05-12 — Log compression + provider links
+
+### Added
+- **Gzip rotated logs** — `ENABLE_COMPRESSION=true` now actually compresses rotated `app-YYYY-MM-DD.log` files to `.log.gz` after rename. Active log is never compressed; compression streams via `zlib.createGzip()` so it never doubles disk usage. Retention cleanup counts both `.log` and `.log.gz` files (#36).
+- **Provider directory** in `CONFIGURATION.md` — site / pricing / docs links for all 16 named providers (#101).
+
+### Changed
+- `CONFIGURATION.md` `ENABLE_COMPRESSION` row no longer says "no-op".
+
 ## [0.2.4] — 2026-05-06 — Cerebras provider
 
 ### Added
