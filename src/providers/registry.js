@@ -43,7 +43,7 @@ export function loadProvider(name, pricingOverridePath = null) {
   const key = `${name}:${pricingOverridePath ?? ''}`
   if (_instances.has(key)) return _instances.get(key)
   const Cls = PROVIDER_CLASSES[name] ?? GenericProvider
-  const instance = new Cls(loadPricing(name, pricingOverridePath))
+  const instance = new Cls(loadPricing(name, pricingOverridePath), name)
   _instances.set(key, instance)
   return instance
 }

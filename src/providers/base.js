@@ -1,8 +1,9 @@
 import { config } from '../config.js'
 
 export class BaseProvider {
-  constructor(pricing) {
+  constructor(pricing, providerName = null) {
     this._pricing = pricing
+    this._providerName = providerName
   }
 
   get name() {

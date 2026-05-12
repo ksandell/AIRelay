@@ -5,11 +5,13 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.6] — unreleased — v0.2.5 cleanup
+## [0.2.6] — Unreleased — v0.2.5 cleanup
 
 ### Fixed
 - **`/api/logs/available` now lists `.log.gz` rotated files** (#104). The reader's filename filter was tightened to plain `.log` in v0.2.5; it now reuses the canonical `ROTATED_RE` exported from `src/logs/rotation.js`, so both `app-YYYY-MM-DD.log` and `app-YYYY-MM-DD[.N].log.gz` appear in `rotated[]`. Each rotated entry now carries a `compressed: boolean` flag for the dashboard.
 - **`readHistoricLog` can read gzipped historic logs** (#105). On `?date=YYYY-MM-DD`, the reader scans the log directory for every matching part (`app-<date>.log`, `app-<date>.log.gz`, `app-<date>.N.log[.gz]`), streams each `.gz` part through `zlib.createGunzip()`, and enforces `LOG_READ_MAX_MB` against the **decompressed** byte count (aborts the stream early on overflow, so a gzip bomb cannot exhaust memory). Same-day re-rotation policy: all parts for the requested date are merged into one response sorted by mtime ascending — no `&part=N` query param needed.
+- **Rotation no longer fails on Windows** (#107). `rotateLogs` previously called `redirectStream(active)` before `fs.renameSync(active, dest)`, opening a fresh writable handle while the rename targeted the same path. Windows holds an exclusive lock on any file with an open writable fd, so the rename failed silently. The file sink's `closeActiveStream()` is now truly async (awaits the `close` event), rename happens with no open handles, and the new active stream opens only after rename succeeds. Cron + size-guard callers were updated to `await rotateLogs()`.
+- **Mistral pricing coverage** — added `mistral-medium-latest` ($0.40/$2.00 per 1M) and `open-mistral-7b` ($0.25/$0.25 per 1M) rows to `config/pricing.json`; previously these returned `costUsd=0` despite valid token usage. Source: mistral.ai/pricing. Pricing module now emits a one-shot stderr warning (`[pricing] unknown <provider>:<model> — counting tokens only`) the first time an unseen `provider:model` pair is looked up, so operators notice gaps (#108).
 
 ## [0.2.5] — 2026-05-12 — Log compression + provider links
 

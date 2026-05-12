@@ -107,7 +107,7 @@ export class AnthropicProvider extends BaseProvider {
 
   calculateCost(tokens) {
     if (!tokens?.model) return null
-    const price = lookupModelPrice(this._pricing, tokens.model)
+    const price = lookupModelPrice(this._pricing, tokens.model, this._providerName)
     if (!price) return null
     const input = ((tokens.inputTokens ?? 0) * price.input) / 1_000_000
     const output = ((tokens.outputTokens ?? 0) * price.output) / 1_000_000

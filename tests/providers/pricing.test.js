@@ -1,8 +1,12 @@
-import { describe, it, expect } from 'vitest'
-import { writeFileSync, unlinkSync } from 'node:fs'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { writeFileSync, unlinkSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { loadPricing, lookupModelPrice } from '../../src/providers/pricing.js'
+import {
+  loadPricing,
+  lookupModelPrice,
+  _resetUnknownModelWarnings,
+} from '../../src/providers/pricing.js'
 
 describe('loadPricing', () => {
   it('returns pricing for a known provider', () => {
@@ -64,5 +68,71 @@ describe('lookupModelPrice', () => {
 
   it('returns null for null pricing', () => {
     expect(lookupModelPrice(null, 'gpt-4o')).toBeNull()
+  })
+})
+
+describe('pricing coverage', () => {
+  it('every model in the bundled pricing table yields cost > 0 for nonzero tokens (except ollama wildcard)', () => {
+    const bundled = JSON.parse(
+      readFileSync(join(import.meta.dirname, '../../config/pricing.json'), 'utf8'),
+    )
+    for (const [provider, models] of Object.entries(bundled.providers)) {
+      if (provider === 'ollama') continue
+      for (const [model, price] of Object.entries(models)) {
+        const cost = (1000 * price.input + 1000 * price.output) / 1_000_000
+        expect(cost, `${provider}:${model} should price > 0`).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('mistral table includes medium-latest and open-mistral-7b', () => {
+    const pricing = loadPricing('mistral')
+    expect(pricing['mistral-medium-latest']).toBeDefined()
+    expect(pricing['mistral-medium-latest'].input).toBeGreaterThan(0)
+    expect(pricing['mistral-medium-latest'].output).toBeGreaterThan(0)
+    expect(pricing['open-mistral-7b']).toBeDefined()
+    expect(pricing['open-mistral-7b'].input).toBeGreaterThan(0)
+    expect(pricing['open-mistral-7b'].output).toBeGreaterThan(0)
+  })
+})
+
+describe('unknown model warning (one-shot)', () => {
+  beforeEach(() => {
+    _resetUnknownModelWarnings()
+  })
+
+  it('writes one stderr line on first unknown provider:model lookup', () => {
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    lookupModelPrice(loadPricing('openai'), 'mystery-model-1', 'openai')
+    const matches = spy.mock.calls.filter((c) => String(c[0]).includes('[pricing] unknown'))
+    expect(matches.length).toBe(1)
+    expect(String(matches[0][0])).toContain('openai:mystery-model-1')
+    spy.mockRestore()
+  })
+
+  it('does not warn twice for the same pair', () => {
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    lookupModelPrice(loadPricing('openai'), 'mystery-model-2', 'openai')
+    lookupModelPrice(loadPricing('openai'), 'mystery-model-2', 'openai')
+    const matches = spy.mock.calls.filter((c) => String(c[0]).includes('openai:mystery-model-2'))
+    expect(matches.length).toBe(1)
+    spy.mockRestore()
+  })
+
+  it('warns separately per distinct provider:model pair', () => {
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    lookupModelPrice(loadPricing('openai'), 'mystery-a', 'openai')
+    lookupModelPrice(loadPricing('openai'), 'mystery-b', 'openai')
+    const matches = spy.mock.calls.filter((c) => String(c[0]).includes('[pricing] unknown'))
+    expect(matches.length).toBe(2)
+    spy.mockRestore()
+  })
+
+  it('does not warn for ollama wildcard match', () => {
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    lookupModelPrice(loadPricing('ollama'), 'any-model', 'ollama')
+    const matches = spy.mock.calls.filter((c) => String(c[0]).includes('[pricing] unknown'))
+    expect(matches.length).toBe(0)
+    spy.mockRestore()
   })
 })

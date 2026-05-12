@@ -39,9 +39,22 @@ export function loadPricing(providerName, overridePath = null) {
   return providers[providerName] ?? {}
 }
 
-export function lookupModelPrice(pricing, model) {
+const _unknownModelWarnings = new Set()
+
+export function _resetUnknownModelWarnings() {
+  _unknownModelWarnings.clear()
+}
+
+export function lookupModelPrice(pricing, model, providerName = null) {
   if (!pricing) return null
   if (pricing[model]) return pricing[model]
   if (pricing['*']) return pricing['*']
+  if (providerName && model) {
+    const key = `${providerName}:${model}`
+    if (!_unknownModelWarnings.has(key)) {
+      _unknownModelWarnings.add(key)
+      process.stderr.write(`[pricing] unknown ${key} — counting tokens only\n`)
+    }
+  }
   return null
 }
