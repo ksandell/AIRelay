@@ -623,6 +623,20 @@ function fmtTokens(n) {
   return fmtNum(Math.round(n))
 }
 
+// Y-axis tick formatter — kill float-precision noise (e.g. 0.6000000000000001).
+// Auto-picks precision from magnitude. Sub-0.01 values fall back to 2
+// significant figures so tiny token-rate ranges stay readable instead of
+// collapsing to "0.00".
+function fmtAxis(v) {
+  if (v === 0) return '0'
+  const a = Math.abs(v)
+  if (a >= 100) return Math.round(a).toString()
+  if (a >= 10) return a.toFixed(0)
+  if (a >= 1) return a.toFixed(1)
+  if (a >= 0.1) return a.toFixed(2)
+  return Number(a.toPrecision(2)).toString()
+}
+
 function fmtBytes(n) {
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
@@ -716,7 +730,7 @@ function makeDualLineChart(canvasId, color1, color2, label1, label2) {
           grid: { color: '#21262d' },
         },
         y: {
-          ticks: { color: '#8b949e', font: { size: 10 } },
+          ticks: { color: '#8b949e', font: { size: 10 }, callback: fmtAxis },
           grid: { color: '#21262d' },
           beginAtZero: true,
         },
@@ -805,7 +819,7 @@ function makeDivergingTokensChart(canvasId) {
           ticks: {
             color: '#8b949e',
             font: { size: 10 },
-            callback: (v) => Math.abs(v),
+            callback: fmtAxis,
           },
           grid: {
             color: (ctx) => (ctx.tick.value === 0 ? '#8b949e' : '#21262d'),
