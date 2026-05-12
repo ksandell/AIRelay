@@ -12,6 +12,7 @@ beforeEach(async () => {
   const { config } = await import('../../src/config.js')
   config.logDir = tmpDir
   config.logRetentionDays = 3
+  config.enableCompression = false
 })
 
 afterEach(() => {
