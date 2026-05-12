@@ -3,7 +3,7 @@ import path from 'node:path'
 import zlib from 'node:zlib'
 import { pipeline } from 'node:stream/promises'
 import { config } from '../config.js'
-import { redirectStream } from './logger.js'
+import { beginRotation, endRotation, closeActiveStream, redirectStream } from './logger.js'
 
 // Streaming gzip; awaited before cleanupOldLogs so retention never sees a
 // partial .gz and can't race with the source file being read.
@@ -52,10 +52,12 @@ export async function rotateLogs() {
   const active = activeLog()
   const date = todayUTC()
 
+  beginRotation()
   try {
-    // 1. Point the write stream at the new active path BEFORE the rename so
-    //    any concurrent write lands in the fresh stream, not the renamed dest.
-    redirectStream(active)
+    // 1. Fully close the active write stream BEFORE the rename. On Windows an
+    //    open write handle holds a kernel lock that blocks rename; closing
+    //    sync isn't enough — must await fd release via the stream 'close' event.
+    await closeActiveStream()
 
     if (fs.existsSync(active)) {
       const dest = uniqueRotatedPath(date)
@@ -66,11 +68,15 @@ export async function rotateLogs() {
         await compressRotated(dest)
       }
     }
-    // 2. Create fresh active file (redirectStream already opened a handle to it).
+    // 2. Recreate active file, then point the sink at it. Order matters: the
+    //    new stream is opened only AFTER rename, so it can't race with it.
     fs.writeFileSync(active, '', 'utf8')
+    redirectStream(active)
     cleanupOldLogs()
   } catch (err) {
     process.stderr.write(`[rotation] failed: ${err.message}\n`)
+  } finally {
+    endRotation()
   }
 }
 
@@ -93,7 +99,7 @@ export function cleanupOldLogs() {
   }
 }
 
-export function rotateLogsIfNeeded() {
+export async function rotateLogsIfNeeded() {
   const active = activeLog()
 
   if (!fs.existsSync(active)) {
@@ -109,7 +115,7 @@ export function rotateLogsIfNeeded() {
   const oversized = stat.size > config.maxLogSizeMb * 1024 * 1024
 
   if (lastModDate < today || oversized) {
-    rotateLogs()
+    await rotateLogs()
   }
 
   cleanupOldLogs()
@@ -117,12 +123,16 @@ export function rotateLogsIfNeeded() {
 
 export function startSizeGuard() {
   return setInterval(
-    () => {
+    async () => {
       const active = activeLog()
       if (!fs.existsSync(active)) return
       const { size } = fs.statSync(active)
       if (size > config.maxLogSizeMb * 1024 * 1024) {
-        rotateLogs()
+        try {
+          await rotateLogs()
+        } catch (err) {
+          process.stderr.write(`[rotation] sizeGuard rotateLogs failed: ${err.message}\n`)
+        }
       }
     },
     5 * 60 * 1000,
