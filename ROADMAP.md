@@ -28,7 +28,8 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.2.3 | ✅ Done | Provider visibility — AnLinkAI added, Setup tab expanded to all 15 |
 | v0.2.4 | ✅ Done | Cerebras provider — wafer-scale inference, 16th provider |
 | v0.2.5 | ✅ Done | Log compression (#36) + provider directory (#101) |
-| v0.2.6 | ⚪ Planned | Azure OpenAI adapter (api-key header + api-version query param) |
+| v0.2.6 | ✅ Done | v0.2.5 cleanup — gzip reader path, Windows rotation, Mistral pricing, docs (#104, #105, #106, #107, #108) |
+| v0.2.7 | ⚪ Planned | Azure OpenAI adapter (api-key header + api-version query param) |
 | v0.3.0 | ⚪ Planned | Persistence + multi-upstream |
 | v0.4.0+ | ⚪ Speculative | Caching, retries, routing intelligence |
 
@@ -52,7 +53,13 @@ recipe, README row. `pricing-completeness` test bumped to 16 required providers.
 
 ---
 
-## v0.2.6 — Azure OpenAI adapter  ⚪
+## v0.2.6 — v0.2.5 cleanup  ✅
+
+**Shipped:** Fix-up release for the v0.2.5 gzip-rotation work. `/api/logs/available` and `/api/logs/history` now correctly enumerate and decode `.log.gz` rotated files (#104, #105). `rotateLogs()` is fully async so Windows no longer fails the rename under an open writable fd (#107). Added `mistral-medium-latest` and `open-mistral-7b` to pricing, plus a one-shot stderr warning the first time an unknown `provider:model` is looked up (#108). `CONFIGURATION.md` and `README.md` provider count corrected to 16 (#106).
+
+---
+
+## v0.2.7 — Azure OpenAI adapter  ⚪
 
 **Theme:** "First non-trivial provider — header + query rewrite hook."
 

@@ -5,7 +5,7 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.6] — Unreleased — v0.2.5 cleanup
+## [0.2.6] — 2026-05-12 — v0.2.5 cleanup
 
 ### Fixed
 - **`/api/logs/available` now lists `.log.gz` rotated files** (#104). The reader's filename filter was tightened to plain `.log` in v0.2.5; it now reuses the canonical `ROTATED_RE` exported from `src/logs/rotation.js`, so both `app-YYYY-MM-DD.log` and `app-YYYY-MM-DD[.N].log.gz` appear in `rotated[]`. Each rotated entry now carries a `compressed: boolean` flag for the dashboard.
