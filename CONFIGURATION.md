@@ -185,10 +185,10 @@ Quick links for every named provider the proxy recognises (`PROXY_PROVIDER` valu
 | Together AI (`together`) | [together.ai](https://www.together.ai/) | [pricing](https://www.together.ai/pricing) | [docs](https://docs.together.ai/) |
 | Fireworks (`fireworks`) | [fireworks.ai](https://fireworks.ai/) | [pricing](https://fireworks.ai/pricing) | [docs](https://docs.fireworks.ai/) |
 | DeepSeek (`deepseek`) | [deepseek.com](https://www.deepseek.com/) | [pricing](https://api-docs.deepseek.com/quick_start/pricing) | [docs](https://api-docs.deepseek.com/) |
-| xAI (`xai`) | [x.ai](https://x.ai/) | [pricing](https://docs.x.ai/docs/models) | [docs](https://docs.x.ai/) |
+| xAI (`xai`) | [x.ai](https://x.ai/) | [models & pricing](https://docs.x.ai/docs/models) | [docs](https://docs.x.ai/) |
 | Perplexity (`perplexity`) | [perplexity.ai](https://www.perplexity.ai/) | [pricing](https://docs.perplexity.ai/guides/pricing) | [docs](https://docs.perplexity.ai/) |
 | Ollama (`ollama`) | [ollama.com](https://ollama.com/) | local — $0 | [docs](https://github.com/ollama/ollama/blob/main/docs/api.md) |
-| NVIDIA NIM (`nvidia`) | [build.nvidia.com](https://build.nvidia.com/) | [pricing](https://www.nvidia.com/en-us/ai/) | [docs](https://docs.api.nvidia.com/) |
+| NVIDIA NIM (`nvidia`) | [build.nvidia.com](https://build.nvidia.com/) | [free tier + credits](https://build.nvidia.com/explore/discover) | [docs](https://docs.api.nvidia.com/) |
 | Cerebras (`cerebras`) | [cerebras.ai](https://cerebras.ai/) | [pricing](https://cerebras.ai/inference) | [docs](https://inference-docs.cerebras.ai/) |
 | AnLinkAI (`anlinkai`) | [anlinkai.com](https://anlinkai.com/) | private beta | — |
 

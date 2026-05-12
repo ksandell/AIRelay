@@ -1,50 +1,56 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import zlib from 'node:zlib'
-import { pipeline } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
 import { config } from '../config.js'
 import { redirectStream } from './logger.js'
 
-function compressRotated(src) {
+// Streaming gzip; awaited before cleanupOldLogs so retention never sees a
+// partial .gz and can't race with the source file being read.
+async function compressRotated(src) {
   const dest = `${src}.gz`
-  const input = fs.createReadStream(src)
-  const gzip = zlib.createGzip()
-  const output = fs.createWriteStream(dest)
-  pipeline(input, gzip, output, (err) => {
-    if (err) {
-      process.stderr.write(`[rotation] gzip failed ${src}: ${err.message}\n`)
-      try {
-        fs.unlinkSync(dest)
-      } catch {
-        /* ignore */
-      }
-      return
-    }
+  try {
+    await pipeline(fs.createReadStream(src), zlib.createGzip(), fs.createWriteStream(dest))
+    fs.unlinkSync(src)
+  } catch (err) {
+    process.stderr.write(`[rotation] gzip failed ${src}: ${err.message}\n`)
     try {
-      fs.unlinkSync(src)
-    } catch (e) {
-      process.stderr.write(`[rotation] post-gzip unlink failed ${src}: ${e.message}\n`)
+      fs.unlinkSync(dest)
+    } catch {
+      /* partial .gz may not exist */
     }
-  })
+  }
+}
+
+// Pick a destination that doesn't collide with an existing rotated file or an
+// in-flight gzip — handles same-day re-rotation (size guard after a burst).
+function uniqueRotatedPath(date) {
+  const base = path.join(config.logDir, `app-${date}`)
+  let candidate = `${base}.log`
+  let i = 1
+  while (fs.existsSync(candidate) || fs.existsSync(`${candidate}.gz`)) {
+    candidate = `${base}.${i}.log`
+    i += 1
+  }
+  return candidate
 }
 
 const activeLog = () => path.join(config.logDir, 'app.log')
-
-function rotatedPath(date) {
-  return path.join(config.logDir, `app-${date}.log`)
-}
 
 function todayUTC() {
   return new Date().toISOString().slice(0, 10)
 }
 
-export function rotateLogs() {
+// Retention regex matches both plain and gzipped rotated files, including the
+// `.N.log[.gz]` suffix used by uniqueRotatedPath for same-day re-rotation.
+const ROTATED_RE = /^app-\d{4}-\d{2}-\d{2}(?:\.\d+)?\.log(?:\.gz)?$/
+
+export async function rotateLogs() {
   const logDir = config.logDir
   fs.mkdirSync(logDir, { recursive: true })
 
   const active = activeLog()
   const date = todayUTC()
-  const dest = rotatedPath(date)
 
   try {
     // 1. Point the write stream at the new active path BEFORE the rename so
@@ -52,9 +58,12 @@ export function rotateLogs() {
     redirectStream(active)
 
     if (fs.existsSync(active)) {
+      const dest = uniqueRotatedPath(date)
       fs.renameSync(active, dest)
       if (config.enableCompression) {
-        compressRotated(dest)
+        // Await — cleanupOldLogs must not run until the .gz is final, otherwise
+        // a partial .gz can be counted toward retention or deleted mid-write.
+        await compressRotated(dest)
       }
     }
     // 2. Create fresh active file (redirectStream already opened a handle to it).
@@ -70,7 +79,7 @@ export function cleanupOldLogs() {
 
   const files = fs
     .readdirSync(logDir)
-    .filter((f) => /^app-\d{4}-\d{2}-\d{2}\.log(\.gz)?$/.test(f))
+    .filter((f) => ROTATED_RE.test(f))
     .map((f) => ({ name: f, mtime: fs.statSync(path.join(logDir, f)).mtimeMs }))
     .sort((a, b) => b.mtime - a.mtime)
 

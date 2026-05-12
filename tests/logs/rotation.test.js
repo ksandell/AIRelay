@@ -47,9 +47,7 @@ describe('rotateLogs', () => {
       const payload = 'compressible payload\n'.repeat(50)
       fs.writeFileSync(active, payload)
 
-      rotateLogs()
-
-      await new Promise((r) => setTimeout(r, 150))
+      await rotateLogs()
 
       const files = fs.readdirSync(tmpDir)
       const gz = files.find((f) => /^app-.*\.log\.gz$/.test(f))
@@ -63,6 +61,23 @@ describe('rotateLogs', () => {
     } finally {
       config.enableCompression = false
     }
+  })
+
+  it('uniquifies dest on same-day re-rotation (no clobber)', async () => {
+    const { rotateLogs } = await import('../../src/logs/rotation.js')
+    const active = path.join(tmpDir, 'app.log')
+
+    fs.writeFileSync(active, 'first\n')
+    await rotateLogs()
+    fs.writeFileSync(active, 'second\n')
+    await rotateLogs()
+
+    const rotated = fs
+      .readdirSync(tmpDir)
+      .filter((f) => /^app-\d{4}-\d{2}-\d{2}(\.\d+)?\.log$/.test(f))
+    expect(rotated).toHaveLength(2)
+    const contents = rotated.map((f) => fs.readFileSync(path.join(tmpDir, f), 'utf8')).sort()
+    expect(contents).toEqual(['first\n', 'second\n'])
   })
 })
 
