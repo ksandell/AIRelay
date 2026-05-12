@@ -40,6 +40,7 @@ export function loadPricing(providerName, overridePath = null) {
 }
 
 const _unknownModelWarnings = new Set()
+const UNKNOWN_WARN_CAP = 1024
 
 export function _resetUnknownModelWarnings() {
   _unknownModelWarnings.clear()
@@ -52,6 +53,10 @@ export function lookupModelPrice(pricing, model, providerName = null) {
   if (providerName && model) {
     const key = `${providerName}:${model}`
     if (!_unknownModelWarnings.has(key)) {
+      // Cap the Set so adversarial / fuzzed model names in upstream request
+      // bodies can't grow it unboundedly. Clear-on-overflow trades re-warning
+      // for bounded memory; acceptable since the warning is operator-facing.
+      if (_unknownModelWarnings.size >= UNKNOWN_WARN_CAP) _unknownModelWarnings.clear()
       _unknownModelWarnings.add(key)
       process.stderr.write(`[pricing] unknown ${key} — counting tokens only\n`)
     }

@@ -114,14 +114,19 @@ export async function readHistoricLog(date) {
     const full = path.join(config.logDir, f)
     try {
       const s = await stat(full)
-      candidates.push({ path: full, gz: Boolean(m[3]), mtime: s.mtimeMs })
+      // Parse `.N` part number (undefined for the base file → -1 so it sorts
+      // first, matching write order). Used as a tiebreak when same-day
+      // re-rotations share mtimeMs (sub-ms FS resolution on Windows / ext4)
+      // or after a clock-skew step.
+      const part = m[2] === undefined ? -1 : Number(m[2])
+      candidates.push({ path: full, gz: Boolean(m[3]), mtime: s.mtimeMs, part })
     } catch {
       /* ignore vanished file */
     }
   }
 
   if (candidates.length === 0) return null
-  candidates.sort((a, b) => a.mtime - b.mtime)
+  candidates.sort((a, b) => a.mtime - b.mtime || a.part - b.part)
 
   const out = []
   for (const c of candidates) {

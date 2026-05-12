@@ -53,6 +53,7 @@ export async function rotateLogs() {
   const date = todayUTC()
 
   beginRotation()
+  let rotatedDest = null
   try {
     // 1. Fully close the active write stream BEFORE the rename. On Windows an
     //    open write handle holds a kernel lock that blocks rename; closing
@@ -60,24 +61,26 @@ export async function rotateLogs() {
     await closeActiveStream()
 
     if (fs.existsSync(active)) {
-      const dest = uniqueRotatedPath(date)
-      fs.renameSync(active, dest)
-      if (config.enableCompression) {
-        // Await — cleanupOldLogs must not run until the .gz is final, otherwise
-        // a partial .gz can be counted toward retention or deleted mid-write.
-        await compressRotated(dest)
-      }
+      rotatedDest = uniqueRotatedPath(date)
+      fs.renameSync(active, rotatedDest)
     }
-    // 2. Recreate active file, then point the sink at it. Order matters: the
-    //    new stream is opened only AFTER rename, so it can't race with it.
+    // 2. Recreate active file and reopen the sink IMMEDIATELY after rename so
+    //    the rotation drop-window (during which logger writes are skipped) is
+    //    bounded to the rename itself, not to rename + gzip + cleanup. Gzip
+    //    runs after the sink is back online.
     fs.writeFileSync(active, '', 'utf8')
     redirectStream(active)
-    cleanupOldLogs()
-  } catch (err) {
-    process.stderr.write(`[rotation] failed: ${err.message}\n`)
   } finally {
     endRotation()
   }
+
+  // 3. Post-swap, non-blocking phases. Errors here propagate to the caller
+  //    (cron / sizeGuard) instead of being swallowed, so failed compression
+  //    or retention deletes are visible in stderr and metrics.
+  if (rotatedDest && config.enableCompression) {
+    await compressRotated(rotatedDest)
+  }
+  cleanupOldLogs()
 }
 
 export function cleanupOldLogs() {
