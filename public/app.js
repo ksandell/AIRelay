@@ -52,6 +52,23 @@ const client = new Anthropic({
     proxyProvider: 'openai',
     sdk: oaiSdk('OPENAI_API_KEY'),
   },
+  azure: {
+    label: 'Azure OpenAI Service',
+    // Replace <resource> with your Azure OpenAI resource name. AIRelay auto-
+    // appends ?api-version=... when missing — control via AZURE_OPENAI_API_VERSION.
+    upstream: 'https://<resource>.openai.azure.com',
+    proxyProvider: 'azure',
+    sdk: (host, prefix) => `// Azure OpenAI — auth via api-key header.
+// AIRelay auto-appends ?api-version when the SDK omits it.
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: "placeholder",                              // ignored — see defaultHeaders
+  baseURL: "${host}${prefix}/openai/deployments/<deployment>",
+  defaultHeaders: { "api-key": process.env.AZURE_OPENAI_API_KEY },
+  // No defaultQuery — AIRelay auto-appends ?api-version from server config.
+});`,
+  },
   gemini: {
     label: 'Google Gemini',
     upstream: 'https://generativelanguage.googleapis.com',

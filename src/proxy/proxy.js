@@ -27,6 +27,20 @@ const proxy = httpProxy.createProxyServer({
   selfHandleResponse: false,
 })
 
+// Azure OpenAI requires `?api-version=YYYY-MM-DD` on every request. When the
+// SDK omits it we append from config — mutate `req.url` inside the proxy
+// handler before `proxy.web()` runs. http-proxy reads req.url to build the
+// upstream path at that moment, so the rewrite lands cleanly. (Mutating
+// `proxyReq.path` from the http-proxy `proxyReq` event is too late: by then
+// the ClientRequest's path is already serialised.) `azureApiVersionParam` is
+// null when the feature is off, making the hot-path check a single null
+// comparison for every non-azure deployment.
+const azureApiVersionParam =
+  config.proxyProvider === 'azure' && config.azureOpenaiApiVersion
+    ? encodeURIComponent(config.azureOpenaiApiVersion)
+    : null
+const apiVersionParamRe = /[?&]api-version=/
+
 // Count outbound bytes via a passive listener — no body is buffered, the chunks
 // flow straight through to the client. Same idea inbound on `req`.
 // When token tracking is enabled, an additional passive listener tees chunks
@@ -206,6 +220,11 @@ export function createProxyHandler() {
     }
     req._metrics = m
     incInFlight()
+
+    if (azureApiVersionParam && !apiVersionParamRe.test(req.url)) {
+      const sep = req.url.includes('?') ? '&' : '?'
+      req.url = `${req.url}${sep}api-version=${azureApiVersionParam}`
+    }
 
     // Idle watchdog — destroy hung connections after proxyRequestIdleTimeoutMs.
     let idleTimer = null
