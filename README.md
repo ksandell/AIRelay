@@ -7,23 +7,26 @@
 [![Tests: Vitest](https://img.shields.io/badge/tests-vitest-6E9F18.svg?logo=vitest&logoColor=white)](https://vitest.dev)
 [![Status](https://img.shields.io/badge/status-alpha-orange.svg)]()
 
-**An API proxy for AI.** Sits between your codebase and any AI/LLM HTTP API (Anthropic, OpenAI, Gemini, OpenRouter, self-hosted). Forwards bytes unchanged. Surfaces live logs + per-request metrics in a browser dashboard.
+**An API proxy for AI** — with an **opt-in prompt compressor** that shaves bloated tool output before it hits your LLM. Sits between your codebase and any AI/LLM HTTP API (Anthropic, OpenAI, Gemini, OpenRouter, self-hosted). Forwards bytes unchanged by default; transparently shrinks them when you flip the switch. Live logs + per-request metrics in a browser dashboard.
 
 > **What this is not:** a desktop chat client, a CLI assistant, or a browser extension. The target traffic is server-to-API SDK calls from a codebase.
+
+![AIRelay Compressors dashboard](docs/screenshots/compressors.png)
+
+*The Compressors dashboard — live view of byte savings per compressor, recent events stream, and cumulative ratios.*
 
 ---
 
 ## What you get
 
+- **Prompt Compressor** — opt-in, deterministic prompt compression. 10 compressors shrink bloated `tool_result` content (git diffs, lockfile diffs, `ls -l`, `npm install` logs, ANSI noise, stack traces, base64 blobs) before forwarding to the LLM. Per-compressor metrics, per-request bypass via `X-Compactor: off`, default off. See [docs/COMPACTOR.md](docs/COMPACTOR.md).
+- **Token & cost tracking** — per-request input/output tokens + USD cost for 17 providers ([full list in CONFIGURATION.md](CONFIGURATION.md#token--cost-tracking)). Per-model breakdown via `/api/metrics/models`, sortable by spend.
+- **17 providers** out of the box — Anthropic, OpenAI, Azure, Gemini, xAI, OpenRouter, Together, Fireworks, Groq, Cerebras, DeepSeek, Perplexity, Mistral, NVIDIA, Microsoft, AnLinkAI, Ollama — plus a `generic` mode for anything else.
+- **Live dashboard.** RPS, p50/p95/p99, error rate, status pills, network + token throughput (In/Out), tokens/sec, recent-requests feed, Compressors panel — updated in real time.
 - **Transparent passthrough** by default. Streaming AI responses (SSE / chunked) flow through unmodified — your SDK doesn't know the proxy is there.
-- **Compactor (NEW in v0.3.0)** — opt-in prompt compression. Shrinks bloated `tool_result` content (git diffs, lockfile diffs, `ls -l`, `npm install` logs, ANSI noise) before forwarding to the LLM. 10 deterministic compressors, per-compressor metrics, default off. See [docs/COMPACTOR.md](docs/COMPACTOR.md).
-- **Live dashboard.** RPS, p50/p95/p99, error rate, status pills, network + token throughput (In/Out), tokens/sec, recent-requests feed — updated in real time.
 - **Guided setup.** First time you open the dashboard, a Setup tab walks you through generating the right `.env` for your provider.
-- **Token & cost tracking** — per-request input/output tokens + USD cost for 17 providers ([full list in CONFIGURATION.md](CONFIGURATION.md#token--cost-tracking)).
-- **Per-model breakdown** — cost/token aggregates via `/api/metrics/models`, sortable by spend.
-- **Single Docker container.** No DB, no Redis, no system cron. Bring `UPSTREAM_URL` and go.
-- **Cross-platform.** Identical on Windows Docker Desktop, macOS, and Linux.
-- **Automated E2E (NEW in v0.3.0)** — Playwright covers all 4 dashboard tabs in ~16 s. No Docker required for CI: `npm run test:e2e`. See [docs/e2e-test-plan.md](docs/e2e-test-plan.md).
+- **Single Docker container.** No DB, no Redis, no system cron. Bring `UPSTREAM_URL` and go. Identical on Windows Docker Desktop, macOS, and Linux.
+- **Automated E2E** — Playwright covers Logs, Metrics, Compressors (+ hash-routed Setup) in ~8 s. No Docker required for CI: `npm run test:e2e`. See [docs/e2e-test-plan.md](docs/e2e-test-plan.md).
 
 What shipped in each release: [CHANGELOG.md](CHANGELOG.md). What's coming next: [ROADMAP.md](ROADMAP.md).
 
@@ -53,6 +56,8 @@ const client = new Anthropic({
 ```
 
 That's it. Every request now flows through the proxy and shows up on the dashboard.
+
+To enable the Compressor, flip `COMPACTOR_ENABLED=true` in `.env` and restart — env vars are pre-plumbed in `docker-compose.yml`, no side-car required. Full reference: [docs/COMPACTOR.md](docs/COMPACTOR.md).
 
 ### Smoke-test with mock upstream
 
