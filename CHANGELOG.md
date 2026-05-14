@@ -5,6 +5,30 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-05-14 — Compactor + Playwright E2E
+
+### Added
+- **Chrome MCP visual scenarios runbook** ([scripts/compactor-mcp-scenarios.md](scripts/compactor-mcp-scenarios.md)) — manual playbook that fires 6 bloated-payload scenarios (git diff with lockfile, `ls -l`, npm install log, Node stacktrace, 600-line file, base64 image) against a real Mistral upstream to prove every compressor fires on real-world data, not just fixtures. Includes pass/fail gates and optional evidence-capture under `docs/compactor/evidence/`. Run after merge as the final human-in-the-loop release validation.
+- **Playwright E2E framework** — automated browser tests across all 4 dashboard tabs (Setup, Logs, Metrics, Compactor) plus visual regression with OS-pinned baselines. 14 functional + 5 visual specs, 19 total tests, ~25 s end-to-end. In-process Node bootstrap (`tests/e2e/fixtures/test-server.js`) spawns a deterministic fake LLM upstream + AIRelay on port 3100 — **no Docker required for CI**. Determinism via `?testMode=1` (disables Chart.js animations + CSS transitions), seeded fake-token responses, and a `POST /api/test/reset` endpoint (gated by `NODE_ENV=test`). New scripts: `npm run test:e2e`, `npm run test:e2e:visual`, `npm run test:e2e:visual:bless`, `npm run test:e2e:ui`. CI workflow `.github/workflows/e2e.yml` runs vitest + Playwright on every push to main, retains traces + screenshots on failure. Full reference in [docs/e2e-test-plan.md](docs/e2e-test-plan.md).
+- **Compactor** — opt-in prompt compression pipeline. Inspired by VSCode 1.120's `chat.tools.compressOutput.enabled` but applied proxy-side so any consumer of AIRelay benefits without SDK changes. Default off; preserves byte-identical passthrough for non-opted-in traffic. When enabled, parses the LLM request, walks provider-specific message shapes (Anthropic Messages, OpenAI Chat / Responses), runs a pipeline of 10 deterministic compressors on `tool_result` content (and optionally other text), and forwards the shrunk body upstream. Full reference in [docs/COMPACTOR.md](docs/COMPACTOR.md).
+- **10 compressors**: `ansi-strip`, `blankline-collapse`, `lockfile-drop`, `diff-collapse`, `ls-long-shrink`, `npm-noise-strip`, `repeat-line-dedupe`, `stacktrace-dedupe`, `base64-truncate`, `long-file-elide` (risky). Each is independently toggleable via `COMPACTOR_<NAME>_ENABLED`. Per-compressor deep-dives under [docs/compactor/compressors/](docs/compactor/compressors/).
+- **Per-request metrics**: bytes in, bytes out, bytes saved, estimated tokens saved (`bytes_saved / 4` heuristic — no tokenizer dep in v1), per-compressor µs latency, bypass reason. Surfaced on a new **Compactor** dashboard tab with KPI cards (1m / 5m / lifetime savings), per-compressor fires/bytes/avg-µs table, and a recent-events feed. Programmatic access at `GET /api/compactor/summary` and `GET /api/compactor/recent`.
+- **Banner injection**: every mutated text segment is prefixed with `[compactor: applied filters=…; bytes …→…; set header X-Compactor: off to bypass]` so the model can see what changed and how to request raw output.
+- **Per-request override** via `X-Compactor: on|off|bypass` header. Header is stripped before forwarding upstream. Audit trail via response header `X-Compactor-Applied: <filters>`.
+- **Streaming bypass**: requests with `"stream": true` bypass Compactor entirely (no buffering, no first-byte-latency penalty) and emit a `compactor.streaming_bypass` counter + `X-Compactor-Applied: bypass-streaming` response header.
+- **Safety model**: (a) default off, (b) per-request opt-out always honored, (c) `system` messages skipped unless `COMPACTOR_ALLOW_RISKY=true`, (d) risky compressors gated, (e) tool-result-only scope by default, (f) property-tested invariants (never grows, idempotent, safe-substring preservation), (g) banner-to-the-model, (h) response header audit trail.
+- **Tests**: 58 compactor tests including 30 property-based runs (idempotence + never-grows + result-shape) across all compressors, 14 empirical fixture assertions, 9 safe-substring property tests, and 5 end-to-end tests through the real proxy that verify header opt-out, byte-identical bypass, streaming bypass behavior, lifetime metric recording, and the `/api/compactor/summary` shape.
+- **Config**: 17 new `COMPACTOR_*` env vars including master switch, scope toggles, per-compressor toggles, buffer cap (`COMPACTOR_MAX_REQ_BYTES`, default 4 MiB), and long-file threshold. All documented in `CONFIGURATION.md` and `.env.example`.
+
+### Changed
+- **Hot-path invariant** restated: "bytes are never modified **for non-opted-in traffic**." Compactor is the explicit, operator-controlled exception. Updated in `CLAUDE.md`, `docs/ARCHITECTURE.md`.
+- **`proxy.js`** now consults `req._compactorBody` and forwards the mutated buffer via http-proxy's `buffer` option when present. When Compactor is disabled (default), this branch is never taken — zero overhead.
+
+### Docs
+- New: [`docs/COMPACTOR.md`](docs/COMPACTOR.md) (11-section user reference: overview, quickstart, activation, catalog, banner, metrics, streaming, ops, safety, tuning recipes, troubleshooting).
+- New: [`docs/compactor/compressors/<name>.md`](docs/compactor/compressors/) — one deep-dive per compressor (10 files), each with trigger heuristic, transform algorithm, before/after examples, known limitations, safety notes.
+- Updated: README.md (Compactor callout), CONFIGURATION.md (full env-var table + provider-support matrix), ARCHITECTURE.md (new Compactor module section + API surface), CLAUDE.md (invariant qualification + docs index row), `.env.example` (every `COMPACTOR_*` var with default and one-line description).
+
 ## [0.2.7] — 2026-05-12 — Azure OpenAI adapter
 
 ### Added
