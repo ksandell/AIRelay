@@ -5,7 +5,7 @@ test.beforeEach(async ({ baseURL }) => {
   await resetMetrics(baseURL)
 })
 
-test.describe('Compactor tab', () => {
+test.describe('Compressors tab', () => {
   test('renders with master switch state', async ({ page }) => {
     await page.goto('/?testMode=1#compactor')
     await expect(page.locator('#compactorPanel')).toBeVisible()
