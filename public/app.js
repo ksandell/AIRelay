@@ -1,3 +1,19 @@
+// ─── E2E test mode ───────────────────────────────────────────
+// When the URL carries ?testMode=1 we disable Chart.js animations and any
+// CSS transitions/keyframes so Playwright visual snapshots are deterministic.
+// No-op for normal users.
+const TEST_MODE =
+  typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).get('testMode') === '1'
+if (TEST_MODE) {
+  document.documentElement.setAttribute('data-test-mode', '1')
+  if (typeof window.Chart !== 'undefined') {
+    window.Chart.defaults.animation = false
+    window.Chart.defaults.animations = { colors: false, numbers: false }
+    window.Chart.defaults.transitions = { active: { animation: { duration: 0 } } }
+  }
+}
+
 // ─── Tab routing ─────────────────────────────────────────────
 const tabs = document.querySelectorAll('.tab')
 const setupTab = document.getElementById('setupTab')
@@ -7,18 +23,115 @@ const logsPanel = document.getElementById('logsPanel')
 const metricsPanel = document.getElementById('metricsPanel')
 const logsControls = document.getElementById('logsControls')
 const metricsControls = document.getElementById('metricsControls')
+const compactorPanel = document.getElementById('compactorPanel')
+const compactorControls = document.getElementById('compactorControls')
 
 function activateTab(name) {
   tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === name))
   setupPanel.classList.toggle('hidden', name !== 'setup')
   logsPanel.classList.toggle('hidden', name !== 'logs')
   metricsPanel.classList.toggle('hidden', name !== 'metrics')
+  if (compactorPanel) compactorPanel.classList.toggle('hidden', name !== 'compactor')
   setupControls.classList.toggle('hidden', name !== 'setup')
   logsControls.classList.toggle('hidden', name !== 'logs')
   metricsControls.classList.toggle('hidden', name !== 'metrics')
+  if (compactorControls) compactorControls.classList.toggle('hidden', name !== 'compactor')
   location.hash = name
+  if (name === 'compactor') refreshCompactor()
+  // Re-pull ring-buffer data when the user lands on Logs/Metrics so tables
+  // populate even if the tab was hidden when the proxy traffic arrived.
+  if (name === 'logs' && typeof loadLive === 'function' && !dateSelect?.value) {
+    loadLive().catch(() => {})
+  }
+  if (name === 'metrics' && typeof loadRecent === 'function') {
+    loadRecent().catch(() => {})
+  }
 }
 tabs.forEach((t) => t.addEventListener('click', () => activateTab(t.dataset.tab)))
+
+// ─── Compactor panel ─────────────────────────────────────────
+// Uses the shared `fmtBytes` defined later in the file (hoisted).
+
+async function refreshCompactor() {
+  const statusEl = document.getElementById('compactorStatus')
+  const enabledPill = document.getElementById('compactorEnabledPill')
+  try {
+    const [summaryRes, recentRes] = await Promise.all([
+      fetch('/api/compactor/summary'),
+      fetch('/api/compactor/recent?limit=50'),
+    ])
+    if (!summaryRes.ok || !recentRes.ok) throw new Error('fetch failed')
+    const s = await summaryRes.json()
+    const recent = await recentRes.json()
+    if (statusEl) {
+      statusEl.textContent = 'Live'
+      statusEl.className = 'status connected'
+    }
+    if (enabledPill) {
+      enabledPill.textContent = s.enabled ? 'enabled' : 'disabled'
+      enabledPill.className = s.enabled ? 'pill ok' : 'pill warn'
+    }
+    document.getElementById('compactorBytes1m').textContent = fmtBytes(s.windows['1m'].bytesSaved)
+    document.getElementById('compactorBytes5m').textContent = fmtBytes(s.windows['5m'].bytesSaved)
+    document.getElementById('compactorBytesLifetime').textContent = fmtBytes(s.lifetime.bytesSaved)
+    document.getElementById('compactorTokensLifetime').textContent = Math.floor(
+      s.lifetime.bytesSaved / 4,
+    ).toLocaleString()
+    const r = s.windows['5m'].ratio
+    document.getElementById('compactorRatio5m').textContent =
+      r == null ? '—' : `${Math.round((1 - r) * 100)}%`
+    document.getElementById('compactorBypasses').textContent = s.lifetime.requestsBypassed
+
+    pushSpark('compactorBytes1m', s.windows['1m'].bytesSaved)
+    pushSpark('compactorBytes5m', s.windows['5m'].bytesSaved)
+    pushSpark('compactorBytesLifetime', s.lifetime.bytesSaved)
+    pushSpark('compactorTokensLifetime', Math.floor(s.lifetime.bytesSaved / 4))
+    pushSpark('compactorRatio5m', r == null ? 0 : Math.round((1 - r) * 100))
+    pushSpark('compactorBypasses', s.lifetime.requestsBypassed)
+
+    const tbody = document.querySelector('#compactorTable tbody')
+    tbody.innerHTML = ''
+    const activeSet = new Set(s.compressors.active)
+    for (const name of s.compressors.all) {
+      const agg = s.lifetime.byCompressor[name]
+      const tr = document.createElement('tr')
+      const fires = agg?.fires ?? 0
+      const saved = agg?.bytesSaved ?? 0
+      const avgMicros = fires > 0 ? Math.round(agg.durationMicros / fires) : 0
+      tr.innerHTML = `<td><code>${name}</code></td>
+        <td>${activeSet.has(name) ? '✓' : '—'}</td>
+        <td>${fires}</td>
+        <td>${fmtBytes(saved)}</td>
+        <td>${avgMicros}</td>`
+      tbody.appendChild(tr)
+    }
+
+    const rbody = document.querySelector('#compactorRecentTable tbody')
+    rbody.innerHTML = ''
+    for (const ev of recent) {
+      const tr = document.createElement('tr')
+      tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
+        <td>${ev.scope}</td>
+        <td>${ev.filtersFired.join(', ') || '—'}</td>
+        <td>${ev.bytesIn} → ${ev.bytesOut}</td>
+        <td>${fmtBytes(ev.bytesSaved)}</td>
+        <td>${ev.durationMicros}</td>
+        <td>${ev.bypassReason ?? ''}</td>`
+      rbody.appendChild(tr)
+    }
+  } catch {
+    if (statusEl) {
+      statusEl.textContent = 'Error'
+      statusEl.className = 'status disconnected'
+    }
+  }
+}
+
+const compactorRefreshBtn = document.getElementById('compactorRefreshBtn')
+if (compactorRefreshBtn) compactorRefreshBtn.addEventListener('click', refreshCompactor)
+setInterval(() => {
+  if (compactorPanel && !compactorPanel.classList.contains('hidden')) refreshCompactor()
+}, 5000)
 
 // ─── Setup panel ─────────────────────────────────────────────
 // `proxyProvider` is the value of PROXY_PROVIDER for pricing/parser dispatch.
@@ -866,6 +979,15 @@ function initSparklines() {
     ['sparkBytesIn', '#58a6ff', 'bytesIn'],
     ['sparkBytesOut', '#3fb950', 'bytesOut'],
     ['sparkInFlight', '#8b949e', 'inFlight'],
+    ['sparkCompactorBytes1m', '#3fb950', 'compactorBytes1m'],
+    ['sparkCompactorBytes5m', '#3fb950', 'compactorBytes5m'],
+    ['sparkCompactorBytesLifetime', '#3fb950', 'compactorBytesLifetime'],
+    ['sparkCompactorTokensLifetime', '#a371f7', 'compactorTokensLifetime'],
+    ['sparkCompactorRatio5m', '#58a6ff', 'compactorRatio5m'],
+    ['sparkCompactorBypasses', '#d29922', 'compactorBypasses'],
+    ['sparkMetricsCompactorBytes5m', '#3fb950', 'metricsCompactorBytes5m'],
+    ['sparkMetricsCompactorRatio5m', '#58a6ff', 'metricsCompactorRatio5m'],
+    ['sparkMetricsCompactorFires5m', '#f0b72f', 'metricsCompactorFires5m'],
   ]
   for (const [id, color, key] of specs) {
     const ch = makeSparkline(id, color)
@@ -1120,9 +1242,55 @@ document.getElementById('metricsClearBtn').addEventListener('click', () => {
   recentTbody.innerHTML = ''
 })
 
+// ─── Metrics-tab Compactor KPIs ──────────────────────────────
+// Piggybacks on the 5s metrics refresh interval. Reads the same
+// /api/compactor/summary endpoint the Compressors tab consumes.
+// When Compactor is disabled at the server level (COMPACTOR_ENABLED=false),
+// tiles render `—` to distinguish "off" from "on but zero traffic".
+const kpiCompactorBytesSaved5m = document.getElementById('kpiCompactorBytesSaved5m')
+const kpiCompactorRatio5m = document.getElementById('kpiCompactorRatio5m')
+const kpiCompactorFires5m = document.getElementById('kpiCompactorFires5m')
+
+async function refreshMetricsCompactorKpis() {
+  if (!kpiCompactorBytesSaved5m) return
+  try {
+    const r = await fetch('/api/compactor/summary')
+    if (!r.ok) return
+    const s = await r.json()
+    if (!s.enabled) {
+      kpiCompactorBytesSaved5m.textContent = '—'
+      kpiCompactorRatio5m.textContent = '—'
+      kpiCompactorFires5m.textContent = '—'
+      pushSpark('metricsCompactorBytes5m', 0)
+      pushSpark('metricsCompactorRatio5m', 0)
+      pushSpark('metricsCompactorFires5m', 0)
+      return
+    }
+    const w5 = s.windows['5m']
+    const bytesSaved = w5.bytesSaved ?? 0
+    const ratio = w5.ratio
+    const ratioPct = ratio == null ? 0 : Math.round((1 - ratio) * 100)
+    let fires = 0
+    for (const name of Object.keys(w5.byCompressor ?? {})) {
+      fires += w5.byCompressor[name] ?? 0
+    }
+    kpiCompactorBytesSaved5m.textContent = fmtBytes(bytesSaved)
+    kpiCompactorRatio5m.textContent = ratio == null ? '—' : String(ratioPct)
+    kpiCompactorFires5m.textContent = fmtNum(fires)
+    pushSpark('metricsCompactorBytes5m', bytesSaved)
+    pushSpark('metricsCompactorRatio5m', ratioPct)
+    pushSpark('metricsCompactorFires5m', fires)
+  } catch {}
+}
+
 // ─── Boot ────────────────────────────────────────────────────
-const initialTab =
-  location.hash === '#metrics' ? 'metrics' : location.hash === '#setup' ? 'setup' : 'logs'
+const HASH_TO_TAB = {
+  '#metrics': 'metrics',
+  '#setup': 'setup',
+  '#compactor': 'compactor',
+  '#logs': 'logs',
+}
+const initialTab = HASH_TO_TAB[location.hash] ?? 'logs'
 activateTab(initialTab)
 
 loadAvailable()
@@ -1132,10 +1300,12 @@ loadRecent()
 seedTotalCost().catch(() => {})
 loadModels().catch(() => {})
 loadTopCost().catch(() => {})
+refreshMetricsCompactorKpis().catch(() => {})
 connectLogsSSE()
 connectMetricsSSE()
 setInterval(loadHealth, 10_000)
 setInterval(() => {
   loadModels().catch(() => {})
   loadTopCost().catch(() => {})
+  refreshMetricsCompactorKpis().catch(() => {})
 }, 5000)

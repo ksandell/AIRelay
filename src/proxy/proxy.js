@@ -1,4 +1,5 @@
 import httpProxy from 'http-proxy'
+import { Readable } from 'node:stream'
 import { config } from '../config.js'
 import { pickAgent } from './agent.js'
 import { record, incInFlight, decInFlight } from '../metrics/collector.js'
@@ -284,7 +285,17 @@ export function createProxyHandler() {
     res.on('finish', () => finalize(m))
     res.on('close', () => finalize(m))
 
-    proxy.web(req, res, {}, (err) => {
+    // Compactor: if a substitute body was buffered by the compactor middleware,
+    // feed it to http-proxy via the `buffer` option so the mutated bytes go
+    // upstream instead of the (already-consumed) original request stream.
+    const proxyOpts = req._compactorBody ? { buffer: Readable.from([req._compactorBody]) } : {}
+    if (req._compactorBody) {
+      // The original req stream has been drained; reset its inbound counter to
+      // reflect what's actually going upstream.
+      m.bytesIn = req._compactorBody.length
+    }
+
+    proxy.web(req, res, proxyOpts, (err) => {
       // Fallback for the err callback variant (rare — error event usually fires first).
       if (err && !m.recorded) {
         m.error = classifyError(err)

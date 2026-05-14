@@ -108,6 +108,43 @@ The proxy can extract token usage from upstream responses and compute per-reques
 | `PRICING_CONFIG_PATH` | _(unset)_ | Optional path to a JSON file that **deep-merges** over the bundled `config/pricing.json`. Use this to add models or override prices without forking. |
 | `PROXY_TOKEN_TEE_MAX_BYTES` | `2097152` | Per-request body buffer cap (2 MiB) for token extraction. Larger responses skip extraction so big SSE streams don't pin memory. |
 
+### Compactor (v0.3.0)
+
+Opt-in prompt/response compression. Default off — when `COMPACTOR_ENABLED=false`,
+AIRelay is byte-identical passthrough. See [docs/COMPACTOR.md](docs/COMPACTOR.md)
+for the full feature reference, including the 10 compressors, banner format,
+metrics, safety model, and tuning recipes.
+
+| Var | Default | Notes |
+|---|---|---|
+| `COMPACTOR_ENABLED` | `false` | Master switch. When false, the middleware is a single boolean check — zero overhead. |
+| `COMPACTOR_REQUEST_BODY` | `true` | Compress outgoing prompts. Only meaningful when master switch is on. |
+| `COMPACTOR_RESPONSE_BODY` | `false` | Compress incoming responses (v2 — currently inert). |
+| `COMPACTOR_TOOL_RESULT_ONLY` | `true` | Only mutate inside `tool_result` / `role: "tool"` blocks. When false, all message content (still skips `system` unless `COMPACTOR_ALLOW_RISKY=true`). |
+| `COMPACTOR_ALLOW_RISKY` | `false` | Enable compressors marked `risky:true` (currently only `long-file-elide`). |
+| `COMPACTOR_MAX_REQ_BYTES` | `4194304` | Buffering cap (4 MiB). Requests larger than this respond 413; advise client to retry with `X-Compactor: off`. |
+| `COMPACTOR_LONG_FILE_THRESHOLD` | `400` | Line count above which `long-file-elide` considers a segment "long". |
+| `COMPACTOR_<NAME>_ENABLED` | `true` | Per-compressor toggle. `<NAME>` is uppercased with `_`: e.g. `COMPACTOR_DIFF_COLLAPSE_ENABLED`. |
+
+Per-request header overrides:
+
+| Header | Effect |
+|---|---|
+| `X-Compactor: off` | Skip Compactor for this request — byte-identical passthrough |
+| `X-Compactor: on` | Force Compactor (no-op when master switch is already on) |
+
+Response side: `X-Compactor-Applied: <comma-sep filters>` is added whenever
+Compactor mutated the body or bypassed a streaming request — clients can
+audit which compressors ran.
+
+#### Provider support
+
+| Provider value | Compactor support |
+|---|---|
+| `anthropic`, `claude` | Full — walks `messages[].content[]`, mutates `tool_result` and (when scope allows) `text` blocks |
+| `openai`, `azure`, `mistral`, `groq`, `cerebras`, `deepseek`, `xai`, `fireworks`, `together`, `openrouter` | Full — walks `messages[]` and `input[]`, mutates `role: "tool"` and (when scope allows) other text content |
+| anything else (e.g. `generic`, `google`, `ollama`, `nvidia`) | Bypass with `compactor.unsupported_provider` metric counter |
+
 #### Provider setup examples
 
 ```env

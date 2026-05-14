@@ -1,6 +1,6 @@
 {
   "name": "airelay",
-  "version": "0.2.7",
+  "version": "0.3.0",
   "description": "AIRelay — transparent passthrough proxy for AI/LLM HTTP APIs with live observability dashboard",
   "type": "module",
   "engines": {
@@ -12,6 +12,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test --project=functional",
+    "test:e2e:visual": "playwright test --project=visual",
+    "test:e2e:visual:bless": "playwright test --project=visual --update-snapshots",
+    "test:e2e:ui": "playwright test --ui",
     "lint": "eslint src/ tests/ && prettier --check src/ tests/ public/",
     "lint:fix": "eslint src/ tests/ --fix && prettier --write src/ tests/ public/",
     "docker:build": "docker build -f docker/Dockerfile -t airelay .",
@@ -25,9 +29,11 @@
     "node-cron": "^3.0.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.49.0",
     "@vitest/coverage-v8": "^3.1.2",
     "dotenv": "^16.5.0",
     "eslint": "^9.25.1",
+    "fast-check": "^3.23.1",
     "eslint-config-prettier": "^10.1.2",
     "prettier": "^3.5.3",
     "supertest": "^7.1.0",

@@ -50,6 +50,12 @@ npm run lint:fix
 npm run docker:up
 npm run docker:down
 npm run docker:logs
+
+# E2E (NEW in v0.3.0) — Playwright across the dashboard (Logs, Metrics, Compressors + hash-routed Setup)
+npm run test:e2e               # functional, ~8 s (no Docker required)
+npm run test:e2e:visual        # visual diff vs OS-pinned baselines
+npm run test:e2e:visual:bless  # update baselines after intentional UI change
+npm run test:e2e:ui            # interactive Playwright debugger
 ```
 
 ## Architecture
@@ -72,8 +78,12 @@ key design decisions, API surface): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - Proxy hot path has **zero sync I/O** — no `appendFileSync`, no `JSON.parse`
   of payloads, no compression. Per-request observability goes through
   `metrics.record()` only; the logger is for app events.
-- Bytes are never modified. `X-Forwarded-*` is opt-in
-  (`PROXY_TRUST_FORWARDED=false` by default).
+- **Bytes are never modified for non-opted-in traffic.** `X-Forwarded-*` is
+  opt-in (`PROXY_TRUST_FORWARDED=false` by default). The v0.3.0 Compactor
+  feature (`COMPACTOR_ENABLED=false` by default) is the only mechanism that
+  may mutate request bodies, and only when an operator explicitly enables it;
+  per-request bypass via `X-Compactor: off` is always honored. See
+  [docs/COMPACTOR.md](docs/COMPACTOR.md).
 - Token extraction runs on a **passive tee** in `queueMicrotask` after
   response end. Never inline.
 
@@ -129,6 +139,7 @@ For releases, follow [docs/RELEASING.md](docs/RELEASING.md).
 | [INSTALL.md](INSTALL.md) | Windows / macOS / Linux / local Node walkthrough |
 | [CONFIGURATION.md](CONFIGURATION.md) | All env vars, provider recipes, DNS, TLS, tuning, prod checklist |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Diagrams + module map + design decisions + API surface |
+| [docs/COMPACTOR.md](docs/COMPACTOR.md) | Compactor feature reference (v0.3.0): activation, compressor catalog, banner, metrics, safety, tuning |
 | [docs/RELEASING.md](docs/RELEASING.md) | Release checklist (SSOT) |
 | [docs/e2e-test-plan.md](docs/e2e-test-plan.md) | Mistral-based E2E playbook |
 | [ROADMAP.md](ROADMAP.md) | Planned + speculative work (not what shipped — see CHANGELOG) |
