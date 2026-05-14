@@ -6,6 +6,17 @@
   padding: 0;
 }
 
+/* E2E test mode (?testMode=1): kill all transitions/animations for snapshot determinism. */
+html[data-test-mode='1'] *,
+html[data-test-mode='1'] *::before,
+html[data-test-mode='1'] *::after {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+  caret-color: transparent !important;
+}
+
 :root {
   --bg: #0d1117;
   --surface: #161b22;

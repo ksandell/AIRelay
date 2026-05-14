@@ -63,6 +63,30 @@ export const config = {
   maxMetricEvents: int('MAX_METRIC_EVENTS', 10_000),
   metricsTickMs: int('METRICS_TICK_MS', 1000),
 
+  // Compactor (v0.3.0) — opt-in prompt/response compression.
+  // Default off: preserves the "bytes never modified" invariant for non-opted-in
+  // traffic. When enabled, mutates request/response bodies through a pipeline of
+  // deterministic compressors. See docs/COMPACTOR.md.
+  compactorEnabled: process.env.COMPACTOR_ENABLED === 'true',
+  compactorRequestBody: process.env.COMPACTOR_REQUEST_BODY !== 'false',
+  compactorResponseBody: process.env.COMPACTOR_RESPONSE_BODY === 'true',
+  compactorToolResultOnly: process.env.COMPACTOR_TOOL_RESULT_ONLY !== 'false',
+  compactorAllowRisky: process.env.COMPACTOR_ALLOW_RISKY === 'true',
+  compactorMaxReqBytes: int('COMPACTOR_MAX_REQ_BYTES', 4_194_304),
+  compactorLongFileThreshold: int('COMPACTOR_LONG_FILE_THRESHOLD', 400),
+  compactor: {
+    ansiStrip: process.env.COMPACTOR_ANSI_STRIP_ENABLED !== 'false',
+    blanklineCollapse: process.env.COMPACTOR_BLANKLINE_COLLAPSE_ENABLED !== 'false',
+    diffCollapse: process.env.COMPACTOR_DIFF_COLLAPSE_ENABLED !== 'false',
+    lockfileDrop: process.env.COMPACTOR_LOCKFILE_DROP_ENABLED !== 'false',
+    lsLongShrink: process.env.COMPACTOR_LS_LONG_SHRINK_ENABLED !== 'false',
+    npmNoiseStrip: process.env.COMPACTOR_NPM_NOISE_STRIP_ENABLED !== 'false',
+    repeatLineDedupe: process.env.COMPACTOR_REPEAT_LINE_DEDUPE_ENABLED !== 'false',
+    stacktraceDedupe: process.env.COMPACTOR_STACKTRACE_DEDUPE_ENABLED !== 'false',
+    longFileElide: process.env.COMPACTOR_LONG_FILE_ELIDE_ENABLED !== 'false',
+    base64Truncate: process.env.COMPACTOR_BASE64_TRUNCATE_ENABLED !== 'false',
+  },
+
   // Shutdown
   shutdownTimeoutMs: int('SHUTDOWN_TIMEOUT_MS', 30_000),
 }

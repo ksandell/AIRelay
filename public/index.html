@@ -22,6 +22,9 @@
           <button class="tab" data-tab="metrics">
             <i aria-hidden="true" data-lucide="bar-chart-3"></i>Metrics
           </button>
+          <button class="tab" data-tab="compactor">
+            <i aria-hidden="true" data-lucide="archive"></i>Compactor
+          </button>
         </nav>
       </div>
 
@@ -53,6 +56,14 @@
 
       <div class="controls hidden" id="setupControls">
         <span class="pill warn">proxy not configured</span>
+      </div>
+
+      <div class="controls hidden" id="compactorControls">
+        <span id="compactorStatus" class="status disconnected" role="status" aria-live="polite"
+          >Connecting…</span
+        >
+        <span class="pill" id="compactorEnabledPill">disabled</span>
+        <button id="compactorRefreshBtn">Refresh</button>
       </div>
     </header>
 
@@ -441,6 +452,82 @@ npm run dev</pre
             <tbody></tbody>
           </table>
         </div>
+      </section>
+    </main>
+
+    <main id="compactorPanel" class="panel hidden">
+      <section class="kpis">
+        <div class="kpi">
+          <div class="kpi-label">Bytes saved (1m)</div>
+          <div class="kpi-value" id="compactorBytes1m">0</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Bytes saved (5m)</div>
+          <div class="kpi-value" id="compactorBytes5m">0</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Bytes saved (lifetime)</div>
+          <div class="kpi-value" id="compactorBytesLifetime">0</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Est. tokens saved (lifetime)</div>
+          <div class="kpi-value" id="compactorTokensLifetime">0</div>
+          <div class="kpi-sub">heuristic: bytes / 4</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Compression ratio (5m)</div>
+          <div class="kpi-value" id="compactorRatio5m">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Bypasses (lifetime)</div>
+          <div class="kpi-value" id="compactorBypasses">0</div>
+        </div>
+      </section>
+
+      <section class="table-card">
+        <h3>Compressors</h3>
+        <table id="compactorTable">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Active</th>
+              <th>Fires</th>
+              <th>Bytes saved</th>
+              <th>Avg µs</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <section class="table-card">
+        <h3>Recent events</h3>
+        <div id="compactorRecent-wrap">
+          <table id="compactorRecentTable">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Scope</th>
+                <th>Filters fired</th>
+                <th>Bytes in → out</th>
+                <th>Saved</th>
+                <th>µs</th>
+                <th>Bypass</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="setup-intro">
+        <p>
+          Compactor is opt-in: set <code>COMPACTOR_ENABLED=true</code> and send the
+          <code>X-Compactor: on</code> header (or rely on the master switch alone — clients can
+          still bypass per-request with <code>X-Compactor: off</code>). See
+          <a href="https://github.com/" target="_blank" rel="noreferrer">docs/COMPACTOR.md</a>
+          for the full catalog, safety model, and tuning recipes.
+        </p>
       </section>
     </main>
 
