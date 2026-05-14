@@ -279,6 +279,8 @@ All 182 tests should pass.
 - **Configure DNS / Tailscale / hosts file** so the proxy is reachable by name from the machines that will call it → [CONFIGURATION.md → DNS](CONFIGURATION.md#dns-and-hostnames).
 - **Wire your application's SDK** at the proxy → [CONFIGURATION.md → SDK setup](CONFIGURATION.md#wiring-your-sdk).
 - **Tune the env vars** for your traffic level → [CONFIGURATION.md → Environment variables](CONFIGURATION.md#environment-variables).
+- **Validate end-to-end** before pointing real traffic at the proxy → [docs/e2e-test-plan.md](docs/e2e-test-plan.md) (Playwright suite + manual playbook).
+- **Try the Compactor** (v0.3.0, opt-in prompt compression) → [docs/COMPACTOR.md](docs/COMPACTOR.md).
 
 ---
 

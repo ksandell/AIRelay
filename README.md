@@ -15,13 +15,15 @@
 
 ## What you get
 
-- **Transparent passthrough.** Streaming AI responses (SSE / chunked) flow through unmodified — your SDK doesn't know the proxy is there.
+- **Transparent passthrough** by default. Streaming AI responses (SSE / chunked) flow through unmodified — your SDK doesn't know the proxy is there.
+- **Compactor (NEW in v0.3.0)** — opt-in prompt compression. Shrinks bloated `tool_result` content (git diffs, lockfile diffs, `ls -l`, `npm install` logs, ANSI noise) before forwarding to the LLM. 10 deterministic compressors, per-compressor metrics, default off. See [docs/COMPACTOR.md](docs/COMPACTOR.md).
 - **Live dashboard.** RPS, p50/p95/p99, error rate, status pills, network + token throughput (In/Out), tokens/sec, recent-requests feed — updated in real time.
 - **Guided setup.** First time you open the dashboard, a Setup tab walks you through generating the right `.env` for your provider.
 - **Token & cost tracking** — per-request input/output tokens + USD cost for 17 providers ([full list in CONFIGURATION.md](CONFIGURATION.md#token--cost-tracking)).
 - **Per-model breakdown** — cost/token aggregates via `/api/metrics/models`, sortable by spend.
 - **Single Docker container.** No DB, no Redis, no system cron. Bring `UPSTREAM_URL` and go.
 - **Cross-platform.** Identical on Windows Docker Desktop, macOS, and Linux.
+- **Automated E2E (NEW in v0.3.0)** — Playwright covers all 4 dashboard tabs in ~16 s. No Docker required for CI: `npm run test:e2e`. See [docs/e2e-test-plan.md](docs/e2e-test-plan.md).
 
 What shipped in each release: [CHANGELOG.md](CHANGELOG.md). What's coming next: [ROADMAP.md](ROADMAP.md).
 

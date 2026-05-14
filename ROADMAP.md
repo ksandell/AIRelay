@@ -11,7 +11,7 @@ For architecture see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Vision
 
-> An API proxy for AI that any codebase can point its SDK at, get observability + cost insight for free, and eventually grow into a smart caching/routing layer — without ever modifying the request bytes that hit the upstream.
+> An API proxy for AI that any codebase can point its SDK at, get observability + cost insight for free, and eventually grow into a smart caching/routing layer. Default behavior is byte-identical passthrough; deliberate mutation (e.g. Compactor in v0.3.0) is always opt-in with per-request bypass.
 
 Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on either side.
 
@@ -30,8 +30,8 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.2.5 | ✅ Done | Log compression (#36) + provider directory (#101) |
 | v0.2.6 | ✅ Done | v0.2.5 cleanup — gzip reader path, Windows rotation, Mistral pricing, docs (#104, #105, #106, #107, #108) |
 | v0.2.7 | ✅ Done | Azure OpenAI adapter (api-key header + auto-appended `api-version` query) + tool-call E2E harness + chart y-axis precision fix |
-| v0.3.0 | ⚪ Planned | Persistence + multi-upstream |
-| v0.4.0+ | ⚪ Speculative | Caching, retries, routing intelligence |
+| v0.3.0 | ✅ Done | **Compactor + Playwright E2E** — opt-in prompt compression (10 compressors, default-off) + automated browser tests across all 4 dashboard tabs (no Docker for CI) |
+| v0.4.0+ | ⚪ Speculative | Persistence + multi-upstream; Compactor v2 (tokenizer for real token-savings reporting, streaming-request compression via incremental SSE rewriting, semantic compressors); caching, retries, routing intelligence |
 
 Per-release detail in [CHANGELOG.md](CHANGELOG.md).
 
