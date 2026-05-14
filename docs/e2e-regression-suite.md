@@ -192,10 +192,10 @@ file:line, repro, status.
 
 | ID | First seen | Where | Issue | Status |
 |---|---|---|---|---|
-| BW-001 | v0.2.5 | `src/logs/reader.js:95` | `listAvailableLogs` regex misses `.log.gz` → rotated compressed logs invisible to API/UI | open |
-| BW-002 | v0.2.5 | `src/logs/reader.js:52` | `readHistoricLog` reads only `.log`, can't read `.log.gz` | open |
-| BW-003 | v0.2.5 | `CONFIGURATION.md:105` | Inline text says "Named providers (15)"; Cerebras (v0.2.4) makes 16 | open |
-| BW-004 | v0.2.5 | `tests/logs/rotation.test.js:29` | Test fails on Windows (file-handle lock during rename) | platform-specific, Linux OK |
+| BW-001 | v0.2.5 | `src/logs/reader.js:95` | `listAvailableLogs` regex misses `.log.gz` → rotated compressed logs invisible to API/UI | **CLOSED** in v0.2.6 (2026-05-12) — see [CHANGELOG](../CHANGELOG.md#026--2026-05-12--v025-cleanup) (#104) |
+| BW-002 | v0.2.5 | `src/logs/reader.js:52` | `readHistoricLog` reads only `.log`, can't read `.log.gz` | **CLOSED** in v0.2.6 (2026-05-12) — see [CHANGELOG](../CHANGELOG.md#026--2026-05-12--v025-cleanup) (gzip reader path) |
+| BW-003 | v0.2.5 | `CONFIGURATION.md:105` | Inline text says "Named providers (15)"; Cerebras (v0.2.4) makes 16 | **CLOSED** in v0.2.6 (2026-05-12) — see [CHANGELOG](../CHANGELOG.md#026--2026-05-12--v025-cleanup) (docs fix) |
+| BW-004 | v0.2.5 | `tests/logs/rotation.test.js:29` | Test fails on Windows (file-handle lock during rename) | **CLOSED** in v0.2.6 (2026-05-12) — see [CHANGELOG](../CHANGELOG.md#026--2026-05-12--v025-cleanup) (Windows rotation) |
 
 ---
 
