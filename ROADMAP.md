@@ -31,7 +31,7 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.2.6 | ✅ Done | v0.2.5 cleanup — gzip reader path, Windows rotation, Mistral pricing, docs (#104, #105, #106, #107, #108) |
 | v0.2.7 | ✅ Done | Azure OpenAI adapter (api-key header + auto-appended `api-version` query) + tool-call E2E harness + chart y-axis precision fix |
 | v0.3.0 | ✅ Done | **Compactor + Playwright E2E** — opt-in prompt compression (10 compressors, default-off) + automated browser tests across all 4 dashboard tabs (no Docker for CI) |
-| v0.4.0+ | ⚪ Speculative | Persistence + multi-upstream; Compactor v2 (tokenizer for real token-savings reporting, streaming-request compression via incremental SSE rewriting, semantic compressors); caching, retries, routing intelligence |
+| Future | ⚪ Deferred | Persistence + multi-upstream, Compactor v2, caching, retries, routing intelligence (no committed target release) |
 
 Per-release detail in [CHANGELOG.md](CHANGELOG.md).
 
@@ -74,9 +74,25 @@ tool-call coverage) and a dashboard y-axis precision fix (`fmtAxis`).
 
 ---
 
-## v0.3.0 — Persistence + Multi-Upstream  ⚪
+## v0.3.0 — Compactor + Playwright E2E  ✅
 
-**Theme:** "Don't lose history on restart, and let one proxy fan out to multiple providers."
+**Shipped:** Opt-in prompt compression via 10 deterministic compressors
+(ansi-strip, blankline-collapse, diff-collapse, lockfile-drop, ls-long-shrink,
+npm-noise-strip, repeat-line-dedupe, stacktrace-dedupe, long-file-elide,
+base64-truncate). Master switch `COMPACTOR_ENABLED` (default off), per-request
+bypass via `X-Compactor: off`, applied-marker response header, per-compressor
+metrics surfaced on the **Compressors** dashboard tab + `/api/compactor/summary`
+endpoint. Compose pre-plumbs all `COMPACTOR_*` env vars. Playwright E2E covers
+Logs, Metrics, Compressors (+ hash-routed Setup) in ~8 s on CI without Docker;
+visual-diff suite with OS-pinned baselines. Full reference:
+[docs/COMPACTOR.md](docs/COMPACTOR.md). Release notes:
+[CHANGELOG.md](CHANGELOG.md).
+
+---
+
+## Future — Persistence + Multi-Upstream  ⚪
+
+**Theme:** "Don't lose history on restart, and let one proxy fan out to multiple providers." Deferred from the v0.3.0 slot; no committed target release.
 
 ### Candidates
 
@@ -84,6 +100,7 @@ tool-call coverage) and a dashboard y-axis precision fix (`fmtAxis`).
 - **Multi-upstream routing** — per-prefix routing table, e.g. `/proxy/anthropic/* → api.anthropic.com`, `/proxy/openai/* → api.openai.com`. Per-route provider profile.
 - **Dashboard route filter** — slice metrics by upstream / model.
 - **Cost rollups** — daily/weekly summaries, CSV export.
+- **Compactor v2** — real tokenizer for accurate token-savings reporting, streaming-request compression via incremental SSE rewriting, semantic compressors.
 
 ### Open questions
 
@@ -92,7 +109,7 @@ tool-call coverage) and a dashboard y-axis precision fix (`fmtAxis`).
 
 ---
 
-## v0.4.0+ — Speculative
+## Speculative
 
 > Prioritization is loose. Items move up based on actual usage friction.
 
