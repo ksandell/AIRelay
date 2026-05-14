@@ -20,6 +20,8 @@ export default [
         setImmediate: 'readonly',
         setInterval: 'readonly',
         setTimeout: 'readonly',
+        fetch: 'readonly',
+        URLSearchParams: 'readonly',
       },
     },
     rules: {
