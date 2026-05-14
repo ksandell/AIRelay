@@ -12,8 +12,10 @@
 > **What this is not:** a desktop chat client, a CLI assistant, or a browser extension. The target traffic is server-to-API SDK calls from a codebase.
 
 ![AIRelay Compressors dashboard](docs/screenshots/compressors.png)
-
 *The Compressors dashboard — live view of byte savings per compressor, recent events stream, and cumulative ratios.*
+
+![AIRelay metrics dashboard](docs/screenshots/metrics.png)
+*The Metrics dashboard — RPS, latency, token throughput, per-model breakdown, and most-expensive requests.*
 
 ---
 
@@ -29,8 +31,6 @@
 - **Automated E2E** — Playwright covers Logs, Metrics, Compressors (+ hash-routed Setup) in ~8 s. No Docker required for CI: `npm run test:e2e`. See [docs/e2e-test-plan.md](docs/e2e-test-plan.md).
 
 What shipped in each release: [CHANGELOG.md](CHANGELOG.md). What's coming next: [ROADMAP.md](ROADMAP.md).
-
-![AIRelay metrics dashboard](docs/screenshots/metrics.png)
 
 ---
 
