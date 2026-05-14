@@ -985,6 +985,9 @@ function initSparklines() {
     ['sparkCompactorTokensLifetime', '#a371f7', 'compactorTokensLifetime'],
     ['sparkCompactorRatio5m', '#58a6ff', 'compactorRatio5m'],
     ['sparkCompactorBypasses', '#d29922', 'compactorBypasses'],
+    ['sparkMetricsCompactorBytes5m', '#3fb950', 'metricsCompactorBytes5m'],
+    ['sparkMetricsCompactorRatio5m', '#58a6ff', 'metricsCompactorRatio5m'],
+    ['sparkMetricsCompactorFires5m', '#f0b72f', 'metricsCompactorFires5m'],
   ]
   for (const [id, color, key] of specs) {
     const ch = makeSparkline(id, color)
@@ -1239,6 +1242,47 @@ document.getElementById('metricsClearBtn').addEventListener('click', () => {
   recentTbody.innerHTML = ''
 })
 
+// ─── Metrics-tab Compactor KPIs ──────────────────────────────
+// Piggybacks on the 5s metrics refresh interval. Reads the same
+// /api/compactor/summary endpoint the Compressors tab consumes.
+// When Compactor is disabled at the server level (COMPACTOR_ENABLED=false),
+// tiles render `—` to distinguish "off" from "on but zero traffic".
+const kpiCompactorBytesSaved5m = document.getElementById('kpiCompactorBytesSaved5m')
+const kpiCompactorRatio5m = document.getElementById('kpiCompactorRatio5m')
+const kpiCompactorFires5m = document.getElementById('kpiCompactorFires5m')
+
+async function refreshMetricsCompactorKpis() {
+  if (!kpiCompactorBytesSaved5m) return
+  try {
+    const r = await fetch('/api/compactor/summary')
+    if (!r.ok) return
+    const s = await r.json()
+    if (!s.enabled) {
+      kpiCompactorBytesSaved5m.textContent = '—'
+      kpiCompactorRatio5m.textContent = '—'
+      kpiCompactorFires5m.textContent = '—'
+      pushSpark('metricsCompactorBytes5m', 0)
+      pushSpark('metricsCompactorRatio5m', 0)
+      pushSpark('metricsCompactorFires5m', 0)
+      return
+    }
+    const w5 = s.windows['5m']
+    const bytesSaved = w5.bytesSaved ?? 0
+    const ratio = w5.ratio
+    const ratioPct = ratio == null ? 0 : Math.round((1 - ratio) * 100)
+    let fires = 0
+    for (const name of Object.keys(w5.byCompressor ?? {})) {
+      fires += w5.byCompressor[name] ?? 0
+    }
+    kpiCompactorBytesSaved5m.textContent = fmtBytes(bytesSaved)
+    kpiCompactorRatio5m.textContent = ratio == null ? '—' : String(ratioPct)
+    kpiCompactorFires5m.textContent = fmtNum(fires)
+    pushSpark('metricsCompactorBytes5m', bytesSaved)
+    pushSpark('metricsCompactorRatio5m', ratioPct)
+    pushSpark('metricsCompactorFires5m', fires)
+  } catch {}
+}
+
 // ─── Boot ────────────────────────────────────────────────────
 const HASH_TO_TAB = {
   '#metrics': 'metrics',
@@ -1256,10 +1300,12 @@ loadRecent()
 seedTotalCost().catch(() => {})
 loadModels().catch(() => {})
 loadTopCost().catch(() => {})
+refreshMetricsCompactorKpis().catch(() => {})
 connectLogsSSE()
 connectMetricsSSE()
 setInterval(loadHealth, 10_000)
 setInterval(() => {
   loadModels().catch(() => {})
   loadTopCost().catch(() => {})
+  refreshMetricsCompactorKpis().catch(() => {})
 }, 5000)

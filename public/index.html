@@ -370,6 +370,44 @@ npm run dev</pre
         </div>
       </section>
 
+      <section class="kpis">
+        <div class="kpi">
+          <span class="kpi-label">Bytes saved (5 min)</span>
+          <span
+            class="kpi-help"
+            title="Compactor — bytes removed from request bodies over the last 5 minutes. Shows — when Compactor is disabled."
+            >?</span
+          >
+          <span class="kpi-val" id="kpiCompactorBytesSaved5m" data-testid="compactor-bytes-5m"
+            >—</span
+          >
+          <canvas class="kpi-spark" id="sparkMetricsCompactorBytes5m"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Compression ratio (5 min)</span>
+          <span
+            class="kpi-help"
+            title="Compactor — percentage of bytes removed (1 − bytesOut/bytesIn) over the last 5 minutes."
+            >?</span
+          >
+          <div class="kpi-val-row">
+            <span class="kpi-val" id="kpiCompactorRatio5m" data-testid="compactor-ratio-5m">—</span
+            ><span class="kpi-unit">%</span>
+          </div>
+          <canvas class="kpi-spark" id="sparkMetricsCompactorRatio5m"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Compressor fires (5 min)</span>
+          <span
+            class="kpi-help"
+            title="Compactor — total number of compressor invocations across all 10 compressors in the last 5 minutes."
+            >?</span
+          >
+          <span class="kpi-val" id="kpiCompactorFires5m" data-testid="compactor-fires-5m">—</span>
+          <canvas class="kpi-spark" id="sparkMetricsCompactorFires5m"></canvas>
+        </div>
+      </section>
+
       <section class="charts">
         <div class="chart-card">
           <header class="chart-title">Requests / sec — last 5 min</header>
