@@ -51,7 +51,7 @@ npm run docker:up
 npm run docker:down
 npm run docker:logs
 
-# E2E (NEW in v0.3.0) — Playwright across all 4 dashboard tabs
+# E2E (NEW in v0.3.0) — Playwright across the dashboard (Logs, Metrics, Compressors + hash-routed Setup)
 npm run test:e2e               # functional, ~8 s (no Docker required)
 npm run test:e2e:visual        # visual diff vs OS-pinned baselines
 npm run test:e2e:visual:bless  # update baselines after intentional UI change

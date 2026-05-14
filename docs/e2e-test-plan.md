@@ -65,7 +65,7 @@ A third layer for **operators with a Claude Code + Chrome MCP session**:
 real LLM traffic, real Mistral, live dashboard inspection. Distinct from
 the automated Playwright suite (which uses a fake upstream).
 
-Runbook: **[scripts/compactor-mcp-scenarios.md](../scripts/compactor-mcp-scenarios.md)**
+Runbook: **[compactor/scenarios.md](compactor/scenarios.md)**
 
 Walks 6 bloated-payload scenarios (git diff with lockfile, `ls -l`, npm
 install log, Node stacktrace, 600-line file, base64 image) and verifies
