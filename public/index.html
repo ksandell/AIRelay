@@ -458,29 +458,35 @@ npm run dev</pre
     <main id="compactorPanel" class="panel hidden">
       <section class="kpis">
         <div class="kpi">
-          <div class="kpi-label">Bytes saved (1m)</div>
-          <div class="kpi-value" id="compactorBytes1m">0</div>
+          <span class="kpi-label">Bytes saved (1m)</span>
+          <span class="kpi-val" id="compactorBytes1m">0</span>
+          <canvas class="kpi-spark" id="sparkCompactorBytes1m"></canvas>
         </div>
         <div class="kpi">
-          <div class="kpi-label">Bytes saved (5m)</div>
-          <div class="kpi-value" id="compactorBytes5m">0</div>
+          <span class="kpi-label">Bytes saved (5m)</span>
+          <span class="kpi-val" id="compactorBytes5m">0</span>
+          <canvas class="kpi-spark" id="sparkCompactorBytes5m"></canvas>
         </div>
         <div class="kpi">
-          <div class="kpi-label">Bytes saved (lifetime)</div>
-          <div class="kpi-value" id="compactorBytesLifetime">0</div>
+          <span class="kpi-label">Bytes saved (lifetime)</span>
+          <span class="kpi-val" id="compactorBytesLifetime">0</span>
+          <canvas class="kpi-spark" id="sparkCompactorBytesLifetime"></canvas>
         </div>
         <div class="kpi">
-          <div class="kpi-label">Est. tokens saved (lifetime)</div>
-          <div class="kpi-value" id="compactorTokensLifetime">0</div>
-          <div class="kpi-sub">heuristic: bytes / 4</div>
+          <span class="kpi-label">Est. tokens saved (lifetime)</span>
+          <span class="kpi-val" id="compactorTokensLifetime">0</span>
+          <span class="kpi-unit">heuristic: bytes / 4</span>
+          <canvas class="kpi-spark" id="sparkCompactorTokensLifetime"></canvas>
         </div>
         <div class="kpi">
-          <div class="kpi-label">Compression ratio (5m)</div>
-          <div class="kpi-value" id="compactorRatio5m">—</div>
+          <span class="kpi-label">Compression ratio (5m)</span>
+          <span class="kpi-val" id="compactorRatio5m">—</span>
+          <canvas class="kpi-spark" id="sparkCompactorRatio5m"></canvas>
         </div>
         <div class="kpi">
-          <div class="kpi-label">Bypasses (lifetime)</div>
-          <div class="kpi-value" id="compactorBypasses">0</div>
+          <span class="kpi-label">Bypasses (lifetime)</span>
+          <span class="kpi-val" id="compactorBypasses">0</span>
+          <canvas class="kpi-spark" id="sparkCompactorBypasses"></canvas>
         </div>
       </section>
 
@@ -520,7 +526,8 @@ npm run dev</pre
         </div>
       </section>
 
-      <section class="setup-intro">
+      <section class="info-callout">
+        <i aria-hidden="true" data-lucide="info" class="info-callout-icon"></i>
         <p>
           Compactor is opt-in: set <code>COMPACTOR_ENABLED=true</code> and send the
           <code>X-Compactor: on</code> header (or rely on the master switch alone — clients can

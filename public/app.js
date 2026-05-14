@@ -38,6 +38,14 @@ function activateTab(name) {
   if (compactorControls) compactorControls.classList.toggle('hidden', name !== 'compactor')
   location.hash = name
   if (name === 'compactor') refreshCompactor()
+  // Re-pull ring-buffer data when the user lands on Logs/Metrics so tables
+  // populate even if the tab was hidden when the proxy traffic arrived.
+  if (name === 'logs' && typeof loadLive === 'function' && !dateSelect?.value) {
+    loadLive().catch(() => {})
+  }
+  if (name === 'metrics' && typeof loadRecent === 'function') {
+    loadRecent().catch(() => {})
+  }
 }
 tabs.forEach((t) => t.addEventListener('click', () => activateTab(t.dataset.tab)))
 
@@ -73,6 +81,13 @@ async function refreshCompactor() {
     document.getElementById('compactorRatio5m').textContent =
       r == null ? '—' : `${Math.round((1 - r) * 100)}%`
     document.getElementById('compactorBypasses').textContent = s.lifetime.requestsBypassed
+
+    pushSpark('compactorBytes1m', s.windows['1m'].bytesSaved)
+    pushSpark('compactorBytes5m', s.windows['5m'].bytesSaved)
+    pushSpark('compactorBytesLifetime', s.lifetime.bytesSaved)
+    pushSpark('compactorTokensLifetime', Math.floor(s.lifetime.bytesSaved / 4))
+    pushSpark('compactorRatio5m', r == null ? 0 : Math.round((1 - r) * 100))
+    pushSpark('compactorBypasses', s.lifetime.requestsBypassed)
 
     const tbody = document.querySelector('#compactorTable tbody')
     tbody.innerHTML = ''
@@ -964,6 +979,12 @@ function initSparklines() {
     ['sparkBytesIn', '#58a6ff', 'bytesIn'],
     ['sparkBytesOut', '#3fb950', 'bytesOut'],
     ['sparkInFlight', '#8b949e', 'inFlight'],
+    ['sparkCompactorBytes1m', '#3fb950', 'compactorBytes1m'],
+    ['sparkCompactorBytes5m', '#3fb950', 'compactorBytes5m'],
+    ['sparkCompactorBytesLifetime', '#3fb950', 'compactorBytesLifetime'],
+    ['sparkCompactorTokensLifetime', '#a371f7', 'compactorTokensLifetime'],
+    ['sparkCompactorRatio5m', '#58a6ff', 'compactorRatio5m'],
+    ['sparkCompactorBypasses', '#d29922', 'compactorBypasses'],
   ]
   for (const [id, color, key] of specs) {
     const ch = makeSparkline(id, color)
