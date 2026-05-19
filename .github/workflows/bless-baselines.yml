@@ -1,5 +1,6 @@
 name: Bless visual baselines
 
+# Manually triggered: regenerates Linux Playwright visual baselines and commits them back.
 on:
   workflow_dispatch:
     inputs:
