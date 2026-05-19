@@ -751,6 +751,16 @@ footer {
   position: relative;
 }
 
+/* ─── Generic table-row hover (all dashboard tables) ─────────── */
+/* Applies to every <table> rendered in a <main class="panel"> — Metrics
+ * (recent / models / topCost), Compactor (catalog + recent), Guardrails
+ * (detectors + recent). The :not(:has(th)) guard excludes header rows
+ * so the hover never repaints the column-header band. */
+.panel table tbody tr:hover {
+  background: var(--surface-2);
+  cursor: default;
+}
+
 /* ─── Compactor + Guardrails panel layout ────────────────────── */
 #compactorPanel,
 #guardrailsPanel {
