@@ -1,0 +1,42 @@
+name: Bless visual baselines
+
+# Manually re-generate Linux Playwright visual baselines.
+# Trigger: Actions tab -> "Bless visual baselines" -> Run workflow.
+# Output: artifact `visual-baselines-linux` containing the regenerated PNGs.
+# Workflow does NOT commit -- download artifact, eyeball the diff, commit by hand.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bless:
+    name: Bless visual (ubuntu-22.04)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Re-bless visual baselines
+        run: npm run test:e2e:visual:bless
+
+      - name: Upload regenerated baselines
+        uses: actions/upload-artifact@v5
+        with:
+          name: visual-baselines-linux
+          path: tests/e2e/visual/**/*-visual-linux.png
+          retention-days: 14

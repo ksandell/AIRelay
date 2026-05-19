@@ -5,6 +5,18 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] — 2026-05-19 — CI: green visual baselines on Linux
+
+### Fixed
+- **E2E workflow green again** ([run 26108146650](https://github.com/ksandell/AIRelay/actions/runs/26108146650)) — v0.4.0 shipped with only `*-visual-win32.png` baselines committed; the `ubuntu-22.04` CI runner found no `*-visual-linux.png` siblings and the `Visual regression` step failed all 5 dashboard specs ("A snapshot doesn't exist… writing actual"). This release commits the 5 missing Linux baselines (logs-empty, metrics-with-traffic, compactor-empty, compactor-active, setup) generated inside `mcr.microsoft.com/playwright:v1.60.0-jammy` so they match the CI image exactly.
+
+### Added
+- **`Bless visual baselines` workflow** ([.github/workflows/bless-visual.yml](.github/workflows/bless-visual.yml)) — `workflow_dispatch`-only job that runs `npm run test:e2e:visual:bless` on `ubuntu-22.04` and uploads the regenerated PNGs as the `visual-baselines-linux` artifact. Lets future intentional UI changes regenerate Linux baselines without needing Docker on a dev box. Artifact is committed by hand, not auto-pushed.
+- **OS-pinning gotcha documented** in [docs/e2e-test-plan.md](docs/e2e-test-plan.md) — Playwright suffixes baselines per-OS, so blessing on Windows does not cover Linux. Doc now spells out the regen recipe (workflow dispatch or `mcr.microsoft.com/playwright:v1.60.0-jammy` locally).
+
+### Changed
+- Bumped GitHub Actions to Node 24-compatible majors in [.github/workflows/e2e.yml](.github/workflows/e2e.yml): `actions/checkout@v5`, `actions/setup-node@v5`, `actions/upload-artifact@v5`. Silences the September 2026 Node 20 deprecation warning that surfaced on the failing run.
+
 ## [0.4.0] — 2026-05-19 — Guardrails + Persistence + Multi-Upstream
 
 ### Added
