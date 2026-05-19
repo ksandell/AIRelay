@@ -21,13 +21,13 @@ server-to-API SDK calls from a codebase.
 
 | Layer | Choice |
 |---|---|
-| Runtime | Node.js 22+ (ESM, `node:` prefix) |
+| Runtime | Node.js 24+ (ESM, `node:` prefix) |
 | Backend | Express.js + `http-proxy` (true streaming, no body buffering) |
 | Frontend | Vanilla JS + SSE (`EventSource`) + Chart.js via CDN — no build step |
 | Scheduler | `node-cron` (internal) |
 | Testing | Vitest + supertest |
 | Linting | ESLint flat config (v9) + Prettier |
-| Container | Docker multi-stage (`node:22.22-alpine3.22`, fully pinned) |
+| Container | Docker multi-stage (`node:24.15-alpine3.22`, fully pinned) |
 
 ## Commands
 
