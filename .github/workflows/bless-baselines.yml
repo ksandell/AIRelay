@@ -1,0 +1,61 @@
+name: Bless visual baselines
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to update baselines on (default: current branch the workflow is dispatched from)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  bless:
+    name: Regenerate Linux Playwright baselines
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch || github.ref }}
+          # Need write access to push the regenerated baselines back.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Regenerate visual baselines (--update-snapshots)
+        run: npm run test:e2e:visual:bless
+
+      - name: Diff summary
+        run: |
+          git status --short
+          git diff --stat
+
+      - name: Commit + push regenerated baselines
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "No baseline changes — nothing to commit."
+            exit 0
+          fi
+          git add 'tests/e2e/visual/*-snapshots'
+          git commit -m "ci: bless Linux Playwright visual baselines
+
+Regenerated via .github/workflows/bless-baselines.yml on $(date -u +%Y-%m-%dT%H:%M:%SZ).
+"
+          git push origin HEAD:${{ inputs.branch || github.ref_name }}
