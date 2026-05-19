@@ -25,7 +25,7 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.10.0",
-    "express": "^4.21.2",
+    "express": "^5.2.1",
     "http-proxy": "^1.18.1",
     "node-cron": "^4.2.1"
   },
