@@ -59,6 +59,35 @@ Determinism techniques used:
 - CI pins `ubuntu-22.04` to match committed baselines; locally on Windows
   visual diffs may be noisy — use `npm run test:e2e` (functional only).
 
+### OS-pinned baselines (gotcha)
+
+Playwright suffixes snapshot files with the OS (`*-visual-linux.png`,
+`*-visual-win32.png`, `*-visual-darwin.png`). Blessing on one OS does **not**
+cover the others — each platform you care about needs its own committed
+baseline. AIRelay CI runs on Linux, so `*-visual-linux.png` is the
+load-bearing set; `*-visual-win32.png` is a convenience for the maintainer's
+local dev loop. (We learned this the hard way in [run 26108146650](https://github.com/ksandell/AIRelay/actions/runs/26108146650)
+— v0.4.0 tagged with only win32 baselines, CI red on `main`. Backfilled post-v0.4.2.)
+
+To regenerate Linux baselines after an intentional UI change:
+
+1. Dispatch the **Bless baselines** workflow
+   (`.github/workflows/bless-baselines.yml`) from the Actions tab on your
+   branch.
+2. Download the `visual-baselines-linux` artifact.
+3. Diff against the committed PNGs by eye — if the change matches intent,
+   replace `tests/e2e/visual/dashboard.visual.spec.js-snapshots/*-visual-linux.png`
+   with the artifact contents and commit.
+
+Equivalent local recipe (requires Docker):
+
+```bash
+docker run --rm -v "${PWD}:/w" -w /w mcr.microsoft.com/playwright:v1.60.0-jammy \
+  bash -lc "npm ci && npm run test:e2e:visual:bless"
+```
+
+Pin the image tag to whatever `npx playwright --version` resolves.
+
 ## Chrome MCP visual scenarios (manual, real LLM)
 
 A third layer for **operators with a Claude Code + Chrome MCP session**:
