@@ -5,6 +5,14 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] — 2026-05-19 — CI: Linux Playwright baselines (the missing piece)
+
+### Fixed
+- **Visual e2e job green on `ubuntu-22.04`** ([#148](https://github.com/ksandell/AIRelay/pull/148)) — v0.4.0 shipped with only `*-visual-win32.png` baselines, so every Linux runner wrote actuals and the visual step failed all 5 dashboard specs. This commits the 5 missing `*-visual-linux.png` baselines generated inside `mcr.microsoft.com/playwright:v1.60.0-jammy` so they match the CI image exactly. (Salvaged from the now-closed [#119](https://github.com/ksandell/AIRelay/pull/119), with the obsolete v0.4.1 metadata dropped because v0.4.2 had already overtaken it.)
+
+### Changed
+- **`docs/e2e-test-plan.md`** documents the OS-pinning gotcha (Playwright suffixes baselines per-OS) and points at the already-shipped [.github/workflows/bless-baselines.yml](.github/workflows/bless-baselines.yml) for regenerating Linux baselines after intentional UI changes.
+
 ## [0.4.2] — 2026-05-19 — Dependency refresh + CI/security housekeeping
 
 No new product features. Coordinated dep + housekeeping bump driven by an

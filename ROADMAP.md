@@ -34,6 +34,7 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.4.0 | ✅ Done | **Guardrails + Persistence + Multi-Upstream** — opt-in prompt safety (secrets / PII / injection detectors, alert/block/redact modes), opt-in SQLite metric history + rollups + CSV export, opt-in multi-upstream routing (per-prefix routes table), dashboard route filter / history window / CSV download, Compactor before/after gallery in docs |
 | v0.4.1 | ✅ Done | **CI green** — committed Linux Playwright baselines (v0.4.0 shipped with win32-only baselines → CI red on `main`), added `Bless visual baselines` workflow + OS-pinning docs, bumped GH Actions to Node 24-compatible v5 majors |
 | v0.4.2 | ✅ Done | **Dependency refresh + CI/security housekeeping** — Node 24 LTS, express 5, http-proxy-3, vitest/eslint/dotenv/fast-check/node-cron/playwright majors; Dependabot + CodeQL + Bless workflows; brotli/gzip token-extraction fix |
+| v0.4.3 | ✅ Done | **CI: Linux Playwright baselines** — committed the 5 missing `*-visual-linux.png` baselines so the `ubuntu-22.04` visual e2e job is green; documented the OS-pinning gotcha in [docs/e2e-test-plan.md](docs/e2e-test-plan.md) |
 | Future | ⚪ Deferred | Persistence + multi-upstream, Compactor v2, caching, retries, routing intelligence (no committed target release) |
 
 Per-release detail in [CHANGELOG.md](CHANGELOG.md).
