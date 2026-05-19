@@ -8,8 +8,10 @@ import healthRouter from './api/health.js'
 import logsRouter from './api/logs.js'
 import metricsRouter from './api/metrics.js'
 import compactorRouter from './api/compactor.js'
+import guardrailsRouter from './api/guardrails.js'
 import { createProxyHandler } from './proxy/proxy.js'
 import { createCompactorMiddleware } from './compactor/middleware.js'
+import { createGuardrailsMiddleware } from './guardrails/middleware.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -34,6 +36,16 @@ export function createApp() {
     if (config.compactorEnabled) {
       app.use(config.proxyPathPrefix, createCompactorMiddleware())
     }
+    // Guardrails middleware (v0.4.0). Mounted under the proxy prefix AFTER
+    // Compactor — so guardrails sees compacted bytes (smaller scan surface) and
+    // banners stack predictably. When GUARDRAILS_ENABLED=false (default), it
+    // is a no-op: single boolean check, no body buffering, byte-identical
+    // passthrough. When enabled, it inspects JSON request bodies against
+    // active detectors and either alerts, blocks, or redacts per category mode.
+    // See docs/GUARDRAILS.md.
+    if (config.guardrailsEnabled) {
+      app.use(config.proxyPathPrefix, createGuardrailsMiddleware())
+    }
     app.use(config.proxyPathPrefix, createProxyHandler())
   }
 
@@ -45,6 +57,7 @@ export function createApp() {
   app.use(logsRouter)
   app.use(metricsRouter)
   app.use(compactorRouter)
+  app.use(guardrailsRouter)
 
   app.use(errorHandler)
 

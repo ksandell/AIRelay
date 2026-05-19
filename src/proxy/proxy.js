@@ -285,14 +285,14 @@ export function createProxyHandler() {
     res.on('finish', () => finalize(m))
     res.on('close', () => finalize(m))
 
-    // Compactor: if a substitute body was buffered by the compactor middleware,
-    // feed it to http-proxy via the `buffer` option so the mutated bytes go
-    // upstream instead of the (already-consumed) original request stream.
-    const proxyOpts = req._compactorBody ? { buffer: Readable.from([req._compactorBody]) } : {}
-    if (req._compactorBody) {
-      // The original req stream has been drained; reset its inbound counter to
-      // reflect what's actually going upstream.
-      m.bytesIn = req._compactorBody.length
+    // Compactor / Guardrails: if a substitute body was buffered by either
+    // middleware, feed it to http-proxy via the `buffer` option so the
+    // (possibly mutated) bytes go upstream instead of the already-consumed
+    // request stream. Guardrails runs after Compactor and its body supersedes.
+    const substituteBody = req._guardrailsBody ?? req._compactorBody
+    const proxyOpts = substituteBody ? { buffer: Readable.from([substituteBody]) } : {}
+    if (substituteBody) {
+      m.bytesIn = substituteBody.length
     }
 
     proxy.web(req, res, proxyOpts, (err) => {

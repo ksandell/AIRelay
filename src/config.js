@@ -11,6 +11,15 @@ function int(name, fallback) {
   return n
 }
 
+const GUARDRAILS_MODES = new Set(['off', 'alert', 'block', 'redact'])
+function mode(name, fallback) {
+  const val = (process.env[name] ?? fallback).toLowerCase()
+  if (!GUARDRAILS_MODES.has(val)) {
+    throw new Error(`Env var ${name} must be one of off|alert|block|redact, got: ${val}`)
+  }
+  return val
+}
+
 export const config = {
   // Server
   port: int('PORT', 3000),
@@ -85,6 +94,37 @@ export const config = {
     stacktraceDedupe: process.env.COMPACTOR_STACKTRACE_DEDUPE_ENABLED !== 'false',
     longFileElide: process.env.COMPACTOR_LONG_FILE_ELIDE_ENABLED !== 'false',
     base64Truncate: process.env.COMPACTOR_BASE64_TRUNCATE_ENABLED !== 'false',
+  },
+
+  // Guardrails (v0.4.0) — opt-in prompt safety: secrets, PII, prompt-injection
+  // detection. Default off: preserves the "bytes never modified" invariant.
+  // When enabled, each category runs in one of four modes:
+  //   off    — detector not run
+  //   alert  — detect + record, forward unchanged (no mutation)
+  //   block  — detect + reject with 4xx (no mutation, no forward)
+  //   redact — detect + replace match with <redacted:NAME>, forward modified
+  // See docs/GUARDRAILS.md.
+  guardrailsEnabled: process.env.GUARDRAILS_ENABLED === 'true',
+  guardrailsMaxReqBytes: int('GUARDRAILS_MAX_REQ_BYTES', 4_194_304),
+  guardrailsSecretsMode: mode('GUARDRAILS_SECRETS_MODE', 'off'),
+  guardrailsPiiMode: mode('GUARDRAILS_PII_MODE', 'off'),
+  guardrailsInjectionMode: mode('GUARDRAILS_INJECTION_MODE', 'off'),
+  guardrailsCustomPatternsFile: process.env.GUARDRAILS_CUSTOM_PATTERNS_FILE ?? null,
+  guardrails: {
+    awsAccessKey: process.env.GUARDRAILS_AWS_ACCESS_KEY_ENABLED !== 'false',
+    githubPat: process.env.GUARDRAILS_GITHUB_PAT_ENABLED !== 'false',
+    anthropicKey: process.env.GUARDRAILS_ANTHROPIC_KEY_ENABLED !== 'false',
+    openaiKey: process.env.GUARDRAILS_OPENAI_KEY_ENABLED !== 'false',
+    privateKey: process.env.GUARDRAILS_PRIVATE_KEY_ENABLED !== 'false',
+    jwt: process.env.GUARDRAILS_JWT_ENABLED !== 'false',
+    genericHighEntropy: process.env.GUARDRAILS_GENERIC_HIGH_ENTROPY_ENABLED === 'true',
+    email: process.env.GUARDRAILS_EMAIL_ENABLED !== 'false',
+    phone: process.env.GUARDRAILS_PHONE_ENABLED !== 'false',
+    ssnUs: process.env.GUARDRAILS_SSN_ENABLED === 'true',
+    creditCard: process.env.GUARDRAILS_CREDIT_CARD_ENABLED !== 'false',
+    roleOverride: process.env.GUARDRAILS_ROLE_OVERRIDE_ENABLED !== 'false',
+    systemPromptLeak: process.env.GUARDRAILS_SYSTEM_PROMPT_LEAK_ENABLED !== 'false',
+    toolOverride: process.env.GUARDRAILS_TOOL_OVERRIDE_ENABLED !== 'false',
   },
 
   // Shutdown

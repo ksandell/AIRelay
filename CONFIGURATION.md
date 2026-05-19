@@ -137,6 +137,42 @@ Response side: `X-Compactor-Applied: <comma-sep filters>` is added whenever
 Compactor mutated the body or bypassed a streaming request — clients can
 audit which compressors ran.
 
+### Guardrails (v0.4.0)
+
+Opt-in prompt safety: detect secrets, PII, and prompt-injection patterns in
+JSON request bodies. Default off — when `GUARDRAILS_ENABLED=false`, AIRelay
+is byte-identical passthrough. See [docs/GUARDRAILS.md](docs/GUARDRAILS.md)
+for the detector catalog, banner format, metrics, safety model, and
+deployment presets.
+
+| Var | Default | Notes |
+|---|---|---|
+| `GUARDRAILS_ENABLED` | `false` | Master switch. When false, the middleware isn't mounted — zero overhead. |
+| `GUARDRAILS_MAX_REQ_BYTES` | `4194304` | Buffering cap (4 MiB). Larger bodies respond 413; advise client to retry with `X-Guardrails: off`. |
+| `GUARDRAILS_SECRETS_MODE` | `off` | One of `off` / `alert` / `block` / `redact` (see [docs/GUARDRAILS.md §3](docs/GUARDRAILS.md#3-modes)). |
+| `GUARDRAILS_PII_MODE` | `off` | Same enum as secrets. |
+| `GUARDRAILS_INJECTION_MODE` | `off` | Same enum as secrets. |
+| `GUARDRAILS_<NAME>_ENABLED` | varies | Per-detector toggle. `<NAME>` upper-snake-case, e.g. `GUARDRAILS_AWS_ACCESS_KEY_ENABLED`, `GUARDRAILS_EMAIL_ENABLED`. Defaults per detector in [docs/GUARDRAILS.md §4](docs/GUARDRAILS.md#4-detector-catalog). |
+| `GUARDRAILS_CUSTOM_PATTERNS_FILE` | unset | Optional path to a JSON file of operator-defined patterns; see [docs/GUARDRAILS.md §7](docs/GUARDRAILS.md#7-custom-patterns). |
+
+Per-request header override:
+
+| Header | Effect |
+|---|---|
+| `X-Guardrails: off` | Skip Guardrails for this request — no detection, no mutation, byte-identical |
+
+Response side: `X-Guardrails-Applied: <comma-sep detectors>` is added on any
+match (alert / block / redact). On block, status is `422` with a JSON body
+listing the detectors that fired.
+
+#### Deployment presets
+
+| Shape | Recommended modes |
+|---|---|
+| Homelab / Tailscale | All off (default) |
+| Small team | `GUARDRAILS_SECRETS_MODE=alert`, `GUARDRAILS_PII_MODE=alert` |
+| Public / multi-tenant | `GUARDRAILS_SECRETS_MODE=block`, `GUARDRAILS_PII_MODE=redact`, `GUARDRAILS_INJECTION_MODE=block` |
+
 #### Provider support
 
 | Provider value | Compactor support |

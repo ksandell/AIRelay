@@ -25,6 +25,9 @@
           <button class="tab" data-tab="compactor">
             <i aria-hidden="true" data-lucide="archive"></i>Compressors
           </button>
+          <button class="tab" data-tab="guardrails">
+            <i aria-hidden="true" data-lucide="shield"></i>Guardrails
+          </button>
         </nav>
       </div>
 
@@ -64,6 +67,14 @@
         >
         <span class="pill" id="compactorEnabledPill">disabled</span>
         <button id="compactorRefreshBtn">Refresh</button>
+      </div>
+
+      <div class="controls hidden" id="guardrailsControls">
+        <span id="guardrailsStatus" class="status disconnected" role="status" aria-live="polite"
+          >Connecting…</span
+        >
+        <span class="pill" id="guardrailsEnabledPill">disabled</span>
+        <button id="guardrailsRefreshBtn">Refresh</button>
       </div>
     </header>
 
@@ -572,6 +583,91 @@ npm run dev</pre
           still bypass per-request with <code>X-Compactor: off</code>). See
           <a href="https://github.com/" target="_blank" rel="noreferrer">docs/COMPACTOR.md</a>
           for the full catalog, safety model, and tuning recipes.
+        </p>
+      </section>
+    </main>
+
+    <main id="guardrailsPanel" class="panel hidden">
+      <section class="kpis">
+        <div class="kpi">
+          <span class="kpi-label">Requests scanned (1m)</span>
+          <span class="kpi-val" id="guardrailsScanned1m">0</span>
+          <canvas class="kpi-spark" id="sparkGuardrailsScanned1m"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Hits (1m)</span>
+          <span class="kpi-val" id="guardrailsHits1m">0</span>
+          <canvas class="kpi-spark" id="sparkGuardrailsHits1m"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Blocked (lifetime)</span>
+          <span class="kpi-val" id="guardrailsBlockedLifetime">0</span>
+          <canvas class="kpi-spark" id="sparkGuardrailsBlockedLifetime"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Redacted (lifetime)</span>
+          <span class="kpi-val" id="guardrailsRedactedLifetime">0</span>
+          <canvas class="kpi-spark" id="sparkGuardrailsRedactedLifetime"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Alerts (lifetime)</span>
+          <span class="kpi-val" id="guardrailsAlertedLifetime">0</span>
+          <canvas class="kpi-spark" id="sparkGuardrailsAlertedLifetime"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Bypasses (lifetime)</span>
+          <span class="kpi-val" id="guardrailsBypassesLifetime">0</span>
+          <canvas class="kpi-spark" id="sparkGuardrailsBypassesLifetime"></canvas>
+        </div>
+      </section>
+
+      <section class="table-card">
+        <h3>Detectors</h3>
+        <table id="guardrailsTable">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Category</th>
+              <th>Mode</th>
+              <th>Fires</th>
+              <th>Hits</th>
+              <th>Bytes redacted</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <section class="table-card">
+        <h3>Recent events</h3>
+        <div id="guardrailsRecent-wrap">
+          <table id="guardrailsRecentTable">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Mode</th>
+                <th>Detectors fired</th>
+                <th>Hits</th>
+                <th>Bytes in → out</th>
+                <th>Blocked</th>
+                <th>Bypass</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="info-callout">
+        <i aria-hidden="true" data-lucide="info" class="info-callout-icon"></i>
+        <p>
+          Guardrails is opt-in: set <code>GUARDRAILS_ENABLED=true</code> and choose a mode per
+          category (<code>GUARDRAILS_SECRETS_MODE</code>, <code>GUARDRAILS_PII_MODE</code>,
+          <code>GUARDRAILS_INJECTION_MODE</code> &mdash; <code>off</code> / <code>alert</code> /
+          <code>block</code> / <code>redact</code>). Clients can bypass per-request with
+          <code>X-Guardrails: off</code>. See
+          <a href="https://github.com/" target="_blank" rel="noreferrer">docs/GUARDRAILS.md</a>
+          for the detector catalog, safety model, and deployment presets.
         </p>
       </section>
     </main>

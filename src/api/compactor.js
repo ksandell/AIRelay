@@ -7,6 +7,7 @@ import {
 } from '../compactor/metrics.js'
 import { allCompressorNames, activeCompressors } from '../compactor/registry.js'
 import { _reset as _resetMetrics } from '../metrics/collector.js'
+import { _resetGuardrailsMetrics } from '../guardrails/metrics.js'
 
 const router = Router()
 
@@ -82,6 +83,7 @@ router.get('/api/compactor/recent', (req, res) => {
 if (process.env.NODE_ENV === 'test') {
   router.post('/api/test/reset', (req, res) => {
     _resetCompactorMetrics()
+    _resetGuardrailsMetrics()
     _resetMetrics()
     res.json({ ok: true })
   })

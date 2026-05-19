@@ -5,6 +5,90 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-05-19 — Guardrails + Compactor gallery
+
+### Added
+- **Guardrails** — opt-in prompt safety pipeline. Default off; preserves
+  byte-identical passthrough when disabled. When enabled, JSON request bodies
+  are scanned against built-in detectors for **secrets** (AWS / GitHub /
+  Anthropic / OpenAI keys, JWTs, private keys, optional high-entropy),
+  **PII** (email, phone E.164, credit-card with Luhn checksum, optional US
+  SSN), and **prompt-injection** patterns (role-override, system-prompt-leak,
+  tool-override). Three independently configurable modes per category:
+  **alert** (record + forward), **block** (reject with HTTP 422),
+  **redact** (replace match with `<redacted:NAME>` and forward). Block beats
+  redact; redacted bodies are re-parsed as JSON and reverted on parse
+  failure so requests are never broken. Full reference in
+  [docs/GUARDRAILS.md](docs/GUARDRAILS.md).
+- **Guardrails dashboard tab** with KPI cards (1m / lifetime requests
+  scanned, hits, blocked, redacted, alerts, bypasses), per-detector counters
+  + modes table, and a recent-events feed. Programmatic access at
+  `GET /api/guardrails/summary` and `GET /api/guardrails/recent`.
+- **Custom patterns** via `GUARDRAILS_CUSTOM_PATTERNS_FILE` — operator-
+  defined regex catalog loaded once at startup; fails loud on malformed
+  input.
+- **Always-on log sanitizer** (`src/guardrails/sanitizer.js`) strips secret-
+  shaped tokens (AWS keys, GitHub PATs, Anthropic/OpenAI keys, JWTs,
+  `Bearer …`) from request URLs and error messages before they're persisted
+  to logs or surfaced on the dashboard. Runs **even when
+  `GUARDRAILS_ENABLED=false`** — the proxy must never write credentials to
+  disk regardless of feature flags.
+- **Per-request override** via `X-Guardrails: off|bypass|false` header.
+  Header is stripped before forwarding upstream. Audit trail via response
+  header `X-Guardrails-Applied: <detectors>`.
+- **Safety model**: (a) default off, (b) per-request opt-out always honored,
+  (c) body never broken (redact re-validates JSON), (d) block beats redact,
+  (e) `GUARDRAILS_MAX_REQ_BYTES` (default 4 MiB) returns 413 on overflow,
+  (f) non-JSON requests skipped, (g) detectors are pure / no I/O, (h)
+  banner-to-the-model on `redact` mutation via a `_guardrails_banner` JSON
+  field.
+- **Tests**: 26 new guardrails tests — 9 sanitizer unit tests, 9
+  scanner/redact tests (covering match correctness, Luhn validation, alert-
+  vs-redact mode separation, safe-substring preservation), 8 end-to-end
+  tests through the real proxy that verify redact mutation, byte-identical
+  bypass via header, block mode rejection, alert-mode non-mutation, clean
+  passthrough, lifetime metrics, summary endpoint shape, and 413 on
+  oversize.
+- **Config**: 17 new `GUARDRAILS_*` env vars — master switch, three
+  category modes, buffering cap, 14 per-detector toggles, custom-patterns
+  file path. All documented in
+  [CONFIGURATION.md](CONFIGURATION.md#guardrails-v040) (including
+  deployment presets for homelab / small-team / public) and
+  [.env.example](.env.example).
+- **Compactor Before / After gallery** in [docs/COMPACTOR.md §4.1](docs/COMPACTOR.md#41-before--after-gallery) —
+  one concrete before/after example per compressor with exact byte counts
+  + token estimates + risk notes, sourced directly from the property test
+  fixtures. New pipeline-composition example showing cumulative savings
+  when multiple compressors fire on a realistic `npm install` log.
+
+### Changed
+- **Hot-path invariant** extended: two opt-in mechanisms may mutate request
+  bodies — Compactor (existing) and Guardrails (new in `redact` mode only).
+  Both default-off. Documented in `CLAUDE.md`, `docs/ARCHITECTURE.md`.
+- **`proxy.js`** now prefers `req._guardrailsBody ?? req._compactorBody`
+  when forwarding via http-proxy's `buffer` option. When both features are
+  disabled (default), this branch is never taken — zero overhead.
+- **`middleware/requestLogger.js`** routes the request URL through
+  `sanitizeUrl()` before persistence.
+- **`middleware/errorHandler.js`** routes error messages + stack traces
+  through `sanitize()` before persistence and before the response body.
+
+### Docs
+- New: [`docs/GUARDRAILS.md`](docs/GUARDRAILS.md) (11-section user
+  reference: overview, quickstart, modes, detector catalog, banner,
+  metrics, custom patterns, deployment presets, safety model, log
+  sanitizer, troubleshooting).
+- Updated: [`docs/COMPACTOR.md`](docs/COMPACTOR.md) with a new
+  [§4.1 Before / After gallery](docs/COMPACTOR.md#41-before--after-gallery)
+  — concrete examples + byte/token savings per compressor + pipeline
+  composition.
+- Updated: README.md (Guardrails callout + gallery link), CLAUDE.md
+  (invariant table + docs index row), CONFIGURATION.md (full env-var
+  table + deployment presets), ARCHITECTURE.md (new Guardrails module
+  section + API surface), ROADMAP.md (moved "prompt redaction in stored
+  logs" + related items to Shipped), `.env.example` (every `GUARDRAILS_*`
+  var with default and one-line description).
+
 ## [0.3.0] — 2026-05-14 — Compactor + Playwright E2E
 
 ### Added

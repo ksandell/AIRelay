@@ -31,6 +31,7 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.2.6 | ✅ Done | v0.2.5 cleanup — gzip reader path, Windows rotation, Mistral pricing, docs (#104, #105, #106, #107, #108) |
 | v0.2.7 | ✅ Done | Azure OpenAI adapter (api-key header + auto-appended `api-version` query) + tool-call E2E harness + chart y-axis precision fix |
 | v0.3.0 | ✅ Done | **Compactor + Playwright E2E** — opt-in prompt compression (10 compressors, default-off) + automated Playwright tests across the dashboard (no Docker for CI) |
+| v0.4.0 | ✅ Done | **Guardrails + Compactor gallery** — opt-in prompt safety (secrets / PII / injection detectors, alert/block/redact modes, default-off) + always-on log sanitizer + Compactor before/after gallery in docs |
 | Future | ⚪ Deferred | Persistence + multi-upstream, Compactor v2, caching, retries, routing intelligence (no committed target release) |
 
 Per-release detail in [CHANGELOG.md](CHANGELOG.md).
@@ -71,6 +72,23 @@ tool-call coverage) and a dashboard y-axis precision fix (`fmtAxis`).
 
 ### Deferred to v0.3.0+
 - **Cohere** — custom `/v2/chat` schema. Real parser work; better to land alongside multi-upstream so it shares route-level provider profiles.
+
+---
+
+## v0.4.0 — Guardrails + Compactor gallery  ✅
+
+**Shipped:** Opt-in prompt safety. Three independently configurable
+categories (secrets, PII, prompt-injection), each in one of four modes
+(`off` / `alert` / `block` / `redact`). 14 built-in detectors plus
+operator-defined custom patterns via `GUARDRAILS_CUSTOM_PATTERNS_FILE`.
+Master switch `GUARDRAILS_ENABLED` (default off), per-request bypass via
+`X-Guardrails: off`, applied-marker response header, per-detector metrics
+surfaced on the **Guardrails** dashboard tab + `/api/guardrails/summary`
+endpoint. Always-on log sanitizer (independent of master switch) strips
+secret-shaped tokens from persisted log entries. Compactor docs gain a
+Before/After gallery with concrete byte+token savings per compressor. Full
+reference: [docs/GUARDRAILS.md](docs/GUARDRAILS.md). Release notes:
+[CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -119,7 +137,13 @@ visual-diff suite with OS-pinned baselines. Full reference:
 - **Per-API-key budgets** — daily $ limit per inbound key with a 429 when exceeded.
 - **WebSocket / Realtime API support** — `server.on('upgrade')` passthrough.
 - **Auth on the dashboard** — basic auth or OIDC, only if leaving the homelab.
-- **Prompt redaction in stored logs** — opt-in masking for compliance scenarios.
+- **Rate limiting** — per-IP / per-key / global throttling middleware for the proxy prefix. (Considered with Guardrails v0.4.0, deferred.)
+- **Guardrails v2** — response-side detectors (model-output PII / secret leakage), streaming-aware partial scans, per-category metrics splits by detector.
+
+> ✅ Shipped in v0.4.0: **prompt redaction in stored logs** (always-on log
+> sanitizer in `src/guardrails/sanitizer.js`) and **opt-in body-level
+> redaction / blocking** of secrets, PII, and injection patterns. See
+> [docs/GUARDRAILS.md](docs/GUARDRAILS.md).
 
 ---
 

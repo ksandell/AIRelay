@@ -25,6 +25,8 @@ const logsControls = document.getElementById('logsControls')
 const metricsControls = document.getElementById('metricsControls')
 const compactorPanel = document.getElementById('compactorPanel')
 const compactorControls = document.getElementById('compactorControls')
+const guardrailsPanel = document.getElementById('guardrailsPanel')
+const guardrailsControls = document.getElementById('guardrailsControls')
 
 function activateTab(name) {
   tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === name))
@@ -32,12 +34,15 @@ function activateTab(name) {
   logsPanel.classList.toggle('hidden', name !== 'logs')
   metricsPanel.classList.toggle('hidden', name !== 'metrics')
   if (compactorPanel) compactorPanel.classList.toggle('hidden', name !== 'compactor')
+  if (guardrailsPanel) guardrailsPanel.classList.toggle('hidden', name !== 'guardrails')
   setupControls.classList.toggle('hidden', name !== 'setup')
   logsControls.classList.toggle('hidden', name !== 'logs')
   metricsControls.classList.toggle('hidden', name !== 'metrics')
   if (compactorControls) compactorControls.classList.toggle('hidden', name !== 'compactor')
+  if (guardrailsControls) guardrailsControls.classList.toggle('hidden', name !== 'guardrails')
   location.hash = name
   if (name === 'compactor') refreshCompactor()
+  if (name === 'guardrails') refreshGuardrails()
   // Re-pull ring-buffer data when the user lands on Logs/Metrics so tables
   // populate even if the tab was hidden when the proxy traffic arrived.
   if (name === 'logs' && typeof loadLive === 'function' && !dateSelect?.value) {
@@ -131,6 +136,89 @@ const compactorRefreshBtn = document.getElementById('compactorRefreshBtn')
 if (compactorRefreshBtn) compactorRefreshBtn.addEventListener('click', refreshCompactor)
 setInterval(() => {
   if (compactorPanel && !compactorPanel.classList.contains('hidden')) refreshCompactor()
+}, 5000)
+
+// ─── Guardrails panel ────────────────────────────────────────
+async function refreshGuardrails() {
+  const statusEl = document.getElementById('guardrailsStatus')
+  const enabledPill = document.getElementById('guardrailsEnabledPill')
+  try {
+    const [summaryRes, recentRes] = await Promise.all([
+      fetch('/api/guardrails/summary'),
+      fetch('/api/guardrails/recent?limit=50'),
+    ])
+    if (!summaryRes.ok || !recentRes.ok) throw new Error('fetch failed')
+    const s = await summaryRes.json()
+    const recent = await recentRes.json()
+    if (statusEl) {
+      statusEl.textContent = 'Live'
+      statusEl.className = 'status connected'
+    }
+    if (enabledPill) {
+      enabledPill.textContent = s.enabled ? 'enabled' : 'disabled'
+      enabledPill.className = s.enabled ? 'pill ok' : 'pill warn'
+    }
+
+    const scanned1m = s.windows['1m'].requestsScanned
+    const hits1m = s.windows['1m'].hits
+    document.getElementById('guardrailsScanned1m').textContent = scanned1m
+    document.getElementById('guardrailsHits1m').textContent = hits1m
+    document.getElementById('guardrailsBlockedLifetime').textContent = s.lifetime.requestsBlocked
+    document.getElementById('guardrailsRedactedLifetime').textContent = s.lifetime.requestsRedacted
+    document.getElementById('guardrailsAlertedLifetime').textContent = s.lifetime.requestsAlerted
+    document.getElementById('guardrailsBypassesLifetime').textContent = s.lifetime.requestsBypassed
+
+    pushSpark('guardrailsScanned1m', scanned1m)
+    pushSpark('guardrailsHits1m', hits1m)
+    pushSpark('guardrailsBlockedLifetime', s.lifetime.requestsBlocked)
+    pushSpark('guardrailsRedactedLifetime', s.lifetime.requestsRedacted)
+    pushSpark('guardrailsAlertedLifetime', s.lifetime.requestsAlerted)
+    pushSpark('guardrailsBypassesLifetime', s.lifetime.requestsBypassed)
+
+    const tbody = document.querySelector('#guardrailsTable tbody')
+    tbody.innerHTML = ''
+    const activeMap = new Map(s.detectors.active.map((d) => [d.name, d]))
+    for (const name of s.detectors.all) {
+      const active = activeMap.get(name)
+      const agg = s.lifetime.byDetector[name]
+      const tr = document.createElement('tr')
+      const fires = agg?.fires ?? 0
+      const hits = agg?.hits ?? 0
+      const bytesRedacted = agg?.bytesRedacted ?? 0
+      tr.innerHTML = `<td><code>${name}</code></td>
+        <td>${active ? active.category : '—'}</td>
+        <td>${active ? active.mode : 'off'}</td>
+        <td>${fires}</td>
+        <td>${hits}</td>
+        <td>${fmtBytes(bytesRedacted)}</td>`
+      tbody.appendChild(tr)
+    }
+
+    const rbody = document.querySelector('#guardrailsRecentTable tbody')
+    rbody.innerHTML = ''
+    for (const ev of recent) {
+      const tr = document.createElement('tr')
+      tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
+        <td>${ev.mode}</td>
+        <td>${ev.detectorsFired.join(', ') || '—'}</td>
+        <td>${ev.hits}</td>
+        <td>${ev.bytesIn} → ${ev.bytesOut}</td>
+        <td>${ev.blocked ? '✓' : ''}</td>
+        <td>${ev.bypassReason ?? ''}</td>`
+      rbody.appendChild(tr)
+    }
+  } catch {
+    if (statusEl) {
+      statusEl.textContent = 'Error'
+      statusEl.className = 'status disconnected'
+    }
+  }
+}
+
+const guardrailsRefreshBtn = document.getElementById('guardrailsRefreshBtn')
+if (guardrailsRefreshBtn) guardrailsRefreshBtn.addEventListener('click', refreshGuardrails)
+setInterval(() => {
+  if (guardrailsPanel && !guardrailsPanel.classList.contains('hidden')) refreshGuardrails()
 }, 5000)
 
 // ─── Setup panel ─────────────────────────────────────────────
@@ -988,6 +1076,12 @@ function initSparklines() {
     ['sparkMetricsCompactorBytes5m', '#3fb950', 'metricsCompactorBytes5m'],
     ['sparkMetricsCompactorRatio5m', '#58a6ff', 'metricsCompactorRatio5m'],
     ['sparkMetricsCompactorFires5m', '#f0b72f', 'metricsCompactorFires5m'],
+    ['sparkGuardrailsScanned1m', '#58a6ff', 'guardrailsScanned1m'],
+    ['sparkGuardrailsHits1m', '#f0b72f', 'guardrailsHits1m'],
+    ['sparkGuardrailsBlockedLifetime', '#f85149', 'guardrailsBlockedLifetime'],
+    ['sparkGuardrailsRedactedLifetime', '#a371f7', 'guardrailsRedactedLifetime'],
+    ['sparkGuardrailsAlertedLifetime', '#f0b72f', 'guardrailsAlertedLifetime'],
+    ['sparkGuardrailsBypassesLifetime', '#d29922', 'guardrailsBypassesLifetime'],
   ]
   for (const [id, color, key] of specs) {
     const ch = makeSparkline(id, color)
@@ -1288,6 +1382,7 @@ const HASH_TO_TAB = {
   '#metrics': 'metrics',
   '#setup': 'setup',
   '#compactor': 'compactor',
+  '#guardrails': 'guardrails',
   '#logs': 'logs',
 }
 const initialTab = HASH_TO_TAB[location.hash] ?? 'logs'

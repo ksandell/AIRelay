@@ -107,6 +107,33 @@ pipeline on each eligible text segment, and stashes the mutated body on
 Streaming requests (`stream: true`) bypass entirely with a header banner.
 The full feature reference is in [COMPACTOR.md](../docs/COMPACTOR.md).
 
+## Guardrails (v0.4.0, opt-in)
+
+A third per-request pipeline, mounted under the proxy prefix **after**
+Compactor and **before** `proxy.js`. Inert when `GUARDRAILS_ENABLED=false`
+(default).
+
+```
+src/guardrails/
+├── middleware.js          Express middleware: activation, bypass header, buffering, dispatch
+├── registry.js            Built-in + custom detector catalog (regex + per-detector gating)
+├── scanner.js             Pure match/redact functions; longest-match overlap resolution
+├── banner.js              "[guardrails: redact detectors=…; bytes …→…; X-Guardrails: off]"
+├── metrics.js             Parallel ring buffer + lifetime counters (per detector + totals)
+└── sanitizer.js           Always-on URL + error-message scrubber (independent of master switch)
+```
+
+Three modes per category (`secrets` / `pii` / `injection`): **alert**
+(record + forward), **block** (reject 422), **redact** (replace match
+with `<redacted:NAME>` and forward). Block beats redact. Body is re-parsed
+after redaction; on parse failure the original bytes go through unchanged.
+The mutated buffer lives on `req._guardrailsBody`, which the proxy handler
+prefers over `req._compactorBody`. Sanitizer is wired into `requestLogger`
+and `errorHandler` to redact secret-shaped tokens from persisted log
+entries — runs even when the master switch is off.
+
+The full feature reference is in [GUARDRAILS.md](../docs/GUARDRAILS.md).
+
 ## E2E test bootstrap (v0.3.0)
 
 Playwright E2E runs against an **in-process** Node bootstrap — no Docker
@@ -182,6 +209,8 @@ ANY  <PROXY_PATH_PREFIX>/*            transparent passthrough to UPSTREAM_URL
 # Compactor (v0.3.0, when COMPACTOR_ENABLED=true)
 GET  /api/compactor/summary           lifetime + 1m/5m/15m windows of compression metrics
 GET  /api/compactor/recent            last N per-request compactor events
+GET  /api/guardrails/summary          guardrails state + lifetime + windowed aggregates
+GET  /api/guardrails/recent           last N per-request guardrails events
 ```
 
 ## Key design decisions

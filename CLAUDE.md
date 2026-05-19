@@ -79,11 +79,13 @@ key design decisions, API surface): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
   of payloads, no compression. Per-request observability goes through
   `metrics.record()` only; the logger is for app events.
 - **Bytes are never modified for non-opted-in traffic.** `X-Forwarded-*` is
-  opt-in (`PROXY_TRUST_FORWARDED=false` by default). The v0.3.0 Compactor
-  feature (`COMPACTOR_ENABLED=false` by default) is the only mechanism that
-  may mutate request bodies, and only when an operator explicitly enables it;
-  per-request bypass via `X-Compactor: off` is always honored. See
-  [docs/COMPACTOR.md](docs/COMPACTOR.md).
+  opt-in (`PROXY_TRUST_FORWARDED=false` by default). Two opt-in mechanisms
+  may mutate request bodies, both default-off:
+  1. Compactor v0.3.0 (`COMPACTOR_ENABLED=false`); per-request bypass via
+     `X-Compactor: off`. See [docs/COMPACTOR.md](docs/COMPACTOR.md).
+  2. Guardrails v0.4.0 (`GUARDRAILS_ENABLED=false`); only mutates in `redact`
+     mode; per-request bypass via `X-Guardrails: off`. Block mode rejects
+     (422) without modifying bytes. See [docs/GUARDRAILS.md](docs/GUARDRAILS.md).
 - Token extraction runs on a **passive tee** in `queueMicrotask` after
   response end. Never inline.
 
@@ -140,6 +142,7 @@ For releases, follow [docs/RELEASING.md](docs/RELEASING.md).
 | [CONFIGURATION.md](CONFIGURATION.md) | All env vars, provider recipes, DNS, TLS, tuning, prod checklist |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Diagrams + module map + design decisions + API surface |
 | [docs/COMPACTOR.md](docs/COMPACTOR.md) | Compactor feature reference (v0.3.0): activation, compressor catalog, banner, metrics, safety, tuning |
+| [docs/GUARDRAILS.md](docs/GUARDRAILS.md) | Guardrails feature reference (v0.4.0): detector catalog, modes (alert/block/redact), banner, metrics, safety, deployment presets |
 | [docs/RELEASING.md](docs/RELEASING.md) | Release checklist (SSOT) |
 | [docs/e2e-test-plan.md](docs/e2e-test-plan.md) | Mistral-based E2E playbook |
 | [ROADMAP.md](ROADMAP.md) | Planned + speculative work (not what shipped — see CHANGELOG) |
