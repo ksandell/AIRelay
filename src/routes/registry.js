@@ -34,7 +34,7 @@ function parseInline(raw) {
     if (Array.isArray(parsed.routes)) return parsed.routes
     return null
   } catch (err) {
-    throw new Error(`failed to parse PROXY_ROUTES JSON: ${err.message}`)
+    throw new Error(`failed to parse PROXY_ROUTES JSON: ${err.message}`, { cause: err })
   }
 }
 
@@ -43,13 +43,13 @@ function loadFromFile(path) {
   try {
     raw = fs.readFileSync(path, 'utf8')
   } catch (err) {
-    throw new Error(`failed to read ROUTES_CONFIG_PATH=${path}: ${err.message}`)
+    throw new Error(`failed to read ROUTES_CONFIG_PATH=${path}: ${err.message}`, { cause: err })
   }
   let parsed
   try {
     parsed = JSON.parse(raw)
   } catch (err) {
-    throw new Error(`failed to parse ROUTES_CONFIG_PATH=${path}: ${err.message}`)
+    throw new Error(`failed to parse ROUTES_CONFIG_PATH=${path}: ${err.message}`, { cause: err })
   }
   if (Array.isArray(parsed)) return parsed
   if (Array.isArray(parsed.routes)) return parsed.routes
@@ -78,7 +78,7 @@ function normalize(r) {
 let cache = null
 
 function build() {
-  let raw = null
+  let raw
   // env vars are read at build time (not config-frozen) so a test or operator
   // can rotate them without re-importing config. dotenv has already populated
   // process.env in dev; in prod Docker injects them directly.
