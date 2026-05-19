@@ -33,7 +33,7 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.3.0 | ✅ Done | **Compactor + Playwright E2E** — opt-in prompt compression (10 compressors, default-off) + automated Playwright tests across the dashboard (no Docker for CI) |
 | v0.4.0 | ✅ Done | **Guardrails + Persistence + Multi-Upstream** — opt-in prompt safety (secrets / PII / injection detectors, alert/block/redact modes), opt-in SQLite metric history + rollups + CSV export, opt-in multi-upstream routing (per-prefix routes table), dashboard route filter / history window / CSV download, Compactor before/after gallery in docs |
 | v0.4.1 | ✅ Done | **CI green** — committed Linux Playwright baselines (v0.4.0 shipped with win32-only baselines → CI red on `main`), added `Bless visual baselines` workflow + OS-pinning docs, bumped GH Actions to Node 24-compatible v5 majors |
-| v0.4.2 | 🟡 Planned | **Dependency refresh + CI/security housekeeping** — see section below |
+| v0.4.2 | ✅ Done | **Dependency refresh + CI/security housekeeping** — Node 24 LTS, express 5, http-proxy-3, vitest/eslint/dotenv/fast-check/node-cron/playwright majors; Dependabot + CodeQL + Bless workflows; brotli/gzip token-extraction fix |
 | Future | ⚪ Deferred | Persistence + multi-upstream, Compactor v2, caching, retries, routing intelligence (no committed target release) |
 
 Per-release detail in [CHANGELOG.md](CHANGELOG.md).
@@ -62,34 +62,32 @@ recipe, README row. `pricing-completeness` test bumped to 16 required providers.
 
 ---
 
-## v0.4.2 — Dependency refresh + CI/security housekeeping  🟡 Planned
+## v0.4.2 — Dependency refresh + CI/security housekeeping  ✅
 
-**Theme:** "Bring deps current; replace unmaintained core libs; automate future bumps."
+**Shipped** (closes GitHub milestone `v0.4.2 — Dependency refresh`, 16 PRs
+landed: [#133](https://github.com/ksandell/AIRelay/pull/133)…[#146](https://github.com/ksandell/AIRelay/pull/146)).
 
-No new product features. Coordinated dep + housekeeping bump driven by an audit
-of Node.js runtime and npm dependencies on 2026-05-19. Findings:
+No new product features. Brought every npm major current, replaced
+unmaintained `http-proxy` with `http-proxy-3`, lifted the runtime to Node 24
+LTS (Docker base + `engines.node`), and automated future dep bumps via
+Dependabot. Hot-path invariants (zero sync I/O on the proxy path, SSE
+streaming, raw-byte passthrough) preserved with a perf baseline before/after
+the `http-proxy` swap.
 
-- `npm audit`: 1 moderate (transitive `brace-expansion` via `test-exclude`,
-  GHSA-jxxr-4gwj-5jf2). `npm audit fix` resolves it.
-- `http-proxy@1.18.1` — last release 2020, unmaintained. Replace (candidate:
-  `http-proxy-3`). Hot-path invariants (zero sync I/O, SSE streaming, raw-byte
-  passthrough; future WS upgrade story) must be preserved with a perf
-  baseline before/after.
-- Pending majors: `vitest` 3→4, `@vitest/coverage-v8` 3→4, `eslint` 9→10,
-  `dotenv` 16→17, `fast-check` 3→4, `node-cron` 3→4 (or swap to `croner`).
-- Patch: `express` 4.22.1→4.22.2, `@playwright/test` to latest 1.x — coupled
-  with bump of CI image `mcr.microsoft.com/playwright:v1.60.0-jammy` and
-  Linux + win32 visual-baseline regen via `Bless visual baselines` workflow.
-- Housekeeping: enable Dependabot (weekly grouped PRs), CodeQL default JS
-  workflow, pin Docker base to `node:22.x-alpine3.x` (no floating tag).
+Originally-deferred items — **`express` 4 → 5** and **Node 22 → 24 LTS** —
+were pulled forward into this milestone after the upstream readiness checks
+passed; v0.5.0 / v0.5.1 are now free of dep carry-over.
 
-### Deferred from v0.4.2
-- **express 4 → 5** → v0.5.0 (path-to-regexp v8, async error handling).
-- **Node.js Docker base 22 → 24 LTS** → v0.5.1, after 24 enters LTS
-  (2025-10-28) and `better-sqlite3` ships prebuilt binaries for it.
+Two real bugs caught during release sign-off and fixed in-milestone:
+- `bless-baselines.yml` YAML parse error (unindented heredoc inside `run: |`
+  block scalar silently dropped the `workflow_dispatch` trigger).
+- Token / cost metrics for non-streaming OpenAI-compatible responses
+  (Mistral et al.) were silently null when the upstream returned a
+  brotli- or gzip-compressed JSON body. Proxy now decodes `br` / `gzip` /
+  `deflate` response bodies in the post-response `queueMicrotask`, off the
+  hot path, before extraction.
 
-Tracked via GitHub milestone `v0.4.2 — Dependency refresh` (see
-`scripts/create-v0.4.2-milestone.sh`).
+Release notes: [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
