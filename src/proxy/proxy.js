@@ -1,4 +1,4 @@
-import httpProxy from 'http-proxy'
+import httpProxy from 'http-proxy-3'
 import { Readable } from 'node:stream'
 import { config } from '../config.js'
 import { pickAgent } from './agent.js'
