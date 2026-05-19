@@ -146,17 +146,20 @@ logic.
 
 ## 5. Banner format
 
-When `redact` mode mutates a request body, a banner is added as a top-level
-`_guardrails_banner` string field on the JSON so the model can see what
-happened:
+When `redact` mode mutates a request body, a banner is exposed on the
+**response** via the `X-Guardrails-Banner` header so callers can see what
+happened without disturbing the upstream-bound JSON shape:
 
 ```
-[guardrails: redact detectors=aws-access-key,anthropic-key; bytes 412->378 (-8%); set header X-Guardrails: off to bypass]
+X-Guardrails-Banner: [guardrails: redact detectors=aws-access-key,anthropic-key; bytes 412->378 (-8%); set header X-Guardrails: off to bypass]
 ```
 
 The format is stable; downstream tooling can parse it. The exact constant
 lives in [src/guardrails/banner.js](../src/guardrails/banner.js). Banners
-are only injected on `redact` mutation — `alert` mode never modifies bytes.
+are only set on `redact` mutation — `alert` mode never modifies bytes and
+never sets the header. The request body forwarded to the upstream contains
+only the redacted byte replacements (no extra banner field), so strict-schema
+endpoints (Mistral, OpenAI strict mode) accept the modified body unchanged.
 
 ## 6. Metrics & dashboard
 
@@ -286,9 +289,11 @@ Same scaffolding as the Compactor. Stated invariants:
   event recorded.
 - **(g) Detectors are pure.** No I/O, no global state, no shared mutable
   cache. Tests live in [tests/guardrails/](../tests/guardrails/).
-- **(h) Banner-to-model.** On `redact` mutation, a `_guardrails_banner`
-  field is added so the model is told what was redacted and how to ask
-  for raw.
+- **(h) Banner-on-response.** On `redact` mutation, the
+  `X-Guardrails-Banner` response header tells the caller what was redacted
+  and how to ask for raw. The request body forwarded upstream contains only
+  the redacted byte replacements — no extra fields — so strict-schema
+  endpoints accept it without `extra_forbidden` errors.
 
 ## 10. Always-on log sanitizer
 
@@ -323,7 +328,9 @@ look for `bypassReason` entries in `/api/guardrails/recent`.
 **Body returned 413.** The body exceeded `GUARDRAILS_MAX_REQ_BYTES`. Raise
 the cap, or send `X-Guardrails: off` to bypass for known-large payloads.
 
-**Banner field shows up in upstream response — was it ever there?** No:
-the banner is added to the **request** body sent upstream. Some upstreams
-echo unknown fields back. If that's a problem, switch the category to
-`alert` (no mutation) or filter the field on your client.
+**Where is the redact banner?** On the proxy response as the
+`X-Guardrails-Banner` header. Prior to v0.4.0's release fix it was injected
+into the forwarded JSON body as a `_guardrails_banner` field — that broke
+strict-schema upstreams (Mistral, OpenAI strict mode) with HTTP 422
+`extra_forbidden`. The header is set only when redact mode actually mutated
+bytes; alert and clean requests never set it.

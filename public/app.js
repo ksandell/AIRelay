@@ -1580,6 +1580,13 @@ const HASH_TO_TAB = {
 const initialTab = HASH_TO_TAB[location.hash] ?? 'logs'
 activateTab(initialTab)
 
+// Hash navigation (deep links, back/forward, programmatic location.hash) must
+// also flip the active panel — clicking tabs only covers one entry path.
+window.addEventListener('hashchange', () => {
+  const next = HASH_TO_TAB[location.hash]
+  if (next) activateTab(next)
+})
+
 loadAvailable()
 loadLive()
 loadHealth()

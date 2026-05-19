@@ -7,6 +7,7 @@ import { record as recordMainEvent } from '../metrics/collector.js'
 
 const HEADER = 'x-guardrails'
 const APPLIED_HEADER = 'X-Guardrails-Applied'
+const BANNER_HEADER = 'X-Guardrails-Banner'
 
 function isBypassValue(v) {
   if (v == null) return false
@@ -251,26 +252,18 @@ export function createGuardrailsMiddleware() {
       }
     }
 
-    // Build banner only if we mutated. Prepend it as a JSON string field so it
-    // remains valid JSON. Simplest portable shape: inject a top-level
-    // "_guardrails_banner" key. We only do this when redact mode actually
-    // mutated bytes — keeps alert-mode forwarding byte-identical.
+    // Expose banner as a response header instead of injecting into the body.
+    // Strict-schema upstreams (Mistral, OpenAI strict mode) reject unknown
+    // top-level fields like `_guardrails_banner`; keeping the body byte-shape
+    // identical except for the redacted runs preserves upstream compatibility.
     if (redactedCount > 0) {
-      try {
-        const parsed = JSON.parse(outBuf.toString('utf8'))
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          const banner = formatBanner({
-            detectors: [...new Set(matches.map((m) => m.name))],
-            bytesIn: original.length,
-            bytesOut: outBuf.length,
-            modes: [...modes],
-          })
-          parsed._guardrails_banner = banner.trim()
-          outBuf = Buffer.from(JSON.stringify(parsed), 'utf8')
-        }
-      } catch {
-        // banner injection is best-effort; mutation already recorded.
-      }
+      const banner = formatBanner({
+        detectors: [...new Set(matches.map((m) => m.name))],
+        bytesIn: original.length,
+        bytesOut: outBuf.length,
+        modes: [...modes],
+      }).trim()
+      res.setHeader(BANNER_HEADER, banner)
     }
 
     // Record per-detector hits + per-request event.

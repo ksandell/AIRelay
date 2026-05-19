@@ -68,6 +68,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fixtures. New pipeline-composition example showing cumulative savings
   when multiple compressors fire on a realistic `npm install` log.
 
+### Fixed
+- **Guardrails redact mode now passes through strict-schema upstreams.** The
+  banner that announces which detectors fired is exposed as a new
+  `X-Guardrails-Banner` response header instead of being injected into the
+  forwarded JSON body as a `_guardrails_banner` top-level field. Mistral and
+  OpenAI strict mode rejected the extra field with HTTP 422 `extra_forbidden`;
+  the redaction itself was always correct, only the round-trip failed.
+  Body bytes are now mutated only by the redaction replacements themselves.
+- **Dashboard hash navigation activates the right tab.** Deep links such as
+  `http://airelay.local:3000/#guardrails` worked on first paint but
+  programmatic `location.hash` writes and browser back/forward did not flip
+  panels — the Compressors and Guardrails tables appeared as all zeros even
+  though server-side counters were populated. A `hashchange` listener now
+  calls `activateTab()` for every hash transition.
+
 ### Changed
 - **Hot-path invariant** extended: two opt-in mechanisms may mutate request
   bodies — Compactor (existing) and Guardrails (new in `redact` mode only).
