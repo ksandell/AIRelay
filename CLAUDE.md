@@ -22,7 +22,7 @@ server-to-API SDK calls from a codebase.
 | Layer | Choice |
 |---|---|
 | Runtime | Node.js 24+ (ESM, `node:` prefix) |
-| Backend | Express.js + `http-proxy` (true streaming, no body buffering) |
+| Backend | Express.js + `http-proxy-3` (true streaming, no body buffering) |
 | Frontend | Vanilla JS + SSE (`EventSource`) + Chart.js via CDN — no build step |
 | Scheduler | `node-cron` (internal) |
 | Testing | Vitest + supertest |
