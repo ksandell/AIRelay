@@ -27,7 +27,7 @@ server-to-API SDK calls from a codebase.
 | Scheduler | `node-cron` (internal) |
 | Testing | Vitest + supertest |
 | Linting | ESLint flat config (v9) + Prettier |
-| Container | Docker multi-stage (`node:22-alpine`) |
+| Container | Docker multi-stage (`node:22.22-alpine3.22`, fully pinned) |
 
 ## Commands
 
