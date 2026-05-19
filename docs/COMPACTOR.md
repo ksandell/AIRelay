@@ -19,6 +19,7 @@ desired, per-request header overrides.
 2. [Quickstart](#2-quickstart)
 3. [Activation model](#3-activation-model)
 4. [Compressor catalog](#4-compressor-catalog)
+    - [Before / After gallery](#41-before--after-gallery)
 5. [Banner format](#5-banner-format)
 6. [Metrics & dashboard](#6-metrics--dashboard)
 7. [Streaming behavior](#7-streaming-behavior)
@@ -146,6 +147,396 @@ first so downstream compressors see canonical input.
 | 8 | `stacktrace-dedupe`  | no  | Repeated identical frames → `<frame repeated N more times>` | [doc](compactor/compressors/stacktrace-dedupe.md) |
 | 9 | `base64-truncate`    | no  | Long base64 runs → `<base64: N bytes, sha256:...>` | [doc](compactor/compressors/base64-truncate.md) |
 | 10 | `long-file-elide`   | **yes** | Text segments > N lines → keep head/tail, elide middle | [doc](compactor/compressors/long-file-elide.md) |
+
+### 4.1 Before / After gallery
+
+One concrete example per compressor, sourced from the property tests at
+[tests/compactor/compressors.property.test.js](../tests/compactor/compressors.property.test.js).
+Byte counts are exact. Token counts use the standard ~4 chars / token
+heuristic and are rounded; exact values vary by tokenizer (Anthropic /
+OpenAI / Google differ by ±15%).
+
+> Every example below is the raw output of the corresponding compressor on
+> the input shown — no banner prefix and no pipeline composition. The banner
+> is added by `src/compactor/pipeline.js` after at least one compressor fires;
+> see [§5 Banner format](#5-banner-format).
+
+---
+
+#### 1. `ansi-strip` &nbsp; <small>category: normalizer · safe</small>
+
+Strips ANSI color/escape sequences. Always runs first so downstream
+compressors see plain text.
+
+**Before** (37 bytes ≈ 9 tokens)
+
+```
+\x1b[31merror\x1b[0m: \x1b[1mbold\x1b[0m text
+```
+
+**After** (16 bytes ≈ 4 tokens)
+
+```
+error: bold text
+```
+
+**Savings:** -21 bytes (-57%) · ~5 tokens saved.
+**Use on:** colored CI logs, `git --color=always`, `npm` output.
+**Watch out for:** none — color codes carry no signal to the model.
+**Toggle:** `COMPACTOR_ANSI_STRIP_ENABLED`.
+
+---
+
+#### 2. `blankline-collapse` &nbsp; <small>category: normalizer · safe</small>
+
+3+ consecutive blank lines collapse to a single blank line.
+
+**Before** (8 bytes ≈ 2 tokens)
+
+```
+a
+
+
+
+
+b
+```
+
+**After** (4 bytes ≈ 1 token)
+
+```
+a
+
+b
+```
+
+**Savings:** -4 bytes (-50%) on this trivial case; 2–8% on real logs.
+**Use on:** verbose CLI output, stack-trace blocks separated by whitespace.
+**Watch out for:** none — preserves a single blank between paragraphs.
+**Toggle:** `COMPACTOR_BLANKLINE_COLLAPSE_ENABLED`.
+
+---
+
+#### 3. `lockfile-drop` &nbsp; <small>category: heuristic · safe</small>
+
+Detects unified diffs of `package-lock.json` / `yarn.lock` / `pnpm-lock.yaml`
+and replaces the body with a one-liner summary. Lockfile churn is the single
+largest source of low-signal tokens in agent traffic.
+
+**Before** (~1.2 KB ≈ 300 tokens — header + 50 lines of version bumps)
+
+```
+diff --git a/package-lock.json b/package-lock.json
+index abc..def 100644
+--- a/package-lock.json
++++ b/package-lock.json
++    "version": "1.0.0"
++    "version": "1.0.1"
++    "version": "1.0.2"
+... 48 more "version" lines ...
+```
+
+**After** (~140 bytes ≈ 35 tokens)
+
+```
+diff --git a/package-lock.json b/package-lock.json
+index abc..def 100644
+--- a/package-lock.json
++++ b/package-lock.json
+<lockfile diff omitted: 50 lines>
+```
+
+**Savings:** ~88% bytes / tokens on the fixture. Real-world example from
+[§1 Overview & why](#1-overview--why): 92,418 B → 3,127 B (**-96.6%**).
+**Use on:** any agent that runs `npm install`, `yarn add`, `pnpm i`.
+**Watch out for:** drops all version-bump detail — if you need to know which
+package moved from x → y, request raw via `X-Compactor: off`.
+**Toggle:** `COMPACTOR_LOCKFILE_DROP_ENABLED`.
+
+---
+
+#### 4. `diff-collapse` &nbsp; <small>category: heuristic · safe</small>
+
+In a unified diff, runs of unchanged context lines (8+) collapse to a
+3-line head + elision marker + 3-line tail. **Never drops `+`/`-` lines**
+(property-tested invariant).
+
+**Before** (~520 bytes ≈ 130 tokens — `@@` header + 15 context + 2 change + 15 context)
+
+```
+@@ -1,20 +1,20 @@
+ unchanged line
+ unchanged line
+ unchanged line
+ unchanged line
+ unchanged line
+ unchanged line
+ unchanged line
+ unchanged line
+ unchanged line
+ unchanged line
+ unchanged line
+ unchanged line
+ unchanged line
+ unchanged line
+ unchanged line
+-removed
++added
+ more unchanged
+ more unchanged
+... (13 more) ...
+```
+
+**After** (~210 bytes ≈ 52 tokens)
+
+```
+@@ -1,20 +1,20 @@
+ unchanged line
+ unchanged line
+ unchanged line
+... 12 lines unchanged ...
+-removed
++added
+ more unchanged
+ more unchanged
+ more unchanged
+... 12 lines unchanged ...
+```
+
+**Savings:** ~60% bytes / tokens on this fixture; 60–90% on real multi-hunk diffs.
+**Use on:** `git diff`, code review prompts.
+**Watch out for:** none for safety — the property test in
+`safe-substring preservation` guarantees `+`/`-` lines are never dropped.
+**Toggle:** `COMPACTOR_DIFF_COLLAPSE_ENABLED`.
+
+---
+
+#### 5. `ls-long-shrink` &nbsp; <small>category: heuristic · safe</small>
+
+`ls -l` output collapses to filenames only. Permission bits, owner, group,
+size, and date carry minimal signal in a chat context.
+
+**Before** (193 bytes ≈ 48 tokens)
+
+```
+total 24
+-rw-r--r--  1 alice group  1234 May 10 12:34 alpha.txt
+-rw-r--r--  1 alice group  5678 May 10 12:35 beta.txt
+-rwxr-xr-x  1 alice group  9999 May 10 12:36 gamma.sh
+```
+
+**After** (27 bytes ≈ 7 tokens)
+
+```
+alpha.txt
+beta.txt
+gamma.sh
+```
+
+**Savings:** -166 bytes (**-86%**) · ~41 tokens saved.
+**Use on:** any agent that does `ls -l`, `ls -la`, file inventory dumps.
+**Watch out for:** drops permission/owner info — if the model needs to
+reason about file ownership or `+x` bits, set `X-Compactor: off`.
+**Toggle:** `COMPACTOR_LS_LONG_SHRINK_ENABLED`.
+
+---
+
+#### 6. `npm-noise-strip` &nbsp; <small>category: heuristic · safe</small>
+
+Strips `npm WARN deprecated`, `npm notice`, audit summaries, and progress
+bars. **Never strips `npm ERR!`** (property-tested invariant) so real
+failures still reach the model.
+
+**Before** (130 bytes ≈ 32 tokens)
+
+```
+npm WARN deprecated old@1.0.0: use new@2
+npm notice created a lockfile
+found 2 vulnerabilities
+npm ERR! something exploded
+```
+
+**After** (27 bytes ≈ 7 tokens)
+
+```
+npm ERR! something exploded
+```
+
+**Savings:** -103 bytes (**-79%**) · ~25 tokens saved.
+**Use on:** any agent running `npm install`, `npm audit`, `npm publish`.
+**Watch out for:** Yarn 2 / pnpm patterns are subtly different — file an
+issue if you see noise leaking through.
+**Toggle:** `COMPACTOR_NPM_NOISE_STRIP_ENABLED`.
+
+---
+
+#### 7. `repeat-line-dedupe` &nbsp; <small>category: heuristic · safe</small>
+
+Consecutive identical lines (3+) collapse to a single line + a counter.
+
+**Before** (370 bytes ≈ 92 tokens)
+
+```
+connection reset by peer at 192.168.1.42 retrying...
+connection reset by peer at 192.168.1.42 retrying...
+connection reset by peer at 192.168.1.42 retrying...
+connection reset by peer at 192.168.1.42 retrying...
+connection reset by peer at 192.168.1.42 retrying...
+connection reset by peer at 192.168.1.42 retrying...
+connection reset by peer at 192.168.1.42 retrying...
+OK
+```
+
+**After** (87 bytes ≈ 21 tokens)
+
+```
+connection reset by peer at 192.168.1.42 retrying...
+<line repeated 6 more times>
+OK
+```
+
+**Savings:** -283 bytes (**-76%**) · ~71 tokens saved.
+**Use on:** flaky-network retry loops, polling logs, watch-mode output.
+**Watch out for:** isolated duplicates (2 in a row) are untouched on purpose.
+**Toggle:** `COMPACTOR_REPEAT_LINE_DEDUPE_ENABLED`.
+
+---
+
+#### 8. `stacktrace-dedupe` &nbsp; <small>category: heuristic · safe</small>
+
+Repeated identical stack frames (3+) collapse to a single frame + counter.
+Detects Node, Python, Java, Ruby, and Go frame syntaxes.
+
+**Before** (165 bytes ≈ 41 tokens)
+
+```
+    at recurse (file.js:1:1)
+    at recurse (file.js:1:1)
+    at recurse (file.js:1:1)
+    at recurse (file.js:1:1)
+    at recurse (file.js:1:1)
+caused by error
+```
+
+**After** (~85 bytes ≈ 21 tokens)
+
+```
+    at recurse (file.js:1:1)
+<frame repeated 4 more times>
+caused by error
+```
+
+**Savings:** ~48% bytes / tokens on this fixture; 30–50% on real infinite-recursion stacks.
+**Use on:** recursive call traces, error chains.
+**Watch out for:** 2 identical frames are kept; only 3+ collapse.
+**Toggle:** `COMPACTOR_STACKTRACE_DEDUPE_ENABLED`.
+
+---
+
+#### 9. `base64-truncate` &nbsp; <small>category: heuristic · safe</small>
+
+Long base64 runs (256+ chars) replaced with a length + sha256 fingerprint
+so the model can still reference the blob without paying the token cost.
+
+**Before** (~415 bytes ≈ 103 tokens)
+
+```
+prefix AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+... 400 chars total ...
+AAAAAA suffix
+```
+
+**After** (~70 bytes ≈ 17 tokens)
+
+```
+prefix <base64: 300 bytes, sha256:abc123def456> suffix
+```
+
+**Savings:** ~83% bytes / tokens on this fixture; 80–95% on embedded images / PDFs.
+**Use on:** prompts that paste images, certificates, binary blobs as base64.
+**Watch out for:** the model can no longer read the blob content — only
+reason about it. If decoding is required, `X-Compactor: off`.
+**Toggle:** `COMPACTOR_BASE64_TRUNCATE_ENABLED`.
+
+---
+
+#### 10. `long-file-elide` &nbsp; <small>category: aggressive · **risky**</small>
+
+Text segments > N lines (default 400, configurable via
+`COMPACTOR_LONG_FILE_THRESHOLD`) keep the first 50 and last 50 lines; the
+middle is elided. **Requires `COMPACTOR_ALLOW_RISKY=true`** — drops user-
+authored content.
+
+**Before** (~3.5 KB ≈ 870 tokens — 500 lines of `line 0`…`line 499`)
+
+```
+line 0
+line 1
+line 2
+... 497 more lines ...
+line 499
+```
+
+**After** (~800 bytes ≈ 200 tokens — first 50 + elision + last 50)
+
+```
+line 0
+line 1
+...
+line 49
+<400 lines elided>
+line 450
+line 451
+...
+line 499
+```
+
+**Savings:** ~77% bytes / tokens on this fixture; 40–70% on large file pastes.
+**Use on:** prompts that include entire files as context.
+**Watch out for:** drops the **middle** of the file — if the model needs
+line 250, it can't see it. Tune `COMPACTOR_LONG_FILE_THRESHOLD` to raise
+the cutoff, or set `X-Compactor: off` per-request.
+**Toggle:** `COMPACTOR_LONG_FILE_ELIDE_ENABLED` (also needs `COMPACTOR_ALLOW_RISKY=true`).
+
+---
+
+#### Pipeline composition example
+
+A realistic `npm install` `tool_result` block hits multiple compressors in
+sequence. Here's what they produce together:
+
+**Before** (~640 bytes ≈ 160 tokens — ANSI codes + double-blank lines + repeated WARN + ERR)
+
+```
+\x1b[31merror\x1b[0m
+
+
+npm WARN deprecated foo@1.0.0: use foo@2
+npm WARN deprecated foo@1.0.0: use foo@2
+npm WARN deprecated foo@1.0.0: use foo@2
+npm WARN deprecated foo@1.0.0: use foo@2
+npm WARN deprecated foo@1.0.0: use foo@2
+npm WARN deprecated foo@1.0.0: use foo@2
+found 3 vulnerabilities (1 high, 2 moderate)
+npm ERR! ELIFECYCLE
+```
+
+**After** (~75 bytes ≈ 19 tokens) — pipeline order: `ansi-strip` → `blankline-collapse` → `npm-noise-strip` →
+`repeat-line-dedupe` left with only the surviving `npm ERR!`:
+
+```
+[compactor: applied filters=ansi-strip,blankline-collapse,npm-noise-strip; bytes 640->75 (-88%); set header X-Compactor: off to bypass]
+error
+
+npm ERR! ELIFECYCLE
+```
+
+**Cumulative savings:** ~88% bytes / tokens. The model still sees the
+single failure signal — `npm ERR! ELIFECYCLE` — and is told what was elided
+plus how to opt out.
+
+---
 
 ## 5. Banner format
 

@@ -5,6 +5,112 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-05-19 — Guardrails + Persistence + Multi-Upstream
+
+### Added
+- **Multi-upstream routing** ([#35](https://github.com/ksandell/AIRelay/issues/35)) — opt-in routes table that fans one AIRelay instance out to multiple upstreams. Routes are configured via `ROUTES_CONFIG_PATH` (JSON file) or `PROXY_ROUTES` (inline JSON, env override). Each route has its own `prefix`, `upstream`, `provider`, and optional `trustForwarded`. Routes are sorted by descending prefix length so longer matches win. Backwards-compatible: when neither env is set, a single route is synthesized from `UPSTREAM_URL` + `PROXY_PATH_PREFIX` + `PROXY_PROVIDER` so v0.3.0 deployments work unchanged. Active routes exposed at `GET /api/metrics/routes`; per-event `route` field carried through metrics. Full reference in [docs/ROUTING.md](docs/ROUTING.md).
+- **SQLite metric persistence** ([#35](https://github.com/ksandell/AIRelay/issues/35)) — opt-in event store via `better-sqlite3` (set `METRICS_DB_PATH` to enable). `collector.record()` calls `enqueue()` synchronously which pushes onto an in-memory queue; a flush timer drains it in batched transactions every `METRICS_WRITE_BATCH_MS` (default 1 s) or when the queue reaches `METRICS_WRITE_BATCH_SIZE` (default 100). Daily cron prunes events older than `METRICS_RETENTION_DAYS` (default 30). WAL mode, indexes on `(ts)`, `(route, ts)`, `(model, ts)`. Hot-path zero-disk-I/O preserved.
+- **Time-range history + rollups + CSV export** ([#35](https://github.com/ksandell/AIRelay/issues/35)) — unlocked when persistence is on:
+  - `GET /api/metrics/history?from=…&to=…&route=…&model=…&limit=…` — SQLite-backed event range
+  - `GET /api/metrics/rollups?period=hour|day|week&…` — bucketed aggregates (requests, totalTokens, totalCostUsd, errors)
+  - `GET /api/metrics/export.csv?from=…&to=…&route=…` — CSV download with all 21 canonical columns; falls back to the ring buffer when SQLite is off
+- **Dashboard route filter + history window + CSV button** ([#35](https://github.com/ksandell/AIRelay/issues/35)) — Metrics tab gains a **Route** dropdown (populated from `/api/metrics/routes`), a **Time window** selector (Live / Last 5m / 10m / 15m / 30m / 1h / 3h / 6h / 12h / 24h / 7d), and a **CSV** download button that respects the current filters. The window drives both the recent-requests table and the RPS / latency / token charts (non-Live windows rebuild the charts from `/api/metrics/history` with adaptive bucketing); x-axis tick labels are `HH:MM:SS`, prefixed with `DD.MM.YYYY` only on day rollovers.
+- **Guardrails** — opt-in prompt safety pipeline. Default off; preserves
+  byte-identical passthrough when disabled. When enabled, JSON request bodies
+  are scanned against built-in detectors for **secrets** (AWS / GitHub /
+  Anthropic / OpenAI keys, JWTs, private keys, optional high-entropy),
+  **PII** (email, phone E.164, credit-card with Luhn checksum, optional US
+  SSN), and **prompt-injection** patterns (role-override, system-prompt-leak,
+  tool-override). Three independently configurable modes per category:
+  **alert** (record + forward), **block** (reject with HTTP 422),
+  **redact** (replace match with `<redacted:NAME>` and forward). Block beats
+  redact; redacted bodies are re-parsed as JSON and reverted on parse
+  failure so requests are never broken. Full reference in
+  [docs/GUARDRAILS.md](docs/GUARDRAILS.md).
+- **Guardrails dashboard tab** with KPI cards (1m / lifetime requests
+  scanned, hits, blocked, redacted, alerts, bypasses), per-detector counters
+  + modes table, and a recent-events feed. Programmatic access at
+  `GET /api/guardrails/summary` and `GET /api/guardrails/recent`.
+- **Custom patterns** via `GUARDRAILS_CUSTOM_PATTERNS_FILE` — operator-
+  defined regex catalog loaded once at startup; fails loud on malformed
+  input.
+- **Always-on log sanitizer** (`src/guardrails/sanitizer.js`) strips secret-
+  shaped tokens (AWS keys, GitHub PATs, Anthropic/OpenAI keys, JWTs,
+  `Bearer …`) from request URLs and error messages before they're persisted
+  to logs or surfaced on the dashboard. Runs **even when
+  `GUARDRAILS_ENABLED=false`** — the proxy must never write credentials to
+  disk regardless of feature flags.
+- **Per-request override** via `X-Guardrails: off|bypass|false` header.
+  Header is stripped before forwarding upstream. Audit trail via response
+  header `X-Guardrails-Applied: <detectors>`.
+- **Safety model**: (a) default off, (b) per-request opt-out always honored,
+  (c) body never broken (redact re-validates JSON), (d) block beats redact,
+  (e) `GUARDRAILS_MAX_REQ_BYTES` (default 4 MiB) returns 413 on overflow,
+  (f) non-JSON requests skipped, (g) detectors are pure / no I/O, (h)
+  banner-to-the-model on `redact` mutation via a `_guardrails_banner` JSON
+  field.
+- **Tests**: 26 new guardrails tests — 9 sanitizer unit tests, 9
+  scanner/redact tests (covering match correctness, Luhn validation, alert-
+  vs-redact mode separation, safe-substring preservation), 8 end-to-end
+  tests through the real proxy that verify redact mutation, byte-identical
+  bypass via header, block mode rejection, alert-mode non-mutation, clean
+  passthrough, lifetime metrics, summary endpoint shape, and 413 on
+  oversize.
+- **Config**: 17 new `GUARDRAILS_*` env vars — master switch, three
+  category modes, buffering cap, 14 per-detector toggles, custom-patterns
+  file path. All documented in
+  [CONFIGURATION.md](CONFIGURATION.md#guardrails-v040) (including
+  deployment presets for homelab / small-team / public) and
+  [.env.example](.env.example).
+- **Compactor Before / After gallery** in [docs/COMPACTOR.md §4.1](docs/COMPACTOR.md#41-before--after-gallery) —
+  one concrete before/after example per compressor with exact byte counts
+  + token estimates + risk notes, sourced directly from the property test
+  fixtures. New pipeline-composition example showing cumulative savings
+  when multiple compressors fire on a realistic `npm install` log.
+
+### Fixed
+- **Guardrails redact mode now passes through strict-schema upstreams.** The
+  banner that announces which detectors fired is exposed as a new
+  `X-Guardrails-Banner` response header instead of being injected into the
+  forwarded JSON body as a `_guardrails_banner` top-level field. Mistral and
+  OpenAI strict mode rejected the extra field with HTTP 422 `extra_forbidden`;
+  the redaction itself was always correct, only the round-trip failed.
+  Body bytes are now mutated only by the redaction replacements themselves.
+- **Dashboard hash navigation activates the right tab.** Deep links such as
+  `http://airelay.local:3000/#guardrails` worked on first paint but
+  programmatic `location.hash` writes and browser back/forward did not flip
+  panels — the Compressors and Guardrails tables appeared as all zeros even
+  though server-side counters were populated. A `hashchange` listener now
+  calls `activateTab()` for every hash transition.
+
+### Changed
+- **Hot-path invariant** extended: two opt-in mechanisms may mutate request
+  bodies — Compactor (existing) and Guardrails (new in `redact` mode only).
+  Both default-off. Documented in `CLAUDE.md`, `docs/ARCHITECTURE.md`.
+- **`proxy.js`** now prefers `req._guardrailsBody ?? req._compactorBody`
+  when forwarding via http-proxy's `buffer` option. When both features are
+  disabled (default), this branch is never taken — zero overhead.
+- **`middleware/requestLogger.js`** routes the request URL through
+  `sanitizeUrl()` before persistence.
+- **`middleware/errorHandler.js`** routes error messages + stack traces
+  through `sanitize()` before persistence and before the response body.
+
+### Docs
+- New: [`docs/GUARDRAILS.md`](docs/GUARDRAILS.md) (11-section user
+  reference: overview, quickstart, modes, detector catalog, banner,
+  metrics, custom patterns, deployment presets, safety model, log
+  sanitizer, troubleshooting).
+- Updated: [`docs/COMPACTOR.md`](docs/COMPACTOR.md) with a new
+  [§4.1 Before / After gallery](docs/COMPACTOR.md#41-before--after-gallery)
+  — concrete examples + byte/token savings per compressor + pipeline
+  composition.
+- Updated: README.md (Guardrails callout + gallery link), CLAUDE.md
+  (invariant table + docs index row), CONFIGURATION.md (full env-var
+  table + deployment presets), ARCHITECTURE.md (new Guardrails module
+  section + API surface), ROADMAP.md (moved "prompt redaction in stored
+  logs" + related items to Shipped), `.env.example` (every `GUARDRAILS_*`
+  var with default and one-line description).
+
 ## [0.3.0] — 2026-05-14 — Compactor + Playwright E2E
 
 ### Added

@@ -69,8 +69,15 @@ function emitBypass(reason, bytesIn = 0) {
  *   - selected provider is unsupported
  *   - parse error
  */
+function attach(req, fields) {
+  req._compactorEvent = { ...(req._compactorEvent ?? {}), ...fields }
+}
+
 export function createCompactorMiddleware() {
   return async (req, res, next) => {
+    const headerVal = (req.headers[HEADER] ?? '').toString().toLowerCase()
+    const bypassedByHeader = headerVal === 'off' || headerVal === 'bypass' || headerVal === 'false'
+    if (bypassedByHeader) attach(req, { compactorBypass: true, compactorActive: false })
     if (!shouldRun(req)) return next()
     if (req.method !== 'POST' && req.method !== 'PUT' && req.method !== 'PATCH') return next()
 
@@ -136,6 +143,12 @@ export function createCompactorMiddleware() {
     const durationMicros = Number((t1 - t0) / 1000n)
 
     if (result.fires.length === 0) {
+      attach(req, {
+        compactorActive: true,
+        compactorBypass: false,
+        compactorSavedBytes: 0,
+        compactorCompressors: null,
+      })
       recordCompactorEvent({
         ts: nowIso(),
         requestId: null,
@@ -159,6 +172,12 @@ export function createCompactorMiddleware() {
       uniqueFilters.add(f.name)
     }
     const bytesSaved = original.length - repacked.length
+    attach(req, {
+      compactorActive: true,
+      compactorBypass: false,
+      compactorSavedBytes: Math.max(0, bytesSaved),
+      compactorCompressors: [...uniqueFilters].join(','),
+    })
     recordCompactorEvent({
       ts: nowIso(),
       requestId: null,

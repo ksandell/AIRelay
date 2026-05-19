@@ -1,13 +1,11 @@
 import { Router } from 'express'
 import { config } from '../config.js'
 import {
-  lifetimeSnapshot,
-  iterRecentCompactor,
-  _resetCompactorMetrics,
-} from '../compactor/metrics.js'
-import { allCompressorNames, activeCompressors } from '../compactor/registry.js'
-import { _reset as _resetMetrics } from '../metrics/collector.js'
-import { _resetGuardrailsMetrics } from '../guardrails/metrics.js'
+  guardrailsLifetimeSnapshot,
+  iterRecentGuardrails,
+  _resetGuardrailsMetrics,
+} from '../guardrails/metrics.js'
+import { allDetectorNames, activeDetectors, categoriesActive } from '../guardrails/registry.js'
 import {
   isOpen as storeIsOpen,
   queryRange as storeQueryRange,
@@ -29,72 +27,75 @@ const router = Router()
 
 function aggregate(seconds) {
   const acc = {
-    requests: 0,
-    bytesIn: 0,
-    bytesOut: 0,
-    bytesSaved: 0,
-    estimatedTokensSaved: 0,
-    byCompressor: {},
-    bypasses: 0,
+    requestsScanned: 0,
+    requestsClean: 0,
+    requestsBlocked: 0,
+    requestsRedacted: 0,
+    requestsAlerted: 0,
+    requestsBypassed: 0,
+    hits: 0,
+    bytesScanned: 0,
+    bytesRedacted: 0,
+    byDetector: {},
     bypassReasons: {},
   }
-  for (const ev of iterRecentCompactor(seconds)) {
+  for (const ev of iterRecentGuardrails(seconds)) {
     if (ev.bypassReason) {
-      acc.bypasses++
+      acc.requestsBypassed++
       acc.bypassReasons[ev.bypassReason] = (acc.bypassReasons[ev.bypassReason] ?? 0) + 1
       continue
     }
-    acc.requests++
-    acc.bytesIn += ev.bytesIn
-    acc.bytesOut += ev.bytesOut
-    acc.bytesSaved += ev.bytesSaved
-    acc.estimatedTokensSaved += ev.estimatedTokensSaved
-    for (const name of ev.filtersFired) {
-      acc.byCompressor[name] = (acc.byCompressor[name] ?? 0) + 1
+    acc.requestsScanned++
+    acc.hits += ev.hits
+    acc.bytesScanned += ev.bytesIn
+    if (ev.hits === 0) acc.requestsClean++
+    if (ev.blocked) acc.requestsBlocked++
+    if (ev.mode === 'redact' || ev.mode === 'mixed') acc.requestsRedacted++
+    if (ev.mode === 'alert' && ev.hits > 0) acc.requestsAlerted++
+    if (ev.bytesIn > ev.bytesOut) acc.bytesRedacted += ev.bytesIn - ev.bytesOut
+    for (const name of ev.detectorsFired) {
+      acc.byDetector[name] = (acc.byDetector[name] ?? 0) + 1
     }
   }
-  return {
-    windowSec: seconds,
-    ...acc,
-    ratio: acc.bytesIn > 0 ? +(acc.bytesOut / acc.bytesIn).toFixed(4) : null,
-  }
+  return { windowSec: seconds, ...acc }
 }
 
-router.get('/api/compactor/summary', (req, res) => {
+router.get('/api/guardrails/summary', (req, res) => {
   res.json({
-    enabled: config.compactorEnabled,
+    enabled: config.guardrailsEnabled,
     settings: {
-      requestBody: config.compactorRequestBody,
-      responseBody: config.compactorResponseBody,
-      toolResultOnly: config.compactorToolResultOnly,
-      allowRisky: config.compactorAllowRisky,
-      maxReqBytes: config.compactorMaxReqBytes,
-      longFileThreshold: config.compactorLongFileThreshold,
+      maxReqBytes: config.guardrailsMaxReqBytes,
+      modes: categoriesActive(),
+      customPatternsFile: config.guardrailsCustomPatternsFile,
     },
-    compressors: {
-      all: allCompressorNames(),
-      active: activeCompressors().map((c) => c.name),
+    detectors: {
+      all: allDetectorNames(),
+      active: activeDetectors().map((d) => ({
+        name: d.name,
+        category: d.category,
+        mode: d.mode,
+      })),
     },
     windows: {
       '1m': aggregate(60),
       '5m': aggregate(300),
       '15m': aggregate(900),
     },
-    lifetime: lifetimeSnapshot(),
+    lifetime: guardrailsLifetimeSnapshot(),
   })
 })
 
-router.get('/api/compactor/recent', (req, res) => {
+router.get('/api/guardrails/recent', (req, res) => {
   const limit = Math.min(parseInt(req.query.limit ?? '50', 10), config.maxApiResultRows)
   const out = []
-  for (const ev of iterRecentCompactor(900)) {
+  for (const ev of iterRecentGuardrails(900)) {
     out.push(ev)
     if (out.length >= limit) break
   }
   res.json(out)
 })
 
-router.get('/api/compactor/history', (req, res) => {
+router.get('/api/guardrails/history', (req, res) => {
   if (!storeIsOpen()) {
     return res.status(503).json({
       error: 'persistence disabled — set METRICS_DB_PATH to enable history queries',
@@ -110,13 +111,13 @@ router.get('/api/compactor/history', (req, res) => {
   const events = storeQueryRange({
     ...range,
     route: req.query.route || null,
-    compactorActive: true,
+    guardrailsAny: true,
     limit,
   })
   res.json({ ...range, count: events.length, events })
 })
 
-router.get('/api/compactor/rollups', (req, res) => {
+router.get('/api/guardrails/rollups', (req, res) => {
   if (!storeIsOpen()) {
     return res.status(503).json({ error: 'persistence disabled — set METRICS_DB_PATH' })
   }
@@ -134,18 +135,17 @@ router.get('/api/compactor/rollups', (req, res) => {
     period,
     ...range,
     route: req.query.route || null,
-    compactorActive: true,
+    guardrailsAny: true,
   })
   res.json({ period, ...range, buckets })
 })
 
-// Test-only reset endpoint. Gated to NODE_ENV=test so it can't be triggered
-// in production. Used by Playwright E2E specs to isolate test state.
+// Test-only reset for Playwright isolation. Already gated in compactor router;
+// this one is additive — exposed as POST /api/test/reset/guardrails so it can
+// be called independently.
 if (process.env.NODE_ENV === 'test') {
-  router.post('/api/test/reset', (req, res) => {
-    _resetCompactorMetrics()
+  router.post('/api/test/reset/guardrails', (req, res) => {
     _resetGuardrailsMetrics()
-    _resetMetrics()
     res.json({ ok: true })
   })
 }

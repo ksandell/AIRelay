@@ -25,6 +25,8 @@ const logsControls = document.getElementById('logsControls')
 const metricsControls = document.getElementById('metricsControls')
 const compactorPanel = document.getElementById('compactorPanel')
 const compactorControls = document.getElementById('compactorControls')
+const guardrailsPanel = document.getElementById('guardrailsPanel')
+const guardrailsControls = document.getElementById('guardrailsControls')
 
 function activateTab(name) {
   tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === name))
@@ -32,12 +34,15 @@ function activateTab(name) {
   logsPanel.classList.toggle('hidden', name !== 'logs')
   metricsPanel.classList.toggle('hidden', name !== 'metrics')
   if (compactorPanel) compactorPanel.classList.toggle('hidden', name !== 'compactor')
+  if (guardrailsPanel) guardrailsPanel.classList.toggle('hidden', name !== 'guardrails')
   setupControls.classList.toggle('hidden', name !== 'setup')
   logsControls.classList.toggle('hidden', name !== 'logs')
   metricsControls.classList.toggle('hidden', name !== 'metrics')
   if (compactorControls) compactorControls.classList.toggle('hidden', name !== 'compactor')
+  if (guardrailsControls) guardrailsControls.classList.toggle('hidden', name !== 'guardrails')
   location.hash = name
   if (name === 'compactor') refreshCompactor()
+  if (name === 'guardrails') refreshGuardrails()
   // Re-pull ring-buffer data when the user lands on Logs/Metrics so tables
   // populate even if the tab was hidden when the proxy traffic arrived.
   if (name === 'logs' && typeof loadLive === 'function' && !dateSelect?.value) {
@@ -128,10 +133,165 @@ async function refreshCompactor() {
 }
 
 const compactorRefreshBtn = document.getElementById('compactorRefreshBtn')
-if (compactorRefreshBtn) compactorRefreshBtn.addEventListener('click', refreshCompactor)
+if (compactorRefreshBtn) compactorRefreshBtn.addEventListener('click', refreshCompactorAuto)
 setInterval(() => {
-  if (compactorPanel && !compactorPanel.classList.contains('hidden')) refreshCompactor()
+  if (compactorPanel && !compactorPanel.classList.contains('hidden')) refreshCompactorAuto()
 }, 5000)
+
+const compactorHistoryWindowEl = document.getElementById('compactorHistoryWindow')
+if (compactorHistoryWindowEl) {
+  compactorHistoryWindowEl.addEventListener('change', refreshCompactorAuto)
+}
+
+async function refreshCompactorAuto() {
+  const win = compactorHistoryWindowEl?.value || 'live'
+  if (win === 'live') return refreshCompactor()
+  const range = windowToRange(win)
+  if (!range) return refreshCompactor()
+  await refreshCompactor() // keep KPIs fresh from in-memory
+  const params = new URLSearchParams({ from: range.from, to: range.to, limit: '500' })
+  try {
+    const r = await fetch('/api/compactor/history?' + params)
+    if (!r.ok) return
+    const body = await r.json()
+    const rbody = document.querySelector('#compactorRecentTable tbody')
+    if (!rbody) return
+    rbody.innerHTML = ''
+    for (const ev of body.events ?? []) {
+      const tr = document.createElement('tr')
+      const filters = ev.compactorCompressors || '—'
+      tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
+        <td>request</td>
+        <td>${filters}</td>
+        <td>${ev.bytesIn ?? 0} → ${ev.bytesOut ?? 0}</td>
+        <td>${fmtBytes(ev.compactorSavedBytes ?? 0)}</td>
+        <td>—</td>
+        <td>${ev.compactorBypass ? 'header' : ''}</td>`
+      rbody.appendChild(tr)
+    }
+  } catch {
+    // ignore
+  }
+}
+
+// ─── Guardrails panel ────────────────────────────────────────
+async function refreshGuardrails() {
+  const statusEl = document.getElementById('guardrailsStatus')
+  const enabledPill = document.getElementById('guardrailsEnabledPill')
+  try {
+    const [summaryRes, recentRes] = await Promise.all([
+      fetch('/api/guardrails/summary'),
+      fetch('/api/guardrails/recent?limit=50'),
+    ])
+    if (!summaryRes.ok || !recentRes.ok) throw new Error('fetch failed')
+    const s = await summaryRes.json()
+    const recent = await recentRes.json()
+    if (statusEl) {
+      statusEl.textContent = 'Live'
+      statusEl.className = 'status connected'
+    }
+    if (enabledPill) {
+      enabledPill.textContent = s.enabled ? 'enabled' : 'disabled'
+      enabledPill.className = s.enabled ? 'pill ok' : 'pill warn'
+    }
+
+    const scanned1m = s.windows['1m'].requestsScanned
+    const hits1m = s.windows['1m'].hits
+    document.getElementById('guardrailsScanned1m').textContent = scanned1m
+    document.getElementById('guardrailsHits1m').textContent = hits1m
+    document.getElementById('guardrailsBlockedLifetime').textContent = s.lifetime.requestsBlocked
+    document.getElementById('guardrailsRedactedLifetime').textContent = s.lifetime.requestsRedacted
+    document.getElementById('guardrailsAlertedLifetime').textContent = s.lifetime.requestsAlerted
+    document.getElementById('guardrailsBypassesLifetime').textContent = s.lifetime.requestsBypassed
+
+    pushSpark('guardrailsScanned1m', scanned1m)
+    pushSpark('guardrailsHits1m', hits1m)
+    pushSpark('guardrailsBlockedLifetime', s.lifetime.requestsBlocked)
+    pushSpark('guardrailsRedactedLifetime', s.lifetime.requestsRedacted)
+    pushSpark('guardrailsAlertedLifetime', s.lifetime.requestsAlerted)
+    pushSpark('guardrailsBypassesLifetime', s.lifetime.requestsBypassed)
+
+    const tbody = document.querySelector('#guardrailsTable tbody')
+    tbody.innerHTML = ''
+    const activeMap = new Map(s.detectors.active.map((d) => [d.name, d]))
+    for (const name of s.detectors.all) {
+      const active = activeMap.get(name)
+      const agg = s.lifetime.byDetector[name]
+      const tr = document.createElement('tr')
+      const fires = agg?.fires ?? 0
+      const hits = agg?.hits ?? 0
+      const bytesRedacted = agg?.bytesRedacted ?? 0
+      tr.innerHTML = `<td><code>${name}</code></td>
+        <td>${active ? active.category : '—'}</td>
+        <td>${active ? active.mode : 'off'}</td>
+        <td>${fires}</td>
+        <td>${hits}</td>
+        <td>${fmtBytes(bytesRedacted)}</td>`
+      tbody.appendChild(tr)
+    }
+
+    const rbody = document.querySelector('#guardrailsRecentTable tbody')
+    rbody.innerHTML = ''
+    for (const ev of recent) {
+      const tr = document.createElement('tr')
+      tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
+        <td>${ev.mode}</td>
+        <td>${ev.detectorsFired.join(', ') || '—'}</td>
+        <td>${ev.hits}</td>
+        <td>${ev.bytesIn} → ${ev.bytesOut}</td>
+        <td>${ev.blocked ? '✓' : ''}</td>
+        <td>${ev.bypassReason ?? ''}</td>`
+      rbody.appendChild(tr)
+    }
+  } catch {
+    if (statusEl) {
+      statusEl.textContent = 'Error'
+      statusEl.className = 'status disconnected'
+    }
+  }
+}
+
+const guardrailsRefreshBtn = document.getElementById('guardrailsRefreshBtn')
+if (guardrailsRefreshBtn) guardrailsRefreshBtn.addEventListener('click', refreshGuardrailsAuto)
+setInterval(() => {
+  if (guardrailsPanel && !guardrailsPanel.classList.contains('hidden')) refreshGuardrailsAuto()
+}, 5000)
+
+const guardrailsHistoryWindowEl = document.getElementById('guardrailsHistoryWindow')
+if (guardrailsHistoryWindowEl) {
+  guardrailsHistoryWindowEl.addEventListener('change', refreshGuardrailsAuto)
+}
+
+async function refreshGuardrailsAuto() {
+  const win = guardrailsHistoryWindowEl?.value || 'live'
+  if (win === 'live') return refreshGuardrails()
+  const range = windowToRange(win)
+  if (!range) return refreshGuardrails()
+  await refreshGuardrails()
+  const params = new URLSearchParams({ from: range.from, to: range.to, limit: '500' })
+  try {
+    const r = await fetch('/api/guardrails/history?' + params)
+    if (!r.ok) return
+    const body = await r.json()
+    const rbody = document.querySelector('#guardrailsRecentTable tbody')
+    if (!rbody) return
+    rbody.innerHTML = ''
+    for (const ev of body.events ?? []) {
+      const tr = document.createElement('tr')
+      const det = ev.guardrailsDetectors || '—'
+      tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
+        <td>${ev.guardrailsAction ?? '—'}</td>
+        <td>${det}</td>
+        <td>${ev.guardrailsHits ?? 0}</td>
+        <td>${ev.bytesIn ?? 0} → ${ev.bytesOut ?? 0}</td>
+        <td>${ev.guardrailsAction === 'block' ? '✓' : ''}</td>
+        <td>${ev.guardrailsAction === 'bypass' ? 'header' : ''}</td>`
+      rbody.appendChild(tr)
+    }
+  } catch {
+    // ignore
+  }
+}
 
 // ─── Setup panel ─────────────────────────────────────────────
 // `proxyProvider` is the value of PROXY_PROVIDER for pricing/parser dispatch.
@@ -515,6 +675,13 @@ function renderEntry(entry) {
   bufferAndRender(type, entry)
 }
 
+// When entering history mode we stash the user's live-mode filter selection
+// so we can restore it on the way back. Historical log files only contain
+// internal + system events (proxied requests are never written to disk —
+// hot-path invariant), so we force those filters on; otherwise the buffer
+// loads but every row is filtered out and the user sees an empty table.
+let preHistoryFilters = null
+
 async function loadHistory(date) {
   const r = await fetch(`/api/logs/history?date=${date}`)
   if (!r.ok) return
@@ -525,8 +692,17 @@ async function loadHistory(date) {
     logBuffer.push({ type: typeForAppEntry(e), entry: e })
     if (logBuffer.length >= LOG_BUFFER_MAX) break
   }
+  if (preHistoryFilters === null) {
+    preHistoryFilters = {
+      proxy: filterProxy.checked,
+      internal: filterInternal.checked,
+      system: filterSystem.checked,
+    }
+  }
   filterProxy.disabled = true
   filterProxy.parentElement.title = 'Live only — proxy requests not stored on disk'
+  filterInternal.checked = true
+  filterSystem.checked = true
   rebuildLogList()
 }
 
@@ -613,6 +789,12 @@ dateSelect.addEventListener('change', () => {
   } else {
     filterProxy.disabled = false
     filterProxy.parentElement.title = ''
+    if (preHistoryFilters) {
+      filterProxy.checked = preHistoryFilters.proxy
+      filterInternal.checked = preHistoryFilters.internal
+      filterSystem.checked = preHistoryFilters.system
+      preHistoryFilters = null
+    }
     loadLive()
   }
 })
@@ -671,6 +853,8 @@ const MAX_TICKS = 300 // 5 minutes at 1Hz
 const MAX_TABLE_ROWS = 40
 
 const tickLabels = []
+const tickTimestamps = []
+let chartMode = 'live'
 const rpsSeries = []
 const p95Series = []
 const tokenInSeries = []
@@ -750,6 +934,22 @@ function fmtTime(ts) {
     `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
     `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`
   )
+}
+
+// Chart-only x-axis formatter. Outputs `HH:MM:SS`, with a `DD.MM.YYYY ` prefix
+// when the date differs from the previous label (or when no previous label is
+// given). Keeps tick labels short for live charts while still disambiguating
+// day rollovers in long-range views (7d).
+function fmtAxisTime(ts, prevTs) {
+  const d = new Date(ts)
+  if (isNaN(d.getTime())) return ''
+  const p = (n, w = 2) => String(n).padStart(w, '0')
+  const hhmmss = `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+  const dateStr = `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()}`
+  if (prevTs == null) return hhmmss
+  const prev = new Date(prevTs)
+  if (isNaN(prev.getTime())) return hhmmss
+  return prev.toDateString() === d.toDateString() ? hhmmss : `${dateStr} ${hhmmss}`
 }
 
 function fmtTokens(n) {
@@ -988,6 +1188,12 @@ function initSparklines() {
     ['sparkMetricsCompactorBytes5m', '#3fb950', 'metricsCompactorBytes5m'],
     ['sparkMetricsCompactorRatio5m', '#58a6ff', 'metricsCompactorRatio5m'],
     ['sparkMetricsCompactorFires5m', '#f0b72f', 'metricsCompactorFires5m'],
+    ['sparkGuardrailsScanned1m', '#58a6ff', 'guardrailsScanned1m'],
+    ['sparkGuardrailsHits1m', '#f0b72f', 'guardrailsHits1m'],
+    ['sparkGuardrailsBlockedLifetime', '#f85149', 'guardrailsBlockedLifetime'],
+    ['sparkGuardrailsRedactedLifetime', '#a371f7', 'guardrailsRedactedLifetime'],
+    ['sparkGuardrailsAlertedLifetime', '#f0b72f', 'guardrailsAlertedLifetime'],
+    ['sparkGuardrailsBypassesLifetime', '#d29922', 'guardrailsBypassesLifetime'],
   ]
   for (const [id, color, key] of specs) {
     const ch = makeSparkline(id, color)
@@ -1054,12 +1260,17 @@ function pushTick(tick) {
   pushSpark('bytesOut', w5.bytesOut)
   pushSpark('inFlight', tick.inFlight ?? 0)
 
-  const t = fmtTime(tick.ts)
-  tickLabels.push(t)
+  // Chart series only stream in live mode; history mode owns the arrays.
+  if (chartMode !== 'live') return
+
+  const prevTs = tickTimestamps.length ? tickTimestamps[tickTimestamps.length - 1] : null
+  tickTimestamps.push(tick.ts)
+  tickLabels.push(fmtAxisTime(tick.ts, prevTs))
   rpsSeries.push(w1.rps)
   p95Series.push(w1.p95)
   if (tickLabels.length > MAX_TICKS) {
     tickLabels.shift()
+    tickTimestamps.shift()
     rpsSeries.shift()
     p95Series.shift()
   }
@@ -1283,19 +1494,281 @@ async function refreshMetricsCompactorKpis() {
   } catch {}
 }
 
+// ─── Routes filter + history window + CSV (v0.4.0) ──────────
+// Multi-upstream support: the routeFilter <select> is populated from
+// /api/metrics/routes. Filter applies to recent / models / topCost. The
+// historyWindow <select> switches between live (ring buffer) and SQLite-
+// backed time ranges. CSV button downloads the current window with filters.
+
+const routeFilterEl = document.getElementById('routeFilter')
+const historyWindowEl = document.getElementById('historyWindow')
+const csvBtn = document.getElementById('metricsCsvBtn')
+
+const HISTORY_WINDOW_SECONDS = {
+  '5m': 5 * 60,
+  '10m': 10 * 60,
+  '15m': 15 * 60,
+  '30m': 30 * 60,
+  '1h': 3600,
+  '3h': 3 * 3600,
+  '6h': 6 * 3600,
+  '12h': 12 * 3600,
+  '24h': 24 * 3600,
+  '7d': 7 * 86400,
+}
+
+function windowToRange(value) {
+  const sec = HISTORY_WINDOW_SECONDS[value]
+  if (!sec) return null
+  return {
+    from: new Date(Date.now() - sec * 1000).toISOString(),
+    to: new Date().toISOString(),
+  }
+}
+
+const HISTORY_WINDOWS = Object.fromEntries(
+  Object.keys(HISTORY_WINDOW_SECONDS).map((k) => [k, () => windowToRange(k)]),
+)
+
+function currentRouteFilter() {
+  return routeFilterEl?.value || ''
+}
+
+function currentHistoryWindow() {
+  return historyWindowEl?.value || 'live'
+}
+
+async function loadRoutesIntoFilter() {
+  if (!routeFilterEl) return
+  try {
+    const r = await fetch('/api/metrics/routes')
+    if (!r.ok) return
+    const routes = await r.json()
+    const current = routeFilterEl.value
+    routeFilterEl.innerHTML = '<option value="">All routes</option>'
+    for (const route of routes) {
+      const opt = document.createElement('option')
+      opt.value = route.prefix
+      opt.textContent = `${route.prefix} → ${route.upstream}`
+      routeFilterEl.appendChild(opt)
+    }
+    if (current && routes.some((r) => r.prefix === current)) routeFilterEl.value = current
+  } catch {
+    // ignore
+  }
+}
+
+async function loadHistoryEvents() {
+  const win = currentHistoryWindow()
+  if (win === 'live') return null
+  const range = HISTORY_WINDOWS[win]()
+  const params = new URLSearchParams({ from: range.from, to: range.to, limit: '5000' })
+  const route = currentRouteFilter()
+  if (route) params.set('route', route)
+  try {
+    const r = await fetch('/api/metrics/history?' + params)
+    if (!r.ok) return []
+    const body = await r.json()
+    return body.events ?? []
+  } catch {
+    return []
+  }
+}
+
+async function refreshRecentForWindow() {
+  const events = await loadHistoryEvents()
+  if (events === null) {
+    // live mode — fall back to the existing ring-buffer fetch
+    if (typeof loadRecent === 'function') loadRecent()
+    return
+  }
+  recentTbody.innerHTML = ''
+  // history returns newest-first; render in that order with prepend → reverse
+  for (let i = events.length - 1; i >= 0; i--) appendRequest(events[i])
+}
+
+// Bucket size (seconds) chosen so we render ~60–120 points regardless of window
+// size — Chart.js stays snappy and the x-axis stays readable.
+function bucketSecondsFor(windowSec) {
+  if (windowSec <= 30 * 60) return 10 // ≤30m → 10s
+  if (windowSec <= 6 * 3600) return 60 // ≤6h → 1min
+  if (windowSec <= 24 * 3600) return 5 * 60 // ≤24h → 5min
+  return 60 * 60 // 7d → 1h
+}
+
+// Build bucketed RPS / p95 / token-rate series from a flat events array
+// (newest-first as returned by /api/metrics/history) and push the result into
+// the live chart instances. `events` may be empty — in that case we render
+// empty buckets so the user sees a blank chart, not stale live data.
+function rebuildChartsFromHistory(events, windowKey) {
+  const winSec = HISTORY_WINDOW_SECONDS[windowKey]
+  if (!winSec) return
+  const bucketSec = bucketSecondsFor(winSec)
+  const bucketMs = bucketSec * 1000
+  const nowMs = Date.now()
+  const startMs = nowMs - winSec * 1000
+  const numBuckets = Math.max(1, Math.ceil(winSec / bucketSec))
+
+  const counts = new Array(numBuckets).fill(0)
+  const durations = Array.from({ length: numBuckets }, () => [])
+  const inTok = new Array(numBuckets).fill(0)
+  const outTok = new Array(numBuckets).fill(0)
+  const toolIn = new Array(numBuckets).fill(0)
+  const toolOut = new Array(numBuckets).fill(0)
+
+  for (const ev of events) {
+    const t = new Date(ev.ts).getTime()
+    if (isNaN(t)) continue
+    const idx = Math.floor((t - startMs) / bucketMs)
+    if (idx < 0 || idx >= numBuckets) continue
+    counts[idx]++
+    if (typeof ev.durationMs === 'number') durations[idx].push(ev.durationMs)
+    inTok[idx] += ev.inputTokens ?? 0
+    outTok[idx] += ev.outputTokens ?? 0
+    toolIn[idx] += ev.toolBytesIn ? 0 : 0 // no per-event tool-token field; leave at 0
+    toolOut[idx] += 0
+  }
+
+  const labels = []
+  const rps = []
+  const p95 = []
+  const tokInRate = []
+  const tokToolInRate = []
+  const tokOutRate = []
+  const tokToolOutRate = []
+  let prevTs = null
+  for (let i = 0; i < numBuckets; i++) {
+    const bucketStartMs = startMs + i * bucketMs
+    labels.push(fmtAxisTime(bucketStartMs, prevTs))
+    prevTs = bucketStartMs
+    rps.push(counts[i] / bucketSec)
+    if (durations[i].length) {
+      const sorted = durations[i].slice().sort((a, b) => a - b)
+      const p = Math.floor(sorted.length * 0.95)
+      p95.push(sorted[Math.min(p, sorted.length - 1)])
+    } else {
+      p95.push(0)
+    }
+    tokInRate.push(inTok[i] / bucketSec)
+    tokToolInRate.push(toolIn[i] / bucketSec)
+    tokOutRate.push(-(outTok[i] / bucketSec))
+    tokToolOutRate.push(-(toolOut[i] / bucketSec))
+  }
+
+  // Mutate the shared label array in place so all three charts pick up the
+  // change (they all reference the same `tickLabels` instance).
+  tickLabels.length = 0
+  tickTimestamps.length = 0
+  for (let i = 0; i < labels.length; i++) {
+    tickLabels.push(labels[i])
+    tickTimestamps.push(startMs + i * bucketMs)
+  }
+  rpsSeries.length = 0
+  rpsSeries.push(...rps)
+  p95Series.length = 0
+  p95Series.push(...p95)
+  tokenInSeries.length = 0
+  tokenInSeries.push(...tokInRate)
+  tokenToolInSeries.length = 0
+  tokenToolInSeries.push(...tokToolInRate)
+  tokenOutSeries.length = 0
+  tokenOutSeries.push(...tokOutRate)
+  tokenToolOutSeries.length = 0
+  tokenToolOutSeries.push(...tokToolOutRate)
+
+  chartRps.data.datasets[0].data = rpsSeries
+  chartRps.update('none')
+  chartLat.data.datasets[0].data = p95Series
+  chartLat.update('none')
+  chartTokens.data.datasets[0].data = tokenInSeries
+  chartTokens.data.datasets[1].data = tokenToolInSeries
+  chartTokens.data.datasets[2].data = tokenOutSeries
+  chartTokens.data.datasets[3].data = tokenToolOutSeries
+  const allVals = [...tokenInSeries, ...tokenToolInSeries, ...tokenOutSeries, ...tokenToolOutSeries]
+  const peak = Math.max(...allVals.map(Math.abs), 0.001)
+  chartTokens.options.scales.y.suggestedMin = -peak
+  chartTokens.options.scales.y.suggestedMax = peak
+  chartTokens.update('none')
+}
+
+async function refreshChartsForWindow() {
+  const win = currentHistoryWindow()
+  if (win === 'live') {
+    chartMode = 'live'
+    // Reset arrays so the live SSE stream starts fresh and doesn't graft new
+    // ticks onto stale history buckets.
+    tickLabels.length = 0
+    tickTimestamps.length = 0
+    rpsSeries.length = 0
+    p95Series.length = 0
+    tokenInSeries.length = 0
+    tokenToolInSeries.length = 0
+    tokenOutSeries.length = 0
+    tokenToolOutSeries.length = 0
+    chartRps.update('none')
+    chartLat.update('none')
+    chartTokens.update('none')
+    return
+  }
+  chartMode = 'history'
+  const events = await loadHistoryEvents()
+  rebuildChartsFromHistory(events ?? [], win)
+}
+
+if (routeFilterEl) {
+  routeFilterEl.addEventListener('change', () => {
+    refreshRecentForWindow()
+    if (chartMode === 'history') refreshChartsForWindow()
+  })
+}
+if (historyWindowEl) {
+  historyWindowEl.addEventListener('change', async () => {
+    await refreshChartsForWindow()
+    await refreshRecentForWindow()
+  })
+}
+if (csvBtn) {
+  csvBtn.addEventListener('click', () => {
+    const params = new URLSearchParams()
+    const route = currentRouteFilter()
+    if (route) params.set('route', route)
+    const win = currentHistoryWindow()
+    if (win !== 'live') {
+      const range = HISTORY_WINDOWS[win]()
+      params.set('from', range.from)
+      params.set('to', range.to)
+    } else {
+      // Live mode CSV — give a 24h window to keep the file scoped.
+      const r = HISTORY_WINDOWS['24h']()
+      params.set('from', r.from)
+      params.set('to', r.to)
+    }
+    window.location.href = '/api/metrics/export.csv?' + params
+  })
+}
+
 // ─── Boot ────────────────────────────────────────────────────
 const HASH_TO_TAB = {
   '#metrics': 'metrics',
   '#setup': 'setup',
   '#compactor': 'compactor',
+  '#guardrails': 'guardrails',
   '#logs': 'logs',
 }
 const initialTab = HASH_TO_TAB[location.hash] ?? 'logs'
 activateTab(initialTab)
 
+// Hash navigation (deep links, back/forward, programmatic location.hash) must
+// also flip the active panel — clicking tabs only covers one entry path.
+window.addEventListener('hashchange', () => {
+  const next = HASH_TO_TAB[location.hash]
+  if (next) activateTab(next)
+})
+
 loadAvailable()
 loadLive()
 loadHealth()
+loadRoutesIntoFilter()
 loadRecent()
 seedTotalCost().catch(() => {})
 loadModels().catch(() => {})
@@ -1309,3 +1782,17 @@ setInterval(() => {
   loadTopCost().catch(() => {})
   refreshMetricsCompactorKpis().catch(() => {})
 }, 5000)
+
+// Expose chart instances and chartMode so Playwright specs (under ?testMode=1)
+// can verify dropdown-driven label/data changes without poking at internals.
+if (TEST_MODE) {
+  Object.assign(window, {
+    chartRps,
+    chartLat,
+    chartTokens,
+    tickLabels,
+    tickTimestamps,
+    getChartMode: () => chartMode,
+    fmtAxisTime,
+  })
+}

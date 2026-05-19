@@ -1,4 +1,5 @@
 import { config } from '../config.js'
+import { enqueue as persistEvent, isOpen as storeIsOpen } from './store.js'
 
 /**
  * Canonical metric event shape (all fields except `ts` may be null/undefined):
@@ -11,6 +12,7 @@ import { config } from '../config.js'
  *   bytesIn        number           — request body bytes forwarded upstream
  *   bytesOut       number           — response body bytes returned to client
  *   upstream       string           — resolved upstream URL
+ *   route          string|null      — route prefix that matched (v0.4.0 multi-upstream)
  *   error          string|null      — error message if proxy failed, else null
  *
  *   v0.2.0 token & cost fields (all nullable — populated by provider parsers):
@@ -44,6 +46,10 @@ export function record(event) {
   buf[head] = event
   head = (head + 1) % SIZE
   if (count < SIZE) count++
+  // Persist when the SQLite store is open. enqueue() is synchronous and only
+  // pushes onto an in-memory buffer — actual disk I/O is on a flush timer.
+  // No-op when METRICS_DB_PATH is unset (default).
+  if (storeIsOpen()) persistEvent(event)
   for (const l of listeners) {
     try {
       l(event)

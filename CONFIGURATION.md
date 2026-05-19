@@ -137,6 +137,96 @@ Response side: `X-Compactor-Applied: <comma-sep filters>` is added whenever
 Compactor mutated the body or bypassed a streaming request — clients can
 audit which compressors ran.
 
+### Multi-upstream routing (v0.4.0)
+
+When set, AIRelay forwards each prefix to a distinct upstream + provider.
+Backwards-compatible: leave unset and the proxy synthesizes a single route
+from `UPSTREAM_URL` + `PROXY_PATH_PREFIX` + `PROXY_PROVIDER`.
+
+| Var | Default | Notes |
+|---|---|---|
+| `ROUTES_CONFIG_PATH` | unset | Path to a JSON file with `{ "routes": [...] }`. |
+| `PROXY_ROUTES` | unset | Inline JSON (array or `{ routes: [...] }`). Wins over the file. |
+
+Route entry shape:
+
+```json
+{
+  "prefix": "/proxy/anthropic",
+  "upstream": "https://api.anthropic.com",
+  "provider": "anthropic",
+  "trustForwarded": false
+}
+```
+
+- `prefix` must start with `/`. Routes are sorted by descending prefix length
+  so `/proxy/anthropic` matches before a more permissive `/proxy`.
+- `upstream` must be an `http://` or `https://` URL.
+- `provider` is the pricing/parser key (any value accepted by `PROXY_PROVIDER`).
+- `trustForwarded` is per-route. Defaults to the global `PROXY_TRUST_FORWARDED`.
+
+Active routes are listed at `GET /api/metrics/routes` and surfaced in the
+**Route** dropdown on the Metrics tab.
+
+### Metric persistence (v0.4.0)
+
+Opt-in SQLite-backed event store. Default off; when disabled the proxy
+remains a pure ring-buffer system (v0.3.0 behavior).
+
+| Var | Default | Notes |
+|---|---|---|
+| `METRICS_DB_PATH` | unset | Path to the SQLite file. Parent dir auto-created. Empty = no persistence. |
+| `METRICS_RETENTION_DAYS` | `30` | Daily cron prunes events older than this. |
+| `METRICS_WRITE_BATCH_SIZE` | `100` | Flush after this many enqueued events. |
+| `METRICS_WRITE_BATCH_MS` | `1000` | Flush at least this often (whichever comes first). |
+
+Endpoints unlocked when persistence is on:
+
+| Endpoint | Notes |
+|---|---|
+| `GET /api/metrics/history?from=…&to=…&route=…&model=…&limit=…` | Time-range events from SQLite. |
+| `GET /api/metrics/rollups?period=hour\|day\|week&from=…&to=…&route=…&model=…` | Bucketed aggregates: requests, totalTokens, totalCostUsd, errors. |
+| `GET /api/metrics/export.csv?from=…&to=…&route=…` | CSV download with all canonical columns. Falls back to ring buffer when persistence is off. |
+
+Hot-path discipline: `record()` calls `enqueue()` synchronously which only
+pushes onto an in-memory queue. Actual disk I/O is batched on the flush timer.
+
+### Guardrails (v0.4.0)
+
+Opt-in prompt safety: detect secrets, PII, and prompt-injection patterns in
+JSON request bodies. Default off — when `GUARDRAILS_ENABLED=false`, AIRelay
+is byte-identical passthrough. See [docs/GUARDRAILS.md](docs/GUARDRAILS.md)
+for the detector catalog, banner format, metrics, safety model, and
+deployment presets.
+
+| Var | Default | Notes |
+|---|---|---|
+| `GUARDRAILS_ENABLED` | `false` | Master switch. When false, the middleware isn't mounted — zero overhead. |
+| `GUARDRAILS_MAX_REQ_BYTES` | `4194304` | Buffering cap (4 MiB). Larger bodies respond 413; advise client to retry with `X-Guardrails: off`. |
+| `GUARDRAILS_SECRETS_MODE` | `off` | One of `off` / `alert` / `block` / `redact` (see [docs/GUARDRAILS.md §3](docs/GUARDRAILS.md#3-modes)). |
+| `GUARDRAILS_PII_MODE` | `off` | Same enum as secrets. |
+| `GUARDRAILS_INJECTION_MODE` | `off` | Same enum as secrets. |
+| `GUARDRAILS_<NAME>_ENABLED` | varies | Per-detector toggle. `<NAME>` upper-snake-case, e.g. `GUARDRAILS_AWS_ACCESS_KEY_ENABLED`, `GUARDRAILS_EMAIL_ENABLED`. Defaults per detector in [docs/GUARDRAILS.md §4](docs/GUARDRAILS.md#4-detector-catalog). |
+| `GUARDRAILS_CUSTOM_PATTERNS_FILE` | unset | Optional path to a JSON file of operator-defined patterns; see [docs/GUARDRAILS.md §7](docs/GUARDRAILS.md#7-custom-patterns). |
+
+Per-request header override:
+
+| Header | Effect |
+|---|---|
+| `X-Guardrails: off` | Skip Guardrails for this request — no detection, no mutation, byte-identical |
+
+Response side: `X-Guardrails-Applied: <comma-sep detectors>` is added on any
+match (alert / block / redact). On block, status is `422` with a JSON body
+listing the detectors that fired.
+
+#### Deployment presets
+
+| Shape | Recommended modes |
+|---|---|
+| Homelab / Tailscale | All off (default) |
+| Small team | `GUARDRAILS_SECRETS_MODE=alert`, `GUARDRAILS_PII_MODE=alert` |
+| Public / multi-tenant | `GUARDRAILS_SECRETS_MODE=block`, `GUARDRAILS_PII_MODE=redact`, `GUARDRAILS_INJECTION_MODE=block` |
+
 #### Provider support
 
 | Provider value | Compactor support |
