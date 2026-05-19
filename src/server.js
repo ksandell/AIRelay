@@ -12,41 +12,33 @@ import guardrailsRouter from './api/guardrails.js'
 import { createProxyHandler } from './proxy/proxy.js'
 import { createCompactorMiddleware } from './compactor/middleware.js'
 import { createGuardrailsMiddleware } from './guardrails/middleware.js'
+import { getRoutes } from './routes/registry.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export function createApp() {
   const app = express()
 
-  // Disable etag/x-powered-by for predictability under load.
   app.disable('x-powered-by')
   app.set('etag', false)
 
-  // PROXY MUST BE FIRST.
-  // Mounted before json/static/requestLogger so the bytes flow through unmodified
-  // and the per-request sync logger does not run on the proxy hot path.
-  if (config.upstreamUrl) {
-    // Compactor middleware (v0.3.0). Mounted under the proxy prefix and BEFORE
-    // the proxy handler. When COMPACTOR_ENABLED=false (default), it is a no-op
-    // — single boolean check, no body buffering, byte-identical passthrough.
-    // When enabled, it buffers JSON request bodies, runs the compressor
-    // pipeline, and stashes the result on req._compactorBody for the proxy
-    // handler to forward via http-proxy's `buffer` option.
-    // See docs/COMPACTOR.md.
+  // PROXY MUST BE FIRST. Mounted before json/static/requestLogger so the bytes
+  // flow through unmodified and the per-request sync logger does not run on
+  // the proxy hot path.
+  //
+  // Multi-upstream (v0.4.0): iterate each route from getRoutes() and mount the
+  // Compactor + Guardrails middleware (when enabled) and the proxy handler
+  // under that route's prefix. Routes are pre-sorted by descending prefix
+  // length so Express's longest-prefix-wins matching does the right thing.
+  const routes = getRoutes()
+  for (const route of routes) {
     if (config.compactorEnabled) {
-      app.use(config.proxyPathPrefix, createCompactorMiddleware())
+      app.use(route.prefix, createCompactorMiddleware())
     }
-    // Guardrails middleware (v0.4.0). Mounted under the proxy prefix AFTER
-    // Compactor — so guardrails sees compacted bytes (smaller scan surface) and
-    // banners stack predictably. When GUARDRAILS_ENABLED=false (default), it
-    // is a no-op: single boolean check, no body buffering, byte-identical
-    // passthrough. When enabled, it inspects JSON request bodies against
-    // active detectors and either alerts, blocks, or redacts per category mode.
-    // See docs/GUARDRAILS.md.
     if (config.guardrailsEnabled) {
-      app.use(config.proxyPathPrefix, createGuardrailsMiddleware())
+      app.use(route.prefix, createGuardrailsMiddleware())
     }
-    app.use(config.proxyPathPrefix, createProxyHandler())
+    app.use(route.prefix, createProxyHandler(route))
   }
 
   app.use(express.json())

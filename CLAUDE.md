@@ -143,6 +143,7 @@ For releases, follow [docs/RELEASING.md](docs/RELEASING.md).
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Diagrams + module map + design decisions + API surface |
 | [docs/COMPACTOR.md](docs/COMPACTOR.md) | Compactor feature reference (v0.3.0): activation, compressor catalog, banner, metrics, safety, tuning |
 | [docs/GUARDRAILS.md](docs/GUARDRAILS.md) | Guardrails feature reference (v0.4.0): detector catalog, modes (alert/block/redact), banner, metrics, safety, deployment presets |
+| [docs/ROUTING.md](docs/ROUTING.md) | Multi-upstream routing reference (v0.4.0): routes config, matching, per-route provider/trustForwarded |
 | [docs/RELEASING.md](docs/RELEASING.md) | Release checklist (SSOT) |
 | [docs/e2e-test-plan.md](docs/e2e-test-plan.md) | Mistral-based E2E playbook |
 | [ROADMAP.md](ROADMAP.md) | Planned + speculative work (not what shipped — see CHANGELOG) |

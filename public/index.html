@@ -54,6 +54,15 @@
           >Connecting…</span
         >
         <span class="pill" id="inFlightPill">in-flight: 0</span>
+        <select id="routeFilter" aria-label="Filter by route">
+          <option value="">All routes</option>
+        </select>
+        <select id="historyWindow" aria-label="Time window">
+          <option value="live">Live</option>
+          <option value="24h">Last 24h</option>
+          <option value="7d">Last 7d</option>
+        </select>
+        <button id="metricsCsvBtn" title="Download CSV of the current window">CSV</button>
         <button id="metricsClearBtn">Clear table</button>
       </div>
 

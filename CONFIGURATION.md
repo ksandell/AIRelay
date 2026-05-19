@@ -137,6 +137,60 @@ Response side: `X-Compactor-Applied: <comma-sep filters>` is added whenever
 Compactor mutated the body or bypassed a streaming request — clients can
 audit which compressors ran.
 
+### Multi-upstream routing (v0.4.0)
+
+When set, AIRelay forwards each prefix to a distinct upstream + provider.
+Backwards-compatible: leave unset and the proxy synthesizes a single route
+from `UPSTREAM_URL` + `PROXY_PATH_PREFIX` + `PROXY_PROVIDER`.
+
+| Var | Default | Notes |
+|---|---|---|
+| `ROUTES_CONFIG_PATH` | unset | Path to a JSON file with `{ "routes": [...] }`. |
+| `PROXY_ROUTES` | unset | Inline JSON (array or `{ routes: [...] }`). Wins over the file. |
+
+Route entry shape:
+
+```json
+{
+  "prefix": "/proxy/anthropic",
+  "upstream": "https://api.anthropic.com",
+  "provider": "anthropic",
+  "trustForwarded": false
+}
+```
+
+- `prefix` must start with `/`. Routes are sorted by descending prefix length
+  so `/proxy/anthropic` matches before a more permissive `/proxy`.
+- `upstream` must be an `http://` or `https://` URL.
+- `provider` is the pricing/parser key (any value accepted by `PROXY_PROVIDER`).
+- `trustForwarded` is per-route. Defaults to the global `PROXY_TRUST_FORWARDED`.
+
+Active routes are listed at `GET /api/metrics/routes` and surfaced in the
+**Route** dropdown on the Metrics tab.
+
+### Metric persistence (v0.4.0)
+
+Opt-in SQLite-backed event store. Default off; when disabled the proxy
+remains a pure ring-buffer system (v0.3.0 behavior).
+
+| Var | Default | Notes |
+|---|---|---|
+| `METRICS_DB_PATH` | unset | Path to the SQLite file. Parent dir auto-created. Empty = no persistence. |
+| `METRICS_RETENTION_DAYS` | `30` | Daily cron prunes events older than this. |
+| `METRICS_WRITE_BATCH_SIZE` | `100` | Flush after this many enqueued events. |
+| `METRICS_WRITE_BATCH_MS` | `1000` | Flush at least this often (whichever comes first). |
+
+Endpoints unlocked when persistence is on:
+
+| Endpoint | Notes |
+|---|---|
+| `GET /api/metrics/history?from=…&to=…&route=…&model=…&limit=…` | Time-range events from SQLite. |
+| `GET /api/metrics/rollups?period=hour\|day\|week&from=…&to=…&route=…&model=…` | Bucketed aggregates: requests, totalTokens, totalCostUsd, errors. |
+| `GET /api/metrics/export.csv?from=…&to=…&route=…` | CSV download with all canonical columns. Falls back to ring buffer when persistence is off. |
+
+Hot-path discipline: `record()` calls `enqueue()` synchronously which only
+pushes onto an in-memory queue. Actual disk I/O is batched on the flush timer.
+
 ### Guardrails (v0.4.0)
 
 Opt-in prompt safety: detect secrets, PII, and prompt-injection patterns in

@@ -50,6 +50,22 @@ export const config = {
   // real AI providers have valid certs. Opt in only for self-signed dev upstreams.
   proxyInsecureTls: process.env.PROXY_INSECURE_TLS === 'true',
 
+  // Multi-upstream routes (v0.4.0). Either set `ROUTES_CONFIG_PATH` to a JSON
+  // file with `{ "routes": [{ prefix, upstream, provider, trustForwarded? }] }`,
+  // or set `PROXY_ROUTES` to inline JSON for the same shape (env wins). When
+  // both are unset the proxy synthesizes a single route from UPSTREAM_URL +
+  // PROXY_PATH_PREFIX + PROXY_PROVIDER for backwards compatibility.
+  // See docs/ROUTING.md and CONFIGURATION.md for the schema.
+  routesConfigPath: process.env.ROUTES_CONFIG_PATH ?? null,
+
+  // Persistence (v0.4.0). When set, every proxied request event is also
+  // written to a SQLite database for time-range queries beyond the in-memory
+  // ring buffer. Default null = no persistence (v0.3.0 behavior).
+  metricsDbPath: process.env.METRICS_DB_PATH ?? null,
+  metricsRetentionDays: int('METRICS_RETENTION_DAYS', 30),
+  metricsWriteBatchSize: int('METRICS_WRITE_BATCH_SIZE', 100),
+  metricsWriteBatchMs: int('METRICS_WRITE_BATCH_MS', 1000),
+
   // Token & Cost Tracking (v0.2.0)
   proxyProvider: process.env.PROXY_PROVIDER ?? 'generic',
   proxyTokenTracking: process.env.PROXY_TOKEN_TRACKING !== 'false',

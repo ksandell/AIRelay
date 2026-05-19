@@ -1377,6 +1377,114 @@ async function refreshMetricsCompactorKpis() {
   } catch {}
 }
 
+// ─── Routes filter + history window + CSV (v0.4.0) ──────────
+// Multi-upstream support: the routeFilter <select> is populated from
+// /api/metrics/routes. Filter applies to recent / models / topCost. The
+// historyWindow <select> switches between live (ring buffer) and SQLite-
+// backed time ranges. CSV button downloads the current window with filters.
+
+const routeFilterEl = document.getElementById('routeFilter')
+const historyWindowEl = document.getElementById('historyWindow')
+const csvBtn = document.getElementById('metricsCsvBtn')
+
+const HISTORY_WINDOWS = {
+  '24h': () => ({
+    from: new Date(Date.now() - 24 * 3600_000).toISOString(),
+    to: new Date().toISOString(),
+  }),
+  '7d': () => ({
+    from: new Date(Date.now() - 7 * 86400_000).toISOString(),
+    to: new Date().toISOString(),
+  }),
+}
+
+function currentRouteFilter() {
+  return routeFilterEl?.value || ''
+}
+
+function currentHistoryWindow() {
+  return historyWindowEl?.value || 'live'
+}
+
+async function loadRoutesIntoFilter() {
+  if (!routeFilterEl) return
+  try {
+    const r = await fetch('/api/metrics/routes')
+    if (!r.ok) return
+    const routes = await r.json()
+    const current = routeFilterEl.value
+    routeFilterEl.innerHTML = '<option value="">All routes</option>'
+    for (const route of routes) {
+      const opt = document.createElement('option')
+      opt.value = route.prefix
+      opt.textContent = `${route.prefix} → ${route.upstream}`
+      routeFilterEl.appendChild(opt)
+    }
+    if (current && routes.some((r) => r.prefix === current)) routeFilterEl.value = current
+  } catch {
+    // ignore
+  }
+}
+
+async function loadHistoryEvents() {
+  const win = currentHistoryWindow()
+  if (win === 'live') return null
+  const range = HISTORY_WINDOWS[win]()
+  const params = new URLSearchParams({ from: range.from, to: range.to, limit: '5000' })
+  const route = currentRouteFilter()
+  if (route) params.set('route', route)
+  try {
+    const r = await fetch('/api/metrics/history?' + params)
+    if (!r.ok) return []
+    const body = await r.json()
+    return body.events ?? []
+  } catch {
+    return []
+  }
+}
+
+async function refreshRecentForWindow() {
+  const events = await loadHistoryEvents()
+  if (events === null) {
+    // live mode — fall back to the existing ring-buffer fetch
+    if (typeof loadRecent === 'function') loadRecent()
+    return
+  }
+  recentTbody.innerHTML = ''
+  // history returns newest-first; render in that order with prepend → reverse
+  for (let i = events.length - 1; i >= 0; i--) appendRequest(events[i])
+}
+
+if (routeFilterEl) {
+  routeFilterEl.addEventListener('change', () => {
+    refreshRecentForWindow()
+  })
+}
+if (historyWindowEl) {
+  historyWindowEl.addEventListener('change', () => {
+    refreshRecentForWindow()
+  })
+}
+if (csvBtn) {
+  csvBtn.addEventListener('click', () => {
+    const params = new URLSearchParams()
+    const route = currentRouteFilter()
+    if (route) params.set('route', route)
+    const win = currentHistoryWindow()
+    if (win !== 'live') {
+      const range = HISTORY_WINDOWS[win]()
+      params.set('from', range.from)
+      params.set('to', range.to)
+    } else {
+      // Live mode CSV — give a 24h window to keep the file scoped.
+      const r = HISTORY_WINDOWS['24h']()
+      params.set('from', r.from)
+      params.set('to', r.to)
+    }
+    window.location.href = '/api/metrics/export.csv?' + params
+  })
+}
+
 // ─── Boot ────────────────────────────────────────────────────
 const HASH_TO_TAB = {
   '#metrics': 'metrics',
@@ -1391,6 +1499,7 @@ activateTab(initialTab)
 loadAvailable()
 loadLive()
 loadHealth()
+loadRoutesIntoFilter()
 loadRecent()
 seedTotalCost().catch(() => {})
 loadModels().catch(() => {})

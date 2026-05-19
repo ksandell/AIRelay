@@ -31,7 +31,7 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.2.6 | ✅ Done | v0.2.5 cleanup — gzip reader path, Windows rotation, Mistral pricing, docs (#104, #105, #106, #107, #108) |
 | v0.2.7 | ✅ Done | Azure OpenAI adapter (api-key header + auto-appended `api-version` query) + tool-call E2E harness + chart y-axis precision fix |
 | v0.3.0 | ✅ Done | **Compactor + Playwright E2E** — opt-in prompt compression (10 compressors, default-off) + automated Playwright tests across the dashboard (no Docker for CI) |
-| v0.4.0 | ✅ Done | **Guardrails + Compactor gallery** — opt-in prompt safety (secrets / PII / injection detectors, alert/block/redact modes, default-off) + always-on log sanitizer + Compactor before/after gallery in docs |
+| v0.4.0 | ✅ Done | **Guardrails + Persistence + Multi-Upstream** — opt-in prompt safety (secrets / PII / injection detectors, alert/block/redact modes), opt-in SQLite metric history + rollups + CSV export, opt-in multi-upstream routing (per-prefix routes table), dashboard route filter / history window / CSV download, Compactor before/after gallery in docs |
 | Future | ⚪ Deferred | Persistence + multi-upstream, Compactor v2, caching, retries, routing intelligence (no committed target release) |
 
 Per-release detail in [CHANGELOG.md](CHANGELOG.md).
@@ -75,20 +75,30 @@ tool-call coverage) and a dashboard y-axis precision fix (`fmtAxis`).
 
 ---
 
-## v0.4.0 — Guardrails + Compactor gallery  ✅
+## v0.4.0 — Guardrails + Persistence + Multi-Upstream  ✅
 
-**Shipped:** Opt-in prompt safety. Three independently configurable
-categories (secrets, PII, prompt-injection), each in one of four modes
-(`off` / `alert` / `block` / `redact`). 14 built-in detectors plus
-operator-defined custom patterns via `GUARDRAILS_CUSTOM_PATTERNS_FILE`.
-Master switch `GUARDRAILS_ENABLED` (default off), per-request bypass via
-`X-Guardrails: off`, applied-marker response header, per-detector metrics
-surfaced on the **Guardrails** dashboard tab + `/api/guardrails/summary`
-endpoint. Always-on log sanitizer (independent of master switch) strips
-secret-shaped tokens from persisted log entries. Compactor docs gain a
-Before/After gallery with concrete byte+token savings per compressor. Full
-reference: [docs/GUARDRAILS.md](docs/GUARDRAILS.md). Release notes:
-[CHANGELOG.md](CHANGELOG.md).
+**Shipped (closes [#35](https://github.com/ksandell/AIRelay/issues/35)):**
+
+- **Guardrails:** opt-in prompt safety. Three independently configurable
+  categories (secrets, PII, prompt-injection), each in one of four modes
+  (`off` / `alert` / `block` / `redact`). 14 built-in detectors plus
+  operator-defined custom patterns. Master switch `GUARDRAILS_ENABLED`
+  (default off), per-request bypass via `X-Guardrails: off`, applied-marker
+  response header, per-detector metrics + dashboard tab. Always-on log
+  sanitizer (independent of master switch) strips secret-shaped tokens
+  from persisted log entries. Reference: [docs/GUARDRAILS.md](docs/GUARDRAILS.md).
+- **Multi-upstream routing:** routes table (JSON file or inline env JSON)
+  per-prefix → upstream + provider + trustForwarded. Backwards-compatible
+  fallback to single-route v0.3.0 config. Reference:
+  [docs/ROUTING.md](docs/ROUTING.md).
+- **SQLite metric persistence:** opt-in event store with WAL mode, batched
+  write-behind, retention pruning. Unlocks `/api/metrics/history`,
+  `/api/metrics/rollups`, and `/api/metrics/export.csv`.
+- **Dashboard upgrade:** route filter dropdown, history window selector
+  (Live / 24h / 7d), CSV download button. Compactor docs gain a
+  Before/After gallery with concrete byte+token savings per compressor.
+
+Release notes: [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -108,22 +118,34 @@ visual-diff suite with OS-pinned baselines. Full reference:
 
 ---
 
-## Future — Persistence + Multi-Upstream  ⚪
+## Future — Compactor v2 + observability extensions  ⚪
 
-**Theme:** "Don't lose history on restart, and let one proxy fan out to multiple providers." Deferred from the v0.3.0 slot; no committed target release.
+**Theme:** "Smarter token accounting and richer dashboards."
 
 ### Candidates
 
-- **SQLite-backed metric history** — write every metric event to a local SQLite DB; UI gains "last 24h", "last 7d" views; ring buffer remains the live source of truth.
-- **Multi-upstream routing** — per-prefix routing table, e.g. `/proxy/anthropic/* → api.anthropic.com`, `/proxy/openai/* → api.openai.com`. Per-route provider profile.
-- **Dashboard route filter** — slice metrics by upstream / model.
-- **Cost rollups** — daily/weekly summaries, CSV export.
-- **Compactor v2** — real tokenizer for accurate token-savings reporting, streaming-request compression via incremental SSE rewriting, semantic compressors.
+- **Compactor v2** — real tokenizer for accurate token-savings reporting,
+  streaming-request compression via incremental SSE rewriting, semantic
+  compressors.
+- **History-tab visualizations** — surface SQLite-backed history with charts
+  (daily cost, model mix, top routes) rather than just the recent-events
+  table.
+- **Cost alerts** — daily $ thresholds with webhook / email notifications.
 
 ### Open questions
 
-1. SQLite WAL on Windows Docker volumes — known fsync quirks. Acceptance test required.
-2. Multi-upstream config format — env vars only (string-encoded), or a separate YAML/JSON file?
+1. Tokenizer choice for Compactor v2 — `@anthropic-ai/tokenizer`, `tiktoken`, or per-provider WASM bundle?
+2. History charts in vanilla JS or pull in a heavier chart toolkit?
+
+### Recently shipped (v0.4.0)
+
+The four sub-items below shipped as part of v0.4.0; see the v0.4.0 release
+section above for details.
+
+- SQLite-backed metric history ✅
+- Multi-upstream routing ✅
+- Dashboard route filter ✅
+- Cost rollups + CSV export ✅
 
 ---
 

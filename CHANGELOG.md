@@ -5,9 +5,16 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0] — 2026-05-19 — Guardrails + Compactor gallery
+## [0.4.0] — 2026-05-19 — Guardrails + Persistence + Multi-Upstream
 
 ### Added
+- **Multi-upstream routing** ([#35](https://github.com/ksandell/AIRelay/issues/35)) — opt-in routes table that fans one AIRelay instance out to multiple upstreams. Routes are configured via `ROUTES_CONFIG_PATH` (JSON file) or `PROXY_ROUTES` (inline JSON, env override). Each route has its own `prefix`, `upstream`, `provider`, and optional `trustForwarded`. Routes are sorted by descending prefix length so longer matches win. Backwards-compatible: when neither env is set, a single route is synthesized from `UPSTREAM_URL` + `PROXY_PATH_PREFIX` + `PROXY_PROVIDER` so v0.3.0 deployments work unchanged. Active routes exposed at `GET /api/metrics/routes`; per-event `route` field carried through metrics. Full reference in [docs/ROUTING.md](docs/ROUTING.md).
+- **SQLite metric persistence** ([#35](https://github.com/ksandell/AIRelay/issues/35)) — opt-in event store via `better-sqlite3` (set `METRICS_DB_PATH` to enable). `collector.record()` calls `enqueue()` synchronously which pushes onto an in-memory queue; a flush timer drains it in batched transactions every `METRICS_WRITE_BATCH_MS` (default 1 s) or when the queue reaches `METRICS_WRITE_BATCH_SIZE` (default 100). Daily cron prunes events older than `METRICS_RETENTION_DAYS` (default 30). WAL mode, indexes on `(ts)`, `(route, ts)`, `(model, ts)`. Hot-path zero-disk-I/O preserved.
+- **Time-range history + rollups + CSV export** ([#35](https://github.com/ksandell/AIRelay/issues/35)) — unlocked when persistence is on:
+  - `GET /api/metrics/history?from=…&to=…&route=…&model=…&limit=…` — SQLite-backed event range
+  - `GET /api/metrics/rollups?period=hour|day|week&…` — bucketed aggregates (requests, totalTokens, totalCostUsd, errors)
+  - `GET /api/metrics/export.csv?from=…&to=…&route=…` — CSV download with all 21 canonical columns; falls back to the ring buffer when SQLite is off
+- **Dashboard route filter + history window + CSV button** ([#35](https://github.com/ksandell/AIRelay/issues/35)) — Metrics tab gains a **Route** dropdown (populated from `/api/metrics/routes`), a **Time window** selector (Live / Last 24h / Last 7d), and a **CSV** download button that respects the current filters. Filters apply to the recent-requests table and CSV download.
 - **Guardrails** — opt-in prompt safety pipeline. Default off; preserves
   byte-identical passthrough when disabled. When enabled, JSON request bodies
   are scanned against built-in detectors for **secrets** (AWS / GitHub /

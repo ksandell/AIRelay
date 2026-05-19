@@ -107,6 +107,39 @@ pipeline on each eligible text segment, and stashes the mutated body on
 Streaming requests (`stream: true`) bypass entirely with a header banner.
 The full feature reference is in [COMPACTOR.md](../docs/COMPACTOR.md).
 
+## Multi-upstream routing (v0.4.0, opt-in)
+
+```
+src/routes/
+└── registry.js   Loads PROXY_ROUTES env / ROUTES_CONFIG_PATH file;
+                  falls back to UPSTREAM_URL+PROXY_PATH_PREFIX+PROXY_PROVIDER.
+                  Sorts by descending prefix length so longer matches win.
+                  Attaches a per-route provider instance for token tracking.
+```
+
+`server.js` iterates `getRoutes()` at startup and mounts the Compactor +
+Guardrails + proxy handler under each route's prefix. The proxy handler is a
+closure over the route so the upstream URL, agent, and provider are pre-
+resolved (no per-request lookup on the hot path). Full reference in
+[ROUTING.md](../docs/ROUTING.md).
+
+## Metric persistence (v0.4.0, opt-in)
+
+```
+src/metrics/
+└── store.js   Opens better-sqlite3 connection when METRICS_DB_PATH is set.
+               record() in collector.js calls enqueue() synchronously; flush
+               timer drains the queue every METRICS_WRITE_BATCH_MS or when
+               the queue reaches METRICS_WRITE_BATCH_SIZE.
+```
+
+Hot-path discipline: `enqueue()` is synchronous, allocation-light, and only
+pushes onto an in-memory queue. Actual SQLite inserts happen on the flush
+timer in a single transaction. Daily cron `pruneOlderThan(retentionDays)`
+keeps the DB bounded. Endpoints `/api/metrics/{history,rollups,export.csv}`
+unlock when the store is open; otherwise they return 503 with a helpful
+message (except `export.csv` which falls back to the ring buffer).
+
 ## Guardrails (v0.4.0, opt-in)
 
 A third per-request pipeline, mounted under the proxy prefix **after**
@@ -211,6 +244,10 @@ GET  /api/compactor/summary           lifetime + 1m/5m/15m windows of compressio
 GET  /api/compactor/recent            last N per-request compactor events
 GET  /api/guardrails/summary          guardrails state + lifetime + windowed aggregates
 GET  /api/guardrails/recent           last N per-request guardrails events
+GET  /api/metrics/routes              active routes (v0.4.0 multi-upstream)
+GET  /api/metrics/history             time-range events from SQLite (when METRICS_DB_PATH set)
+GET  /api/metrics/rollups             bucketed aggregates (hour/day/week) — requires SQLite
+GET  /api/metrics/export.csv          CSV download; falls back to ring buffer when SQLite off
 ```
 
 ## Key design decisions
