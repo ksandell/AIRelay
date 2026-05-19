@@ -32,6 +32,8 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.2.7 | ✅ Done | Azure OpenAI adapter (api-key header + auto-appended `api-version` query) + tool-call E2E harness + chart y-axis precision fix |
 | v0.3.0 | ✅ Done | **Compactor + Playwright E2E** — opt-in prompt compression (10 compressors, default-off) + automated Playwright tests across the dashboard (no Docker for CI) |
 | v0.4.0 | ✅ Done | **Guardrails + Persistence + Multi-Upstream** — opt-in prompt safety (secrets / PII / injection detectors, alert/block/redact modes), opt-in SQLite metric history + rollups + CSV export, opt-in multi-upstream routing (per-prefix routes table), dashboard route filter / history window / CSV download, Compactor before/after gallery in docs |
+| v0.4.1 | ✅ Done | **CI green** — committed Linux Playwright baselines (v0.4.0 shipped with win32-only baselines → CI red on `main`), added `Bless visual baselines` workflow + OS-pinning docs, bumped GH Actions to Node 24-compatible v5 majors |
+| v0.4.2 | 🟡 Planned | **Dependency refresh + CI/security housekeeping** — see section below |
 | Future | ⚪ Deferred | Persistence + multi-upstream, Compactor v2, caching, retries, routing intelligence (no committed target release) |
 
 Per-release detail in [CHANGELOG.md](CHANGELOG.md).
@@ -57,6 +59,37 @@ recipe, README row. `pricing-completeness` test bumped to 16 required providers.
 ## v0.2.6 — v0.2.5 cleanup  ✅
 
 **Shipped:** Fix-up release for the v0.2.5 gzip-rotation work. `/api/logs/available` and `/api/logs/history` now correctly enumerate and decode `.log.gz` rotated files (#104, #105). `rotateLogs()` is fully async so Windows no longer fails the rename under an open writable fd (#107). Added `mistral-medium-latest` and `open-mistral-7b` to pricing, plus a one-shot stderr warning the first time an unknown `provider:model` is looked up (#108). `CONFIGURATION.md` and `README.md` provider count corrected to 16 (#106).
+
+---
+
+## v0.4.2 — Dependency refresh + CI/security housekeeping  🟡 Planned
+
+**Theme:** "Bring deps current; replace unmaintained core libs; automate future bumps."
+
+No new product features. Coordinated dep + housekeeping bump driven by an audit
+of Node.js runtime and npm dependencies on 2026-05-19. Findings:
+
+- `npm audit`: 1 moderate (transitive `brace-expansion` via `test-exclude`,
+  GHSA-jxxr-4gwj-5jf2). `npm audit fix` resolves it.
+- `http-proxy@1.18.1` — last release 2020, unmaintained. Replace (candidate:
+  `http-proxy-3`). Hot-path invariants (zero sync I/O, SSE streaming, raw-byte
+  passthrough; future WS upgrade story) must be preserved with a perf
+  baseline before/after.
+- Pending majors: `vitest` 3→4, `@vitest/coverage-v8` 3→4, `eslint` 9→10,
+  `dotenv` 16→17, `fast-check` 3→4, `node-cron` 3→4 (or swap to `croner`).
+- Patch: `express` 4.22.1→4.22.2, `@playwright/test` to latest 1.x — coupled
+  with bump of CI image `mcr.microsoft.com/playwright:v1.60.0-jammy` and
+  Linux + win32 visual-baseline regen via `Bless visual baselines` workflow.
+- Housekeeping: enable Dependabot (weekly grouped PRs), CodeQL default JS
+  workflow, pin Docker base to `node:22.x-alpine3.x` (no floating tag).
+
+### Deferred from v0.4.2
+- **express 4 → 5** → v0.5.0 (path-to-regexp v8, async error handling).
+- **Node.js Docker base 22 → 24 LTS** → v0.5.1, after 24 enters LTS
+  (2025-10-28) and `better-sqlite3` ships prebuilt binaries for it.
+
+Tracked via GitHub milestone `v0.4.2 — Dependency refresh` (see
+`scripts/create-v0.4.2-milestone.sh`).
 
 ---
 
