@@ -74,7 +74,7 @@ Save the file. **Don't put your API key here** — the proxy doesn't need it. Yo
 docker compose up --build
 ```
 
-The first run takes ~1 minute (Docker downloads `node:22-alpine` and builds the image). When you see lines like `server listening on 0.0.0.0:3000`, it's running. Leave that terminal window open.
+The first run takes ~1 minute (Docker downloads `node:22.22-alpine3.22` and builds the image). When you see lines like `server listening on 0.0.0.0:3000`, it's running. Leave that terminal window open.
 
 ### A5. Open the dashboard
 

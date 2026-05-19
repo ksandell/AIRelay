@@ -120,7 +120,7 @@ Full instructions: [docs/e2e-test-plan.md](docs/e2e-test-plan.md)
 
 ## Tech stack
 
-Node.js 22+ · Express · `http-proxy` · vanilla JS dashboard with Chart.js · Vitest · Docker multi-stage (`node:22-alpine`).
+Node.js 22+ · Express · `http-proxy` · vanilla JS dashboard with Chart.js · Vitest · Docker multi-stage (`node:22.22-alpine3.22`).
 
 ---
 
