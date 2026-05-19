@@ -95,8 +95,10 @@ tool-call coverage) and a dashboard y-axis precision fix (`fmtAxis`).
   write-behind, retention pruning. Unlocks `/api/metrics/history`,
   `/api/metrics/rollups`, and `/api/metrics/export.csv`.
 - **Dashboard upgrade:** route filter dropdown, history window selector
-  (Live / 24h / 7d), CSV download button. Compactor docs gain a
-  Before/After gallery with concrete byte+token savings per compressor.
+  (Live / 5m / 10m / 15m / 30m / 1h / 3h / 6h / 12h / 24h / 7d — drives the
+  recent table and the RPS / latency / token charts), CSV download button.
+  Compactor docs gain a Before/After gallery with concrete byte+token
+  savings per compressor.
 
 Release notes: [CHANGELOG.md](CHANGELOG.md).
 

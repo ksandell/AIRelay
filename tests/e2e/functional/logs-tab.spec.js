@@ -32,4 +32,63 @@ test.describe('Logs tab', () => {
     await expect(page.locator('#logList > *').first()).toBeVisible({ timeout: 10_000 })
     await expect(page.locator('#entryCount')).not.toHaveText('0 entries', { timeout: 10_000 })
   })
+
+  test('selecting a date renders entries and force-checks internal/system filters', async ({
+    page,
+  }) => {
+    // Intercept the history API so the test is deterministic regardless of
+    // whether the test server has rotated any log files yet.
+    const fakeDate = '2026-01-15'
+    await page.route('**/api/logs/history?date=*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          { ts: '2026-01-15T10:00:00.000Z', level: 'info', msg: 'startup', src: 'system' },
+          {
+            ts: '2026-01-15T10:00:01.000Z',
+            level: 'info',
+            msg: 'GET /api/health',
+            src: 'http',
+            path: '/api/health',
+          },
+        ]),
+      })
+    })
+    await page.route('**/api/logs/available', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ rotated: [{ date: fakeDate, sizeBytes: 4096 }] }),
+      })
+    })
+
+    await page.goto('/?testMode=1#logs')
+    // Wait for /api/logs/available to populate the dropdown.
+    await expect(page.locator(`#dateSelect option[value="${fakeDate}"]`)).toHaveCount(1, {
+      timeout: 5000,
+    })
+
+    // Default state: internal/system unchecked, proxy enabled+checked.
+    await expect(page.locator('#filterProxy')).toBeEnabled()
+    await expect(page.locator('#filterInternal')).not.toBeChecked()
+    await expect(page.locator('#filterSystem')).not.toBeChecked()
+
+    await page.selectOption('#dateSelect', fakeDate)
+
+    // Fix verified: proxy is disabled (informative, not a bug), internal+system are auto-checked.
+    await expect(page.locator('#filterProxy')).toBeDisabled()
+    await expect(page.locator('#filterInternal')).toBeChecked()
+    await expect(page.locator('#filterSystem')).toBeChecked()
+
+    // And the loaded entries actually render (the original bug was zero rows).
+    await expect(page.locator('#logList > *').first()).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('#entryCount')).not.toHaveText('0 entries')
+
+    // Returning to Live restores the filter checkboxes to their previous state.
+    await page.selectOption('#dateSelect', '')
+    await expect(page.locator('#filterProxy')).toBeEnabled()
+    await expect(page.locator('#filterInternal')).not.toBeChecked()
+    await expect(page.locator('#filterSystem')).not.toBeChecked()
+  })
 })

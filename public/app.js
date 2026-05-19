@@ -675,6 +675,13 @@ function renderEntry(entry) {
   bufferAndRender(type, entry)
 }
 
+// When entering history mode we stash the user's live-mode filter selection
+// so we can restore it on the way back. Historical log files only contain
+// internal + system events (proxied requests are never written to disk —
+// hot-path invariant), so we force those filters on; otherwise the buffer
+// loads but every row is filtered out and the user sees an empty table.
+let preHistoryFilters = null
+
 async function loadHistory(date) {
   const r = await fetch(`/api/logs/history?date=${date}`)
   if (!r.ok) return
@@ -685,8 +692,17 @@ async function loadHistory(date) {
     logBuffer.push({ type: typeForAppEntry(e), entry: e })
     if (logBuffer.length >= LOG_BUFFER_MAX) break
   }
+  if (preHistoryFilters === null) {
+    preHistoryFilters = {
+      proxy: filterProxy.checked,
+      internal: filterInternal.checked,
+      system: filterSystem.checked,
+    }
+  }
   filterProxy.disabled = true
   filterProxy.parentElement.title = 'Live only — proxy requests not stored on disk'
+  filterInternal.checked = true
+  filterSystem.checked = true
   rebuildLogList()
 }
 
@@ -773,6 +789,12 @@ dateSelect.addEventListener('change', () => {
   } else {
     filterProxy.disabled = false
     filterProxy.parentElement.title = ''
+    if (preHistoryFilters) {
+      filterProxy.checked = preHistoryFilters.proxy
+      filterInternal.checked = preHistoryFilters.internal
+      filterSystem.checked = preHistoryFilters.system
+      preHistoryFilters = null
+    }
     loadLive()
   }
 })
@@ -831,6 +853,8 @@ const MAX_TICKS = 300 // 5 minutes at 1Hz
 const MAX_TABLE_ROWS = 40
 
 const tickLabels = []
+const tickTimestamps = []
+let chartMode = 'live'
 const rpsSeries = []
 const p95Series = []
 const tokenInSeries = []
@@ -910,6 +934,22 @@ function fmtTime(ts) {
     `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
     `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`
   )
+}
+
+// Chart-only x-axis formatter. Outputs `HH:MM:SS`, with a `DD.MM.YYYY ` prefix
+// when the date differs from the previous label (or when no previous label is
+// given). Keeps tick labels short for live charts while still disambiguating
+// day rollovers in long-range views (7d).
+function fmtAxisTime(ts, prevTs) {
+  const d = new Date(ts)
+  if (isNaN(d.getTime())) return ''
+  const p = (n, w = 2) => String(n).padStart(w, '0')
+  const hhmmss = `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+  const dateStr = `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()}`
+  if (prevTs == null) return hhmmss
+  const prev = new Date(prevTs)
+  if (isNaN(prev.getTime())) return hhmmss
+  return prev.toDateString() === d.toDateString() ? hhmmss : `${dateStr} ${hhmmss}`
 }
 
 function fmtTokens(n) {
@@ -1220,12 +1260,17 @@ function pushTick(tick) {
   pushSpark('bytesOut', w5.bytesOut)
   pushSpark('inFlight', tick.inFlight ?? 0)
 
-  const t = fmtTime(tick.ts)
-  tickLabels.push(t)
+  // Chart series only stream in live mode; history mode owns the arrays.
+  if (chartMode !== 'live') return
+
+  const prevTs = tickTimestamps.length ? tickTimestamps[tickTimestamps.length - 1] : null
+  tickTimestamps.push(tick.ts)
+  tickLabels.push(fmtAxisTime(tick.ts, prevTs))
   rpsSeries.push(w1.rps)
   p95Series.push(w1.p95)
   if (tickLabels.length > MAX_TICKS) {
     tickLabels.shift()
+    tickTimestamps.shift()
     rpsSeries.shift()
     p95Series.shift()
   }
@@ -1461,6 +1506,9 @@ const csvBtn = document.getElementById('metricsCsvBtn')
 
 const HISTORY_WINDOW_SECONDS = {
   '5m': 5 * 60,
+  '10m': 10 * 60,
+  '15m': 15 * 60,
+  '30m': 30 * 60,
   '1h': 3600,
   '3h': 3 * 3600,
   '6h': 6 * 3600,
@@ -1539,14 +1587,144 @@ async function refreshRecentForWindow() {
   for (let i = events.length - 1; i >= 0; i--) appendRequest(events[i])
 }
 
+// Bucket size (seconds) chosen so we render ~60–120 points regardless of window
+// size — Chart.js stays snappy and the x-axis stays readable.
+function bucketSecondsFor(windowSec) {
+  if (windowSec <= 30 * 60) return 10 // ≤30m → 10s
+  if (windowSec <= 6 * 3600) return 60 // ≤6h → 1min
+  if (windowSec <= 24 * 3600) return 5 * 60 // ≤24h → 5min
+  return 60 * 60 // 7d → 1h
+}
+
+// Build bucketed RPS / p95 / token-rate series from a flat events array
+// (newest-first as returned by /api/metrics/history) and push the result into
+// the live chart instances. `events` may be empty — in that case we render
+// empty buckets so the user sees a blank chart, not stale live data.
+function rebuildChartsFromHistory(events, windowKey) {
+  const winSec = HISTORY_WINDOW_SECONDS[windowKey]
+  if (!winSec) return
+  const bucketSec = bucketSecondsFor(winSec)
+  const bucketMs = bucketSec * 1000
+  const nowMs = Date.now()
+  const startMs = nowMs - winSec * 1000
+  const numBuckets = Math.max(1, Math.ceil(winSec / bucketSec))
+
+  const counts = new Array(numBuckets).fill(0)
+  const durations = Array.from({ length: numBuckets }, () => [])
+  const inTok = new Array(numBuckets).fill(0)
+  const outTok = new Array(numBuckets).fill(0)
+  const toolIn = new Array(numBuckets).fill(0)
+  const toolOut = new Array(numBuckets).fill(0)
+
+  for (const ev of events) {
+    const t = new Date(ev.ts).getTime()
+    if (isNaN(t)) continue
+    const idx = Math.floor((t - startMs) / bucketMs)
+    if (idx < 0 || idx >= numBuckets) continue
+    counts[idx]++
+    if (typeof ev.durationMs === 'number') durations[idx].push(ev.durationMs)
+    inTok[idx] += ev.inputTokens ?? 0
+    outTok[idx] += ev.outputTokens ?? 0
+    toolIn[idx] += ev.toolBytesIn ? 0 : 0 // no per-event tool-token field; leave at 0
+    toolOut[idx] += 0
+  }
+
+  const labels = []
+  const rps = []
+  const p95 = []
+  const tokInRate = []
+  const tokToolInRate = []
+  const tokOutRate = []
+  const tokToolOutRate = []
+  let prevTs = null
+  for (let i = 0; i < numBuckets; i++) {
+    const bucketStartMs = startMs + i * bucketMs
+    labels.push(fmtAxisTime(bucketStartMs, prevTs))
+    prevTs = bucketStartMs
+    rps.push(counts[i] / bucketSec)
+    if (durations[i].length) {
+      const sorted = durations[i].slice().sort((a, b) => a - b)
+      const p = Math.floor(sorted.length * 0.95)
+      p95.push(sorted[Math.min(p, sorted.length - 1)])
+    } else {
+      p95.push(0)
+    }
+    tokInRate.push(inTok[i] / bucketSec)
+    tokToolInRate.push(toolIn[i] / bucketSec)
+    tokOutRate.push(-(outTok[i] / bucketSec))
+    tokToolOutRate.push(-(toolOut[i] / bucketSec))
+  }
+
+  // Mutate the shared label array in place so all three charts pick up the
+  // change (they all reference the same `tickLabels` instance).
+  tickLabels.length = 0
+  tickTimestamps.length = 0
+  for (let i = 0; i < labels.length; i++) {
+    tickLabels.push(labels[i])
+    tickTimestamps.push(startMs + i * bucketMs)
+  }
+  rpsSeries.length = 0
+  rpsSeries.push(...rps)
+  p95Series.length = 0
+  p95Series.push(...p95)
+  tokenInSeries.length = 0
+  tokenInSeries.push(...tokInRate)
+  tokenToolInSeries.length = 0
+  tokenToolInSeries.push(...tokToolInRate)
+  tokenOutSeries.length = 0
+  tokenOutSeries.push(...tokOutRate)
+  tokenToolOutSeries.length = 0
+  tokenToolOutSeries.push(...tokToolOutRate)
+
+  chartRps.data.datasets[0].data = rpsSeries
+  chartRps.update('none')
+  chartLat.data.datasets[0].data = p95Series
+  chartLat.update('none')
+  chartTokens.data.datasets[0].data = tokenInSeries
+  chartTokens.data.datasets[1].data = tokenToolInSeries
+  chartTokens.data.datasets[2].data = tokenOutSeries
+  chartTokens.data.datasets[3].data = tokenToolOutSeries
+  const allVals = [...tokenInSeries, ...tokenToolInSeries, ...tokenOutSeries, ...tokenToolOutSeries]
+  const peak = Math.max(...allVals.map(Math.abs), 0.001)
+  chartTokens.options.scales.y.suggestedMin = -peak
+  chartTokens.options.scales.y.suggestedMax = peak
+  chartTokens.update('none')
+}
+
+async function refreshChartsForWindow() {
+  const win = currentHistoryWindow()
+  if (win === 'live') {
+    chartMode = 'live'
+    // Reset arrays so the live SSE stream starts fresh and doesn't graft new
+    // ticks onto stale history buckets.
+    tickLabels.length = 0
+    tickTimestamps.length = 0
+    rpsSeries.length = 0
+    p95Series.length = 0
+    tokenInSeries.length = 0
+    tokenToolInSeries.length = 0
+    tokenOutSeries.length = 0
+    tokenToolOutSeries.length = 0
+    chartRps.update('none')
+    chartLat.update('none')
+    chartTokens.update('none')
+    return
+  }
+  chartMode = 'history'
+  const events = await loadHistoryEvents()
+  rebuildChartsFromHistory(events ?? [], win)
+}
+
 if (routeFilterEl) {
   routeFilterEl.addEventListener('change', () => {
     refreshRecentForWindow()
+    if (chartMode === 'history') refreshChartsForWindow()
   })
 }
 if (historyWindowEl) {
-  historyWindowEl.addEventListener('change', () => {
-    refreshRecentForWindow()
+  historyWindowEl.addEventListener('change', async () => {
+    await refreshChartsForWindow()
+    await refreshRecentForWindow()
   })
 }
 if (csvBtn) {
@@ -1604,3 +1782,17 @@ setInterval(() => {
   loadTopCost().catch(() => {})
   refreshMetricsCompactorKpis().catch(() => {})
 }, 5000)
+
+// Expose chart instances and chartMode so Playwright specs (under ?testMode=1)
+// can verify dropdown-driven label/data changes without poking at internals.
+if (TEST_MODE) {
+  Object.assign(window, {
+    chartRps,
+    chartLat,
+    chartTokens,
+    tickLabels,
+    tickTimestamps,
+    getChartMode: () => chartMode,
+    fmtAxisTime,
+  })
+}

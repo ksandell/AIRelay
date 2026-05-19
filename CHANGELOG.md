@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `GET /api/metrics/history?from=…&to=…&route=…&model=…&limit=…` — SQLite-backed event range
   - `GET /api/metrics/rollups?period=hour|day|week&…` — bucketed aggregates (requests, totalTokens, totalCostUsd, errors)
   - `GET /api/metrics/export.csv?from=…&to=…&route=…` — CSV download with all 21 canonical columns; falls back to the ring buffer when SQLite is off
-- **Dashboard route filter + history window + CSV button** ([#35](https://github.com/ksandell/AIRelay/issues/35)) — Metrics tab gains a **Route** dropdown (populated from `/api/metrics/routes`), a **Time window** selector (Live / Last 24h / Last 7d), and a **CSV** download button that respects the current filters. Filters apply to the recent-requests table and CSV download.
+- **Dashboard route filter + history window + CSV button** ([#35](https://github.com/ksandell/AIRelay/issues/35)) — Metrics tab gains a **Route** dropdown (populated from `/api/metrics/routes`), a **Time window** selector (Live / Last 5m / 10m / 15m / 30m / 1h / 3h / 6h / 12h / 24h / 7d), and a **CSV** download button that respects the current filters. The window drives both the recent-requests table and the RPS / latency / token charts (non-Live windows rebuild the charts from `/api/metrics/history` with adaptive bucketing); x-axis tick labels are `HH:MM:SS`, prefixed with `DD.MM.YYYY` only on day rollovers.
 - **Guardrails** — opt-in prompt safety pipeline. Default off; preserves
   byte-identical passthrough when disabled. When enabled, JSON request bodies
   are scanned against built-in detectors for **secrets** (AWS / GitHub /
