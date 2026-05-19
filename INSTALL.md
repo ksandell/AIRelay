@@ -74,7 +74,7 @@ Save the file. **Don't put your API key here** — the proxy doesn't need it. Yo
 docker compose up --build
 ```
 
-The first run takes ~1 minute (Docker downloads `node:22.22-alpine3.22` and builds the image). When you see lines like `server listening on 0.0.0.0:3000`, it's running. Leave that terminal window open.
+The first run takes ~1 minute (Docker downloads `node:24.15-alpine3.22` and builds the image). When you see lines like `server listening on 0.0.0.0:3000`, it's running. Leave that terminal window open.
 
 ### A5. Open the dashboard
 
@@ -223,12 +223,12 @@ docker compose ps              # check status
 
 Fastest iteration if you're hacking on the code itself.
 
-### D1. Install Node.js 22+
+### D1. Install Node.js 24+
 
 | OS | Install command |
 |---|---|
-| Windows | Download from [nodejs.org](https://nodejs.org/) — pick the **22.x LTS** installer. |
-| macOS | `brew install node@22` (install [Homebrew](https://brew.sh/) first if needed) |
+| Windows | Download from [nodejs.org](https://nodejs.org/) — pick the **24.x LTS** installer. |
+| macOS | `brew install node@24` (install [Homebrew](https://brew.sh/) first if needed) |
 | Linux | Use [nvm](https://github.com/nvm-sh/nvm): `nvm install 22 && nvm use 22` |
 
 Verify:

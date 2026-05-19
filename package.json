@@ -4,7 +4,7 @@
   "description": "AIRelay — transparent passthrough proxy for AI/LLM HTTP APIs with live observability dashboard",
   "type": "module",
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "start": "node src/index.js",

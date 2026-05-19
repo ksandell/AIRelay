@@ -1,10 +1,10 @@
-FROM node:22.22-alpine3.22 AS deps
+FROM node:24.15-alpine3.22 AS deps
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
 # Dev image: includes devDependencies (dotenv, vitest, etc.) for `node --watch`.
-FROM node:22.22-alpine3.22 AS dev
+FROM node:24.15-alpine3.22 AS dev
 WORKDIR /app
 ENV NODE_ENV=development
 ENV TZ=UTC
@@ -17,7 +17,7 @@ RUN mkdir -p /data/logs
 EXPOSE 3000
 CMD ["node", "--watch", "src/index.js"]
 
-FROM node:22.22-alpine3.22 AS prod
+FROM node:24.15-alpine3.22 AS prod
 WORKDIR /app
 ENV NODE_ENV=production
 ENV TZ=UTC
