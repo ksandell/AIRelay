@@ -1,8 +1,27 @@
 import httpProxy from 'http-proxy-3'
 import { Readable } from 'node:stream'
+import { gunzipSync, inflateSync, brotliDecompressSync } from 'node:zlib'
 import { config } from '../config.js'
 import { pickAgent } from './agent.js'
 import { record, incInFlight, decInFlight } from '../metrics/collector.js'
+
+// Off the hot path: decode the (possibly compressed) teed response body
+// for token/tool extraction. Mistral & friends ship brotli-compressed JSON
+// for non-streaming responses when the client sends Accept-Encoding: br/gzip.
+// SSE streams aren't compressed (servers skip compression for text/event-stream),
+// so the streaming path doesn't need this. Returns null on decode failure.
+function decodeBody(buffer, encoding) {
+  if (!encoding) return buffer
+  const enc = encoding.toLowerCase().trim()
+  try {
+    if (enc === 'gzip' || enc === 'x-gzip') return gunzipSync(buffer)
+    if (enc === 'br') return brotliDecompressSync(buffer)
+    if (enc === 'deflate') return inflateSync(buffer)
+  } catch {
+    return null
+  }
+  return buffer
+}
 
 // Module-scoped proxy instance. Target is supplied per-request via web()'s
 // options bag so the same instance serves every route in the table.
@@ -58,6 +77,7 @@ proxy.on('proxyRes', (proxyRes, req, res) => {
   if (provider && proxyRes.statusCode < 400) {
     m.chunks = []
     m.teeBytes = 0
+    m.respEncoding = proxyRes.headers['content-encoding'] ?? null
     const cap = config.proxyTokenTeeMaxBytes
     proxyRes.on('data', (chunk) => {
       if (m.teeAborted) return
@@ -147,9 +167,18 @@ function finalize(m, providerInstance) {
     const reqChunks = m.reqChunks
     m.chunks = null
     m.reqChunks = null
+    const respEncoding = m.respEncoding ?? null
     queueMicrotask(() => {
       try {
-        const body = Buffer.concat(chunks)
+        const rawBody = Buffer.concat(chunks)
+        const body = decodeBody(rawBody, respEncoding)
+        if (!body) {
+          // Decode failed — still surface the provider on the event so the
+          // dashboard shows the call was handled by e.g. 'mistral', just
+          // without token/tool figures.
+          event.provider = providerInstance.name
+          return
+        }
         const reqBody = reqChunks ? Buffer.concat(reqChunks) : null
         const tokens = providerInstance.extractTokens(body)
         if (tokens) {
