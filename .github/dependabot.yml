@@ -1,0 +1,64 @@
+version: 2
+updates:
+  # npm — grouped weekly so we don't drown in single-dep PRs between releases.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: UTC
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+    groups:
+      npm-prod-minor-patch:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      npm-dev-minor-patch:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+    # Majors land as individual PRs — they need human review per the v0.4.2
+    # refresh playbook (separate ADR or test work often required).
+    ignore: []
+
+  # GitHub Actions used by workflows in .github/workflows/.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: UTC
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - ci
+    groups:
+      actions-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  # Docker base image (Dockerfile uses node:22-alpine — pin in #130 will give
+  # Dependabot something to bump beyond the floating tag).
+  - package-ecosystem: docker
+    directory: /docker
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: UTC
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - docker
+    groups:
+      docker-minor-patch:
+        update-types:
+          - minor
+          - patch
