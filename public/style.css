@@ -751,8 +751,9 @@ footer {
   position: relative;
 }
 
-/* ─── Compactor panel ────────────────────────────────────────── */
-#compactorPanel {
+/* ─── Compactor + Guardrails panel layout ────────────────────── */
+#compactorPanel,
+#guardrailsPanel {
   padding: 16px;
   display: flex;
   flex-direction: column;
