@@ -760,33 +760,44 @@ footer {
 }
 
 #compactorTable,
-#compactorRecentTable {
+#compactorRecentTable,
+#guardrailsTable,
+#guardrailsRecentTable {
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
 }
 #compactorTable thead tr,
-#compactorRecentTable thead tr {
+#compactorRecentTable thead tr,
+#guardrailsTable thead tr,
+#guardrailsRecentTable thead tr {
   background: var(--surface-2);
 }
 #compactorTable th,
 #compactorTable td,
 #compactorRecentTable th,
-#compactorRecentTable td {
+#compactorRecentTable td,
+#guardrailsTable th,
+#guardrailsTable td,
+#guardrailsRecentTable th,
+#guardrailsRecentTable td {
   text-align: left;
   padding: 8px 14px;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
 #compactorTable th,
-#compactorRecentTable th {
+#compactorRecentTable th,
+#guardrailsTable th,
+#guardrailsRecentTable th {
   color: var(--muted);
   font-weight: 500;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-#compactorTable td code {
+#compactorTable td code,
+#guardrailsTable td code {
   background: var(--bg);
   padding: 1px 6px;
   border-radius: 3px;
@@ -800,7 +811,8 @@ footer {
   font-weight: 500;
   padding: 12px 14px 8px;
 }
-#compactorRecent-wrap {
+#compactorRecent-wrap,
+#guardrailsRecent-wrap {
   max-height: 420px;
   overflow-y: auto;
 }
