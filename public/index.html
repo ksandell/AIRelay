@@ -22,6 +22,12 @@
           <button class="tab" data-tab="metrics">
             <i aria-hidden="true" data-lucide="bar-chart-3"></i>Metrics
           </button>
+          <button class="tab" data-tab="compactor">
+            <i aria-hidden="true" data-lucide="archive"></i>Compressors
+          </button>
+          <button class="tab" data-tab="guardrails">
+            <i aria-hidden="true" data-lucide="shield"></i>Guardrails
+          </button>
         </nav>
       </div>
 
@@ -48,11 +54,70 @@
           >Connecting…</span
         >
         <span class="pill" id="inFlightPill">in-flight: 0</span>
+        <select id="routeFilter" aria-label="Filter by route">
+          <option value="">All routes</option>
+        </select>
+        <select id="historyWindow" aria-label="Time window" data-history-window>
+          <option value="live">Live</option>
+          <option value="5m">Last 5m</option>
+          <option value="10m">Last 10m</option>
+          <option value="15m">Last 15m</option>
+          <option value="30m">Last 30m</option>
+          <option value="1h">Last 1h</option>
+          <option value="3h">Last 3h</option>
+          <option value="6h">Last 6h</option>
+          <option value="12h">Last 12h</option>
+          <option value="24h">Last 24h</option>
+          <option value="7d">Last 7d</option>
+        </select>
+        <button id="metricsCsvBtn" title="Download CSV of the current window">CSV</button>
         <button id="metricsClearBtn">Clear table</button>
       </div>
 
       <div class="controls hidden" id="setupControls">
         <span class="pill warn">proxy not configured</span>
+      </div>
+
+      <div class="controls hidden" id="compactorControls">
+        <span id="compactorStatus" class="status disconnected" role="status" aria-live="polite"
+          >Connecting…</span
+        >
+        <span class="pill" id="compactorEnabledPill">disabled</span>
+        <select id="compactorHistoryWindow" aria-label="Time window" data-history-window>
+          <option value="live">Live</option>
+          <option value="5m">Last 5m</option>
+          <option value="10m">Last 10m</option>
+          <option value="15m">Last 15m</option>
+          <option value="30m">Last 30m</option>
+          <option value="1h">Last 1h</option>
+          <option value="3h">Last 3h</option>
+          <option value="6h">Last 6h</option>
+          <option value="12h">Last 12h</option>
+          <option value="24h">Last 24h</option>
+          <option value="7d">Last 7d</option>
+        </select>
+        <button id="compactorRefreshBtn">Refresh</button>
+      </div>
+
+      <div class="controls hidden" id="guardrailsControls">
+        <span id="guardrailsStatus" class="status disconnected" role="status" aria-live="polite"
+          >Connecting…</span
+        >
+        <span class="pill" id="guardrailsEnabledPill">disabled</span>
+        <select id="guardrailsHistoryWindow" aria-label="Time window" data-history-window>
+          <option value="live">Live</option>
+          <option value="5m">Last 5m</option>
+          <option value="10m">Last 10m</option>
+          <option value="15m">Last 15m</option>
+          <option value="30m">Last 30m</option>
+          <option value="1h">Last 1h</option>
+          <option value="3h">Last 3h</option>
+          <option value="6h">Last 6h</option>
+          <option value="12h">Last 12h</option>
+          <option value="24h">Last 24h</option>
+          <option value="7d">Last 7d</option>
+        </select>
+        <button id="guardrailsRefreshBtn">Refresh</button>
       </div>
     </header>
 
@@ -77,6 +142,7 @@
               <optgroup label="Frontier">
                 <option value="anthropic">Anthropic (Claude API)</option>
                 <option value="openai">OpenAI</option>
+                <option value="azure">Azure OpenAI Service</option>
                 <option value="gemini">Google Gemini</option>
                 <option value="xai">xAI (Grok)</option>
               </optgroup>
@@ -358,6 +424,44 @@ npm run dev</pre
         </div>
       </section>
 
+      <section class="kpis">
+        <div class="kpi">
+          <span class="kpi-label">Bytes saved (5 min)</span>
+          <span
+            class="kpi-help"
+            title="Compactor — bytes removed from request bodies over the last 5 minutes. Shows — when Compactor is disabled."
+            >?</span
+          >
+          <span class="kpi-val" id="kpiCompactorBytesSaved5m" data-testid="compactor-bytes-5m"
+            >—</span
+          >
+          <canvas class="kpi-spark" id="sparkMetricsCompactorBytes5m"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Compression ratio (5 min)</span>
+          <span
+            class="kpi-help"
+            title="Compactor — percentage of bytes removed (1 − bytesOut/bytesIn) over the last 5 minutes."
+            >?</span
+          >
+          <div class="kpi-val-row">
+            <span class="kpi-val" id="kpiCompactorRatio5m" data-testid="compactor-ratio-5m">—</span
+            ><span class="kpi-unit">%</span>
+          </div>
+          <canvas class="kpi-spark" id="sparkMetricsCompactorRatio5m"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Compressor fires (5 min)</span>
+          <span
+            class="kpi-help"
+            title="Compactor — total number of compressor invocations across all 10 compressors in the last 5 minutes."
+            >?</span
+          >
+          <span class="kpi-val" id="kpiCompactorFires5m" data-testid="compactor-fires-5m">—</span>
+          <canvas class="kpi-spark" id="sparkMetricsCompactorFires5m"></canvas>
+        </div>
+      </section>
+
       <section class="charts">
         <div class="chart-card">
           <header class="chart-title">Requests / sec — last 5 min</header>
@@ -440,6 +544,174 @@ npm run dev</pre
             <tbody></tbody>
           </table>
         </div>
+      </section>
+    </main>
+
+    <main id="compactorPanel" class="panel hidden">
+      <section class="kpis">
+        <div class="kpi">
+          <span class="kpi-label">Bytes saved (1m)</span>
+          <span class="kpi-val" id="compactorBytes1m">0</span>
+          <canvas class="kpi-spark" id="sparkCompactorBytes1m"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Bytes saved (5m)</span>
+          <span class="kpi-val" id="compactorBytes5m">0</span>
+          <canvas class="kpi-spark" id="sparkCompactorBytes5m"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Bytes saved (lifetime)</span>
+          <span class="kpi-val" id="compactorBytesLifetime">0</span>
+          <canvas class="kpi-spark" id="sparkCompactorBytesLifetime"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Est. tokens saved (lifetime)</span>
+          <span class="kpi-val" id="compactorTokensLifetime">0</span>
+          <span class="kpi-unit">heuristic: bytes / 4</span>
+          <canvas class="kpi-spark" id="sparkCompactorTokensLifetime"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Compression ratio (5m)</span>
+          <span class="kpi-val" id="compactorRatio5m">—</span>
+          <canvas class="kpi-spark" id="sparkCompactorRatio5m"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Bypasses (lifetime)</span>
+          <span class="kpi-val" id="compactorBypasses">0</span>
+          <canvas class="kpi-spark" id="sparkCompactorBypasses"></canvas>
+        </div>
+      </section>
+
+      <section class="table-card">
+        <h3>Compressors</h3>
+        <table id="compactorTable">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Active</th>
+              <th>Fires</th>
+              <th>Bytes saved</th>
+              <th>Avg µs</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <section class="table-card">
+        <h3>Recent events</h3>
+        <div id="compactorRecent-wrap">
+          <table id="compactorRecentTable">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Scope</th>
+                <th>Filters fired</th>
+                <th>Bytes in → out</th>
+                <th>Saved</th>
+                <th>µs</th>
+                <th>Bypass</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="info-callout">
+        <i aria-hidden="true" data-lucide="info" class="info-callout-icon"></i>
+        <p>
+          Compactor is opt-in: set <code>COMPACTOR_ENABLED=true</code> and send the
+          <code>X-Compactor: on</code> header (or rely on the master switch alone — clients can
+          still bypass per-request with <code>X-Compactor: off</code>). See
+          <a href="https://github.com/" target="_blank" rel="noreferrer">docs/COMPACTOR.md</a>
+          for the full catalog, safety model, and tuning recipes.
+        </p>
+      </section>
+    </main>
+
+    <main id="guardrailsPanel" class="panel hidden">
+      <section class="kpis">
+        <div class="kpi">
+          <span class="kpi-label">Requests scanned (1m)</span>
+          <span class="kpi-val" id="guardrailsScanned1m">0</span>
+          <canvas class="kpi-spark" id="sparkGuardrailsScanned1m"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Hits (1m)</span>
+          <span class="kpi-val" id="guardrailsHits1m">0</span>
+          <canvas class="kpi-spark" id="sparkGuardrailsHits1m"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Blocked (lifetime)</span>
+          <span class="kpi-val" id="guardrailsBlockedLifetime">0</span>
+          <canvas class="kpi-spark" id="sparkGuardrailsBlockedLifetime"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Redacted (lifetime)</span>
+          <span class="kpi-val" id="guardrailsRedactedLifetime">0</span>
+          <canvas class="kpi-spark" id="sparkGuardrailsRedactedLifetime"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Alerts (lifetime)</span>
+          <span class="kpi-val" id="guardrailsAlertedLifetime">0</span>
+          <canvas class="kpi-spark" id="sparkGuardrailsAlertedLifetime"></canvas>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Bypasses (lifetime)</span>
+          <span class="kpi-val" id="guardrailsBypassesLifetime">0</span>
+          <canvas class="kpi-spark" id="sparkGuardrailsBypassesLifetime"></canvas>
+        </div>
+      </section>
+
+      <section class="table-card">
+        <h3>Detectors</h3>
+        <table id="guardrailsTable">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Category</th>
+              <th>Mode</th>
+              <th>Fires</th>
+              <th>Hits</th>
+              <th>Bytes redacted</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <section class="table-card">
+        <h3>Recent events</h3>
+        <div id="guardrailsRecent-wrap">
+          <table id="guardrailsRecentTable">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Mode</th>
+                <th>Detectors fired</th>
+                <th>Hits</th>
+                <th>Bytes in → out</th>
+                <th>Blocked</th>
+                <th>Bypass</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="info-callout">
+        <i aria-hidden="true" data-lucide="info" class="info-callout-icon"></i>
+        <p>
+          Guardrails is opt-in: set <code>GUARDRAILS_ENABLED=true</code> and choose a mode per
+          category (<code>GUARDRAILS_SECRETS_MODE</code>, <code>GUARDRAILS_PII_MODE</code>,
+          <code>GUARDRAILS_INJECTION_MODE</code> &mdash; <code>off</code> / <code>alert</code> /
+          <code>block</code> / <code>redact</code>). Clients can bypass per-request with
+          <code>X-Guardrails: off</code>. See
+          <a href="https://github.com/" target="_blank" rel="noreferrer">docs/GUARDRAILS.md</a>
+          for the detector catalog, safety model, and deployment presets.
+        </p>
       </section>
     </main>
 

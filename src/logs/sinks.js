@@ -64,6 +64,31 @@ export function createFileSink(logDir) {
         _streamPath = null
       }
     },
+
+    // Async close — awaits the stream's 'close' event so the underlying fd
+    // is fully released. Required on Windows before renaming the active log
+    // file (open write handle blocks rename).
+    async closeAsync() {
+      if (!_stream) return
+      const s = _stream
+      _stream = null
+      _streamPath = null
+      await new Promise((resolve) => {
+        let done = false
+        const finish = () => {
+          if (done) return
+          done = true
+          resolve()
+        }
+        s.once('close', finish)
+        s.once('error', finish)
+        try {
+          s.end(finish)
+        } catch {
+          finish()
+        }
+      })
+    },
   }
 }
 

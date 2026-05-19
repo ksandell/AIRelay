@@ -64,7 +64,7 @@ export class GoogleProvider extends BaseProvider {
 
   calculateCost(tokens) {
     if (!tokens?.model) return null
-    const price = lookupModelPrice(this._pricing, tokens.model)
+    const price = lookupModelPrice(this._pricing, tokens.model, this._providerName)
     if (!price) return null
     return (
       ((tokens.inputTokens ?? 0) * price.input + (tokens.outputTokens ?? 0) * price.output) /

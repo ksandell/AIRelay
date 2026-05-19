@@ -14,6 +14,7 @@ import { OllamaProvider } from './ollama.js'
 import { NvidiaProvider } from './nvidia.js'
 import { AnLinkAIProvider } from './anlinkai.js'
 import { CerebrasProvider } from './cerebras.js'
+import { AzureOpenAIProvider } from './azure.js'
 import { GenericProvider } from './generic.js'
 import { loadPricing } from './pricing.js'
 
@@ -34,6 +35,7 @@ const PROVIDER_CLASSES = {
   nvidia: NvidiaProvider,
   anlinkai: AnLinkAIProvider,
   cerebras: CerebrasProvider,
+  azure: AzureOpenAIProvider,
   generic: GenericProvider,
 }
 
@@ -43,7 +45,7 @@ export function loadProvider(name, pricingOverridePath = null) {
   const key = `${name}:${pricingOverridePath ?? ''}`
   if (_instances.has(key)) return _instances.get(key)
   const Cls = PROVIDER_CLASSES[name] ?? GenericProvider
-  const instance = new Cls(loadPricing(name, pricingOverridePath))
+  const instance = new Cls(loadPricing(name, pricingOverridePath), name)
   _instances.set(key, instance)
   return instance
 }

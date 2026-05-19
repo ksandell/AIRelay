@@ -50,6 +50,12 @@ npm run lint:fix
 npm run docker:up
 npm run docker:down
 npm run docker:logs
+
+# E2E (NEW in v0.3.0) — Playwright across the dashboard (Logs, Metrics, Compressors + hash-routed Setup)
+npm run test:e2e               # functional, ~8 s (no Docker required)
+npm run test:e2e:visual        # visual diff vs OS-pinned baselines
+npm run test:e2e:visual:bless  # update baselines after intentional UI change
+npm run test:e2e:ui            # interactive Playwright debugger
 ```
 
 ## Architecture
@@ -72,8 +78,14 @@ key design decisions, API surface): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - Proxy hot path has **zero sync I/O** — no `appendFileSync`, no `JSON.parse`
   of payloads, no compression. Per-request observability goes through
   `metrics.record()` only; the logger is for app events.
-- Bytes are never modified. `X-Forwarded-*` is opt-in
-  (`PROXY_TRUST_FORWARDED=false` by default).
+- **Bytes are never modified for non-opted-in traffic.** `X-Forwarded-*` is
+  opt-in (`PROXY_TRUST_FORWARDED=false` by default). Two opt-in mechanisms
+  may mutate request bodies, both default-off:
+  1. Compactor v0.3.0 (`COMPACTOR_ENABLED=false`); per-request bypass via
+     `X-Compactor: off`. See [docs/COMPACTOR.md](docs/COMPACTOR.md).
+  2. Guardrails v0.4.0 (`GUARDRAILS_ENABLED=false`); only mutates in `redact`
+     mode; per-request bypass via `X-Guardrails: off`. Block mode rejects
+     (422) without modifying bytes. See [docs/GUARDRAILS.md](docs/GUARDRAILS.md).
 - Token extraction runs on a **passive tee** in `queueMicrotask` after
   response end. Never inline.
 
@@ -129,6 +141,9 @@ For releases, follow [docs/RELEASING.md](docs/RELEASING.md).
 | [INSTALL.md](INSTALL.md) | Windows / macOS / Linux / local Node walkthrough |
 | [CONFIGURATION.md](CONFIGURATION.md) | All env vars, provider recipes, DNS, TLS, tuning, prod checklist |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Diagrams + module map + design decisions + API surface |
+| [docs/COMPACTOR.md](docs/COMPACTOR.md) | Compactor feature reference (v0.3.0): activation, compressor catalog, banner, metrics, safety, tuning |
+| [docs/GUARDRAILS.md](docs/GUARDRAILS.md) | Guardrails feature reference (v0.4.0): detector catalog, modes (alert/block/redact), banner, metrics, safety, deployment presets |
+| [docs/ROUTING.md](docs/ROUTING.md) | Multi-upstream routing reference (v0.4.0): routes config, matching, per-route provider/trustForwarded |
 | [docs/RELEASING.md](docs/RELEASING.md) | Release checklist (SSOT) |
 | [docs/e2e-test-plan.md](docs/e2e-test-plan.md) | Mistral-based E2E playbook |
 | [ROADMAP.md](ROADMAP.md) | Planned + speculative work (not what shipped — see CHANGELOG) |

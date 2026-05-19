@@ -34,6 +34,29 @@ export function redirectStream(newPath) {
   }
 }
 
+// Set the rotation mutex without redirecting. Used by rotation.js to gate
+// writes while the active file is being renamed on Windows (where an open
+// write handle blocks rename).
+export function beginRotation() {
+  _rotating = true
+}
+
+export function endRotation() {
+  _rotating = false
+}
+
+// Close the active write stream and await its close event. Required on
+// Windows before renaming the active log file — an open write handle holds
+// a kernel lock that blocks rename. Returns a Promise resolved when the
+// underlying fd is fully released.
+export async function closeActiveStream() {
+  if (!_sink.closeAsync) {
+    _sink.close?.()
+    return
+  }
+  await _sink.closeAsync()
+}
+
 export function closeStream() {
   _sink.close()
 }

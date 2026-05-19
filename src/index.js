@@ -9,8 +9,21 @@ import {
   stopMetricsBroadcaster,
   closeAllMetricsClients,
 } from './metrics/broadcaster.js'
+import {
+  open as openMetricsStore,
+  pruneOlderThan,
+  close as closeMetricsStore,
+} from './metrics/store.js'
 
 rotateLogsIfNeeded()
+
+if (config.metricsDbPath) {
+  await openMetricsStore(config.metricsDbPath)
+  logger.info('metrics persistence enabled', {
+    dbPath: config.metricsDbPath,
+    retentionDays: config.metricsRetentionDays,
+  })
+}
 
 const app = createApp()
 
@@ -33,9 +46,23 @@ server.requestTimeout = 0 // proxied uploads can be long; rely on upstream timeo
 
 cron.schedule(
   config.cronSchedule,
-  () => {
+  async () => {
     logger.info('cron: rotating logs')
-    rotateLogs()
+    try {
+      await rotateLogs()
+    } catch (err) {
+      logger.error('cron: rotateLogs failed', { error: err.message })
+    }
+    if (config.metricsDbPath) {
+      try {
+        const removed = pruneOlderThan(config.metricsRetentionDays)
+        if (removed > 0) {
+          logger.info('cron: pruned old metric events', { removed })
+        }
+      } catch (err) {
+        logger.error('cron: pruneOlderThan failed', { error: err.message })
+      }
+    }
   },
   { timezone: 'UTC' },
 )
@@ -56,6 +83,7 @@ function shutdown(signal) {
 
   clearInterval(sizeGuard)
   clearInterval(heartbeat)
+  closeMetricsStore()
 
   server.close(() => {
     logger.info('server closed')

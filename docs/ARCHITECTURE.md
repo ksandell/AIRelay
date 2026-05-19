@@ -82,6 +82,127 @@ The logger is **never** invoked per proxied request — it exists for app events
 (startup, cron, errors). The metric event path is the only per-request
 observability mechanism.
 
+## Compactor (v0.3.0, opt-in)
+
+A second per-request pipeline, mounted under the same proxy prefix but
+**before** `proxy.js`. Inert when `COMPACTOR_ENABLED=false` (default).
+
+```
+src/compactor/
+├── middleware.js         Express middleware: activation check, body buffering, dispatch
+├── pipeline.js           Fixed-order compressor application + banner injection
+├── registry.js           Loads enabled compressors based on COMPACTOR_* env vars
+├── banner.js             "[compactor: applied filters=…; bytes …→…; X-Compactor: off to bypass]"
+├── metrics.js            Parallel ring buffer + lifetime counters (per compressor + totals)
+├── compressors/          10 pure-function transforms (ansi-strip, diff-collapse, …)
+└── providers/            Provider-aware parsers: anthropic.js, openai.js, passthrough.js
+```
+
+The middleware buffers the JSON body (capped by `COMPACTOR_MAX_REQ_BYTES`),
+parses it, walks provider-specific message shapes, runs the compressor
+pipeline on each eligible text segment, and stashes the mutated body on
+`req._compactorBody`. The proxy handler then forwards via http-proxy's
+`buffer` option instead of the consumed request stream.
+
+Streaming requests (`stream: true`) bypass entirely with a header banner.
+The full feature reference is in [COMPACTOR.md](../docs/COMPACTOR.md).
+
+## Multi-upstream routing (v0.4.0, opt-in)
+
+```
+src/routes/
+└── registry.js   Loads PROXY_ROUTES env / ROUTES_CONFIG_PATH file;
+                  falls back to UPSTREAM_URL+PROXY_PATH_PREFIX+PROXY_PROVIDER.
+                  Sorts by descending prefix length so longer matches win.
+                  Attaches a per-route provider instance for token tracking.
+```
+
+`server.js` iterates `getRoutes()` at startup and mounts the Compactor +
+Guardrails + proxy handler under each route's prefix. The proxy handler is a
+closure over the route so the upstream URL, agent, and provider are pre-
+resolved (no per-request lookup on the hot path). Full reference in
+[ROUTING.md](../docs/ROUTING.md).
+
+## Metric persistence (v0.4.0, opt-in)
+
+```
+src/metrics/
+└── store.js   Opens better-sqlite3 connection when METRICS_DB_PATH is set.
+               record() in collector.js calls enqueue() synchronously; flush
+               timer drains the queue every METRICS_WRITE_BATCH_MS or when
+               the queue reaches METRICS_WRITE_BATCH_SIZE.
+```
+
+Hot-path discipline: `enqueue()` is synchronous, allocation-light, and only
+pushes onto an in-memory queue. Actual SQLite inserts happen on the flush
+timer in a single transaction. Daily cron `pruneOlderThan(retentionDays)`
+keeps the DB bounded. Endpoints `/api/metrics/{history,rollups,export.csv}`
+unlock when the store is open; otherwise they return 503 with a helpful
+message (except `export.csv` which falls back to the ring buffer).
+
+## Guardrails (v0.4.0, opt-in)
+
+A third per-request pipeline, mounted under the proxy prefix **after**
+Compactor and **before** `proxy.js`. Inert when `GUARDRAILS_ENABLED=false`
+(default).
+
+```
+src/guardrails/
+├── middleware.js          Express middleware: activation, bypass header, buffering, dispatch
+├── registry.js            Built-in + custom detector catalog (regex + per-detector gating)
+├── scanner.js             Pure match/redact functions; longest-match overlap resolution
+├── banner.js              "[guardrails: redact detectors=…; bytes …→…; X-Guardrails: off]"
+├── metrics.js             Parallel ring buffer + lifetime counters (per detector + totals)
+└── sanitizer.js           Always-on URL + error-message scrubber (independent of master switch)
+```
+
+Three modes per category (`secrets` / `pii` / `injection`): **alert**
+(record + forward), **block** (reject 422), **redact** (replace match
+with `<redacted:NAME>` and forward). Block beats redact. Body is re-parsed
+after redaction; on parse failure the original bytes go through unchanged.
+The mutated buffer lives on `req._guardrailsBody`, which the proxy handler
+prefers over `req._compactorBody`. Sanitizer is wired into `requestLogger`
+and `errorHandler` to redact secret-shaped tokens from persisted log
+entries — runs even when the master switch is off.
+
+The full feature reference is in [GUARDRAILS.md](../docs/GUARDRAILS.md).
+
+## E2E test bootstrap (v0.3.0)
+
+Playwright E2E runs against an **in-process** Node bootstrap — no Docker
+required for local runs or CI:
+
+```
+tests/e2e/fixtures/test-server.js
+  ├─ fake LLM upstream  (http.Server, random port, fixed Mistral response)
+  └─ AIRelay createApp() on port 3100, pointing at the fake upstream
+```
+
+Playwright's `webServer` block (see `playwright.config.js`) spawns this
+script, waits on `/health`, then runs two project suites:
+
+- `functional` — 14 specs across all 4 tabs (Setup, Logs, Metrics, Compactor)
+- `visual` — 5 screenshot snapshots vs OS-pinned baselines
+
+Determinism techniques:
+
+| Source of jitter | Mitigation |
+|---|---|
+| Chart.js animations | `?testMode=1` → `Chart.defaults.animation = false` |
+| CSS transitions | `html[data-test-mode='1'] *` zeros animation + transition durations |
+| LLM token randomness | Fake upstream returns fixed `prompt_tokens: 12, completion_tokens: 2` |
+| Cross-test state leak | `POST /api/test/reset` endpoint (gated to `NODE_ENV=test`) |
+| Dynamic timestamps in DOM | Playwright `mask: [#compactorRecentTable]` in screenshot calls |
+| Render jitter | `maxDiffPixelRatio: 0.03` |
+| Parallel races | `fullyParallel: false`, `workers: 1` (in-process shared state) |
+
+CI workflow: `.github/workflows/e2e.yml` (push to main + manual dispatch).
+Visual baselines OS-pinned — Windows baselines committed; Linux baselines
+generated on first CI run via `--update-snapshots` (one-time bless).
+
+Full E2E playbook (including the legacy manual Mistral verification) is
+in [e2e-test-plan.md](e2e-test-plan.md).
+
 ## Log rotation lifecycle
 
 ```mermaid
@@ -116,6 +237,17 @@ GET  /api/metrics/stream              SSE — 'request' (per call) + 'tick' (eve
 
 # Proxy
 ANY  <PROXY_PATH_PREFIX>/*            transparent passthrough to UPSTREAM_URL
+                                        (optionally via Compactor middleware — v0.3.0, default off)
+
+# Compactor (v0.3.0, when COMPACTOR_ENABLED=true)
+GET  /api/compactor/summary           lifetime + 1m/5m/15m windows of compression metrics
+GET  /api/compactor/recent            last N per-request compactor events
+GET  /api/guardrails/summary          guardrails state + lifetime + windowed aggregates
+GET  /api/guardrails/recent           last N per-request guardrails events
+GET  /api/metrics/routes              active routes (v0.4.0 multi-upstream)
+GET  /api/metrics/history             time-range events from SQLite (when METRICS_DB_PATH set)
+GET  /api/metrics/rollups             bucketed aggregates (hour/day/week) — requires SQLite
+GET  /api/metrics/export.csv          CSV download; falls back to ring buffer when SQLite off
 ```
 
 ## Key design decisions
@@ -147,7 +279,7 @@ For release process see [RELEASING.md](RELEASING.md).
 | Invariant | Why |
 |---|---|
 | Zero sync I/O on proxy path | `appendFileSync`/`readFileSync` stall the event loop — banned from `proxy.js`, `middleware/`, hot-path code |
-| Zero body buffering | `http-proxy` streams bytes unchanged; tee is a passive `data` listener |
+| Zero body buffering **(for non-opted-in traffic)** | `http-proxy` streams bytes unchanged; tee is a passive `data` listener. **Opted-in Compactor traffic** (v0.3.0, `COMPACTOR_ENABLED=true` + no `X-Compactor: off`) deliberately buffers the JSON body in order to mutate it — see [COMPACTOR.md](../docs/COMPACTOR.md). Default-off behavior preserves the byte-identical passthrough invariant. |
 | Token extraction in `queueMicrotask` | Deferred until after `res.finish` — never inline |
 | O(1) metric record | Ring buffer pre-allocated; `record()` is a single array slot write |
 | Aggregator single-pass | `summary()` scans the ring once for all three windows; result memoized 1 s |

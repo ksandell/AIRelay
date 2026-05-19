@@ -1,36 +1,38 @@
 import httpProxy from 'http-proxy'
+import { Readable } from 'node:stream'
 import { config } from '../config.js'
 import { pickAgent } from './agent.js'
 import { record, incInFlight, decInFlight } from '../metrics/collector.js'
-import { loadProvider } from '../providers/registry.js'
 
-// Provider singleton — constructed once at module load. Null when token tracking
-// is disabled, which short-circuits all per-request buffering for zero overhead.
-const provider = config.proxyTokenTracking
-  ? loadProvider(config.proxyProvider, config.pricingConfigPath)
-  : null
-
+// Module-scoped proxy instance. Target is supplied per-request via web()'s
+// options bag so the same instance serves every route in the table.
 const proxy = httpProxy.createProxyServer({
-  target: config.upstreamUrl,
   // Rewrite Host header to the upstream's host. Required for any upstream that
   // validates the Host header (most managed AI APIs do — e.g. api.anthropic.com,
   // api.openai.com, generativelanguage.googleapis.com return 4xx without this).
   // Body bytes still pass through unchanged — only Host is touched.
-  // NOTE: this breaks SigV4-signed providers (e.g. AWS Bedrock) because the
+  // NOTE: breaks SigV4-signed providers (e.g. AWS Bedrock) because the
   // signature is bound to the original Host header. See docs/proxy-metrics-plan.md
   // §"Provider compatibility" for details.
   changeOrigin: true,
-  xfwd: config.proxyTrustForwarded,
-  agent: pickAgent(config.upstreamUrl),
   secure: false,
   ws: false,
   selfHandleResponse: false,
 })
 
+// Azure OpenAI requires `?api-version=YYYY-MM-DD` on every request. When the
+// upstream SDK omits it we append from config. The check is per-request and
+// route-aware (only fires when the matched route's provider is `azure`).
+const azureApiVersionParam = config.azureOpenaiApiVersion
+  ? encodeURIComponent(config.azureOpenaiApiVersion)
+  : null
+const apiVersionParamRe = /[?&]api-version=/
+
 // Count outbound bytes via a passive listener — no body is buffered, the chunks
 // flow straight through to the client. Same idea inbound on `req`.
-// When token tracking is enabled, an additional passive listener tees chunks
-// into a per-request array for post-response extraction.
+// When token tracking is enabled and the route has a provider instance, an
+// additional passive listener tees chunks into a per-request array for
+// post-response extraction.
 proxy.on('proxyRes', (proxyRes, req, res) => {
   const m = req._metrics
   if (!m) return
@@ -52,6 +54,7 @@ proxy.on('proxyRes', (proxyRes, req, res) => {
     }
   })
 
+  const provider = req._route?.providerInstance
   if (provider && proxyRes.statusCode < 400) {
     m.chunks = []
     m.teeBytes = 0
@@ -69,8 +72,6 @@ proxy.on('proxyRes', (proxyRes, req, res) => {
   }
 })
 
-// Map low-level errors to a stable taxonomy so the dashboard can group
-// timeouts vs. refused connections vs. TLS failures distinctly.
 function classifyError(err) {
   const code = err?.code || ''
   if (code === 'ECONNABORTED' || err?.message?.includes('client abort')) return 'client_abort'
@@ -102,6 +103,8 @@ proxy.on('error', (err, req, res) => {
 })
 
 function baseEvent(m) {
+  const ce = m.compactorEvent ?? null
+  const ge = m.guardrailsEvent ?? null
   return {
     ts: m.ts,
     method: m.method,
@@ -110,7 +113,8 @@ function baseEvent(m) {
     durationMs: Date.now() - m.start,
     bytesIn: m.bytesIn,
     bytesOut: m.bytesOut,
-    upstream: config.upstreamUrl,
+    upstream: m.upstream,
+    route: m.routePrefix,
     error: m.error ?? null,
     provider: null,
     model: null,
@@ -123,26 +127,33 @@ function baseEvent(m) {
     toolCalls: null,
     toolBytesIn: null,
     toolBytesOut: null,
+    compactorActive: ce?.compactorActive ?? null,
+    compactorBypass: ce?.compactorBypass ?? null,
+    compactorSavedBytes: ce?.compactorSavedBytes ?? null,
+    compactorCompressors: ce?.compactorCompressors ?? null,
+    guardrailsAction: ge?.guardrailsAction ?? null,
+    guardrailsHits: ge?.guardrailsHits ?? null,
+    guardrailsDetectors: ge?.guardrailsDetectors ?? null,
   }
 }
 
-function finalize(m) {
+function finalize(m, providerInstance) {
   if (!m || m.recorded) return
   m.recorded = true
   const event = baseEvent(m)
 
-  if (provider && m.chunks && m.chunks.length > 0) {
+  if (providerInstance && m.chunks && m.chunks.length > 0) {
     const chunks = m.chunks
     const reqChunks = m.reqChunks
-    m.chunks = null // release ref before microtask queue settles
+    m.chunks = null
     m.reqChunks = null
     queueMicrotask(() => {
       try {
         const body = Buffer.concat(chunks)
         const reqBody = reqChunks ? Buffer.concat(reqChunks) : null
-        const tokens = provider.extractTokens(body)
+        const tokens = providerInstance.extractTokens(body)
         if (tokens) {
-          event.provider = provider.name
+          event.provider = providerInstance.name
           event.model = tokens.model ?? null
           event.inputTokens = tokens.inputTokens ?? null
           event.outputTokens = tokens.outputTokens ?? null
@@ -150,15 +161,15 @@ function finalize(m) {
           event.cacheWriteTokens = tokens.cacheWriteTokens ?? null
           event.totalTokens = tokens.totalTokens ?? null
           try {
-            event.costUsd = provider.calculateCost(tokens)
+            event.costUsd = providerInstance.calculateCost(tokens)
           } catch {
             event.costUsd = null
           }
         } else {
-          event.provider = provider.name
+          event.provider = providerInstance.name
         }
         try {
-          const tools = provider.extractToolCalls(reqBody, body)
+          const tools = providerInstance.extractToolCalls(reqBody, body)
           if (tools) {
             event.toolCalls = tools.toolCalls ?? null
             event.toolBytesIn = tools.toolBytesIn ?? null
@@ -179,24 +190,32 @@ function finalize(m) {
   decInFlight()
 }
 
-export function createProxyHandler() {
-  if (!config.upstreamUrl) {
-    // Misconfig guard — a 503 is more honest than silently 404ing.
+/**
+ * Build an Express handler bound to a specific route. Each route gets its own
+ * handler closure so the upstream URL, provider, agent, and trustForwarded
+ * setting are pre-resolved (no per-request lookup on the hot path).
+ */
+export function createProxyHandler(route) {
+  if (!route) {
     return (req, res) => {
       res.statusCode = 503
       res.setHeader('Content-Type', 'application/json')
-      res.end(JSON.stringify({ error: 'proxy disabled — UPSTREAM_URL not set' }))
+      res.end(JSON.stringify({ error: 'proxy disabled — no routes configured' }))
     }
   }
 
+  const agent = pickAgent(route.upstream)
+  const isAzure = route.provider === 'azure' && azureApiVersionParam !== null
+
   return (req, res) => {
+    req._route = route
     const m = {
       ts: new Date().toISOString(),
       start: Date.now(),
       method: req.method,
-      // originalUrl preserves the full incoming path (req.url is stripped by Express
-      // when mounted under PROXY_PATH_PREFIX).
       path: req.originalUrl,
+      routePrefix: route.prefix,
+      upstream: route.upstream,
       status: 0,
       bytesIn: 0,
       bytesOut: 0,
@@ -207,6 +226,11 @@ export function createProxyHandler() {
     req._metrics = m
     incInFlight()
 
+    if (isAzure && !apiVersionParamRe.test(req.url)) {
+      const sep = req.url.includes('?') ? '&' : '?'
+      req.url = `${req.url}${sep}api-version=${azureApiVersionParam}`
+    }
+
     // Idle watchdog — destroy hung connections after proxyRequestIdleTimeoutMs.
     let idleTimer = null
     if (config.proxyRequestIdleTimeoutMs > 0) {
@@ -214,7 +238,7 @@ export function createProxyHandler() {
         if (!m.recorded) {
           m.error = 'upstream_timeout'
           m.status = m.status || 504
-          finalize(m)
+          finalize(m, route.providerInstance)
         }
         try {
           req.destroy()
@@ -241,7 +265,7 @@ export function createProxyHandler() {
 
     req.on('data', (chunk) => {
       m.bytesIn += chunk.length
-      if (provider && !m.reqTeeAborted) {
+      if (route.providerInstance && !m.reqTeeAborted) {
         if (!m.reqChunks) {
           m.reqChunks = []
           m.reqTeeBytes = 0
@@ -259,18 +283,39 @@ export function createProxyHandler() {
       m.error = m.error || 'client_abort'
     })
 
-    // 'finish' fires when the response body has been flushed to the kernel —
-    // this is the right moment for duration. 'close' is a backstop in case the
-    // client disconnects before completion. The `recorded` flag prevents double-counting.
-    res.on('finish', () => finalize(m))
-    res.on('close', () => finalize(m))
+    const captureMw = () => {
+      m.compactorEvent = req._compactorEvent ?? null
+      m.guardrailsEvent = req._guardrailsEvent ?? null
+    }
+    res.on('finish', () => {
+      captureMw()
+      finalize(m, route.providerInstance)
+    })
+    res.on('close', () => {
+      captureMw()
+      finalize(m, route.providerInstance)
+    })
 
-    proxy.web(req, res, {}, (err) => {
-      // Fallback for the err callback variant (rare — error event usually fires first).
+    // Compactor / Guardrails: if a substitute body was buffered by either
+    // middleware, feed it to http-proxy via the `buffer` option so the
+    // (possibly mutated) bytes go upstream instead of the already-consumed
+    // request stream. Guardrails runs after Compactor and its body supersedes.
+    const substituteBody = req._guardrailsBody ?? req._compactorBody
+    const proxyOpts = {
+      target: route.upstream,
+      agent,
+      xfwd: route.trustForwarded,
+    }
+    if (substituteBody) {
+      proxyOpts.buffer = Readable.from([substituteBody])
+      m.bytesIn = substituteBody.length
+    }
+
+    proxy.web(req, res, proxyOpts, (err) => {
       if (err && !m.recorded) {
         m.error = classifyError(err)
         m.status = m.status || 502
-        finalize(m)
+        finalize(m, route.providerInstance)
         if (!res.headersSent) {
           res.statusCode = 502
           res.setHeader('Content-Type', 'application/json')

@@ -86,7 +86,7 @@ Every variable, what it does, and when you'd touch it. Defaults match `.env.exam
 | `LOG_RETENTION_DAYS` | `7` | Rotated files older than this are deleted. |
 | `MAX_LOG_SIZE_MB` | `50` | If active log exceeds this, rotation triggers (checked every 5 min). |
 | `CRON_SCHEDULE` | `0 0 * * *` | Daily rotation cron. UTC. |
-| `ENABLE_COMPRESSION` | `false` | Future — gzip rotated logs. Currently a no-op. |
+| `ENABLE_COMPRESSION` | `false` | Gzip rotated log files (`app-YYYY-MM-DD.log.gz`). Active log is never compressed. |
 
 ### SSE (live streams)
 
@@ -102,10 +102,138 @@ The proxy can extract token usage from upstream responses and compute per-reques
 
 | Var | Default | Notes |
 |---|---|---|
-| `PROXY_PROVIDER` | `generic` | Named providers (15): `anthropic`, `openai`, `google`, `mistral`, `groq`, `microsoft`, `openrouter`, `together`, `fireworks`, `deepseek`, `xai`, `perplexity`, `ollama`, `nvidia`, `anlinkai`. Fallback: `generic` (records bytes only — no token/cost fields). Selects the response parser and pricing table key. |
+| `PROXY_PROVIDER` | `generic` | Named providers (17): `anthropic`, `openai`, `azure`, `google`, `mistral`, `groq`, `microsoft`, `openrouter`, `together`, `fireworks`, `deepseek`, `xai`, `perplexity`, `ollama`, `nvidia`, `anlinkai`, `cerebras`. Fallback: `generic` (records bytes only — no token/cost fields). Selects the response parser and pricing table key. |
 | `PROXY_TOKEN_TRACKING` | `true` | Set `false` to disable body inspection entirely (zero-overhead passthrough). |
+| `AZURE_OPENAI_API_VERSION` | `2024-10-21` | Only consulted when `PROXY_PROVIDER=azure`. Auto-appended as `?api-version=…` to any proxied request that omits it. Set empty to disable auto-append. |
 | `PRICING_CONFIG_PATH` | _(unset)_ | Optional path to a JSON file that **deep-merges** over the bundled `config/pricing.json`. Use this to add models or override prices without forking. |
 | `PROXY_TOKEN_TEE_MAX_BYTES` | `2097152` | Per-request body buffer cap (2 MiB) for token extraction. Larger responses skip extraction so big SSE streams don't pin memory. |
+
+### Compactor (v0.3.0)
+
+Opt-in prompt/response compression. Default off — when `COMPACTOR_ENABLED=false`,
+AIRelay is byte-identical passthrough. See [docs/COMPACTOR.md](docs/COMPACTOR.md)
+for the full feature reference, including the 10 compressors, banner format,
+metrics, safety model, and tuning recipes.
+
+| Var | Default | Notes |
+|---|---|---|
+| `COMPACTOR_ENABLED` | `false` | Master switch. When false, the middleware is a single boolean check — zero overhead. |
+| `COMPACTOR_REQUEST_BODY` | `true` | Compress outgoing prompts. Only meaningful when master switch is on. |
+| `COMPACTOR_RESPONSE_BODY` | `false` | Compress incoming responses (v2 — currently inert). |
+| `COMPACTOR_TOOL_RESULT_ONLY` | `true` | Only mutate inside `tool_result` / `role: "tool"` blocks. When false, all message content (still skips `system` unless `COMPACTOR_ALLOW_RISKY=true`). |
+| `COMPACTOR_ALLOW_RISKY` | `false` | Enable compressors marked `risky:true` (currently only `long-file-elide`). |
+| `COMPACTOR_MAX_REQ_BYTES` | `4194304` | Buffering cap (4 MiB). Requests larger than this respond 413; advise client to retry with `X-Compactor: off`. |
+| `COMPACTOR_LONG_FILE_THRESHOLD` | `400` | Line count above which `long-file-elide` considers a segment "long". |
+| `COMPACTOR_<NAME>_ENABLED` | `true` | Per-compressor toggle. `<NAME>` is uppercased with `_`: e.g. `COMPACTOR_DIFF_COLLAPSE_ENABLED`. |
+
+Per-request header overrides:
+
+| Header | Effect |
+|---|---|
+| `X-Compactor: off` | Skip Compactor for this request — byte-identical passthrough |
+| `X-Compactor: on` | Force Compactor (no-op when master switch is already on) |
+
+Response side: `X-Compactor-Applied: <comma-sep filters>` is added whenever
+Compactor mutated the body or bypassed a streaming request — clients can
+audit which compressors ran.
+
+### Multi-upstream routing (v0.4.0)
+
+When set, AIRelay forwards each prefix to a distinct upstream + provider.
+Backwards-compatible: leave unset and the proxy synthesizes a single route
+from `UPSTREAM_URL` + `PROXY_PATH_PREFIX` + `PROXY_PROVIDER`.
+
+| Var | Default | Notes |
+|---|---|---|
+| `ROUTES_CONFIG_PATH` | unset | Path to a JSON file with `{ "routes": [...] }`. |
+| `PROXY_ROUTES` | unset | Inline JSON (array or `{ routes: [...] }`). Wins over the file. |
+
+Route entry shape:
+
+```json
+{
+  "prefix": "/proxy/anthropic",
+  "upstream": "https://api.anthropic.com",
+  "provider": "anthropic",
+  "trustForwarded": false
+}
+```
+
+- `prefix` must start with `/`. Routes are sorted by descending prefix length
+  so `/proxy/anthropic` matches before a more permissive `/proxy`.
+- `upstream` must be an `http://` or `https://` URL.
+- `provider` is the pricing/parser key (any value accepted by `PROXY_PROVIDER`).
+- `trustForwarded` is per-route. Defaults to the global `PROXY_TRUST_FORWARDED`.
+
+Active routes are listed at `GET /api/metrics/routes` and surfaced in the
+**Route** dropdown on the Metrics tab.
+
+### Metric persistence (v0.4.0)
+
+Opt-in SQLite-backed event store. Default off; when disabled the proxy
+remains a pure ring-buffer system (v0.3.0 behavior).
+
+| Var | Default | Notes |
+|---|---|---|
+| `METRICS_DB_PATH` | unset | Path to the SQLite file. Parent dir auto-created. Empty = no persistence. |
+| `METRICS_RETENTION_DAYS` | `30` | Daily cron prunes events older than this. |
+| `METRICS_WRITE_BATCH_SIZE` | `100` | Flush after this many enqueued events. |
+| `METRICS_WRITE_BATCH_MS` | `1000` | Flush at least this often (whichever comes first). |
+
+Endpoints unlocked when persistence is on:
+
+| Endpoint | Notes |
+|---|---|
+| `GET /api/metrics/history?from=…&to=…&route=…&model=…&limit=…` | Time-range events from SQLite. |
+| `GET /api/metrics/rollups?period=hour\|day\|week&from=…&to=…&route=…&model=…` | Bucketed aggregates: requests, totalTokens, totalCostUsd, errors. |
+| `GET /api/metrics/export.csv?from=…&to=…&route=…` | CSV download with all canonical columns. Falls back to ring buffer when persistence is off. |
+
+Hot-path discipline: `record()` calls `enqueue()` synchronously which only
+pushes onto an in-memory queue. Actual disk I/O is batched on the flush timer.
+
+### Guardrails (v0.4.0)
+
+Opt-in prompt safety: detect secrets, PII, and prompt-injection patterns in
+JSON request bodies. Default off — when `GUARDRAILS_ENABLED=false`, AIRelay
+is byte-identical passthrough. See [docs/GUARDRAILS.md](docs/GUARDRAILS.md)
+for the detector catalog, banner format, metrics, safety model, and
+deployment presets.
+
+| Var | Default | Notes |
+|---|---|---|
+| `GUARDRAILS_ENABLED` | `false` | Master switch. When false, the middleware isn't mounted — zero overhead. |
+| `GUARDRAILS_MAX_REQ_BYTES` | `4194304` | Buffering cap (4 MiB). Larger bodies respond 413; advise client to retry with `X-Guardrails: off`. |
+| `GUARDRAILS_SECRETS_MODE` | `off` | One of `off` / `alert` / `block` / `redact` (see [docs/GUARDRAILS.md §3](docs/GUARDRAILS.md#3-modes)). |
+| `GUARDRAILS_PII_MODE` | `off` | Same enum as secrets. |
+| `GUARDRAILS_INJECTION_MODE` | `off` | Same enum as secrets. |
+| `GUARDRAILS_<NAME>_ENABLED` | varies | Per-detector toggle. `<NAME>` upper-snake-case, e.g. `GUARDRAILS_AWS_ACCESS_KEY_ENABLED`, `GUARDRAILS_EMAIL_ENABLED`. Defaults per detector in [docs/GUARDRAILS.md §4](docs/GUARDRAILS.md#4-detector-catalog). |
+| `GUARDRAILS_CUSTOM_PATTERNS_FILE` | unset | Optional path to a JSON file of operator-defined patterns; see [docs/GUARDRAILS.md §7](docs/GUARDRAILS.md#7-custom-patterns). |
+
+Per-request header override:
+
+| Header | Effect |
+|---|---|
+| `X-Guardrails: off` | Skip Guardrails for this request — no detection, no mutation, byte-identical |
+
+Response side: `X-Guardrails-Applied: <comma-sep detectors>` is added on any
+match (alert / block / redact). On block, status is `422` with a JSON body
+listing the detectors that fired.
+
+#### Deployment presets
+
+| Shape | Recommended modes |
+|---|---|
+| Homelab / Tailscale | All off (default) |
+| Small team | `GUARDRAILS_SECRETS_MODE=alert`, `GUARDRAILS_PII_MODE=alert` |
+| Public / multi-tenant | `GUARDRAILS_SECRETS_MODE=block`, `GUARDRAILS_PII_MODE=redact`, `GUARDRAILS_INJECTION_MODE=block` |
+
+#### Provider support
+
+| Provider value | Compactor support |
+|---|---|
+| `anthropic`, `claude` | Full — walks `messages[].content[]`, mutates `tool_result` and (when scope allows) `text` blocks |
+| `openai`, `azure`, `mistral`, `groq`, `cerebras`, `deepseek`, `xai`, `fireworks`, `together`, `openrouter` | Full — walks `messages[]` and `input[]`, mutates `role: "tool"` and (when scope allows) other text content |
+| anything else (e.g. `generic`, `google`, `ollama`, `nvidia`) | Bypass with `compactor.unsupported_provider` metric counter |
 
 #### Provider setup examples
 
@@ -169,7 +297,39 @@ Prices are expressed in **USD per million tokens** (`$/MTok`). The bundled file 
 
 Drop these into your `.env`:
 
+### Provider directory
+
+Quick links for every named provider the proxy recognises (`PROXY_PROVIDER` value in parentheses):
+
+| Provider | Site | Pricing | Docs |
+|---|---|---|---|
+| Anthropic (`anthropic`) | [anthropic.com](https://www.anthropic.com/) | [pricing](https://www.anthropic.com/pricing) | [docs](https://docs.anthropic.com/) |
+| OpenAI (`openai`) | [openai.com](https://openai.com/) | [pricing](https://openai.com/api/pricing/) | [docs](https://platform.openai.com/docs) |
+| Google Gemini (`google`) | [ai.google.dev](https://ai.google.dev/) | [pricing](https://ai.google.dev/pricing) | [docs](https://ai.google.dev/gemini-api/docs) |
+| Mistral (`mistral`) | [mistral.ai](https://mistral.ai/) | [pricing](https://mistral.ai/pricing) | [docs](https://docs.mistral.ai/) |
+| Groq (`groq`) | [groq.com](https://groq.com/) | [pricing](https://groq.com/pricing/) | [docs](https://console.groq.com/docs) |
+| Microsoft Azure OpenAI (`microsoft`) | [azure.microsoft.com](https://azure.microsoft.com/en-us/products/ai-services/openai-service) | [pricing](https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/) | [docs](https://learn.microsoft.com/en-us/azure/ai-services/openai/) |
+| OpenRouter (`openrouter`) | [openrouter.ai](https://openrouter.ai/) | [models & pricing](https://openrouter.ai/models) | [docs](https://openrouter.ai/docs) |
+| Together AI (`together`) | [together.ai](https://www.together.ai/) | [pricing](https://www.together.ai/pricing) | [docs](https://docs.together.ai/) |
+| Fireworks (`fireworks`) | [fireworks.ai](https://fireworks.ai/) | [pricing](https://fireworks.ai/pricing) | [docs](https://docs.fireworks.ai/) |
+| DeepSeek (`deepseek`) | [deepseek.com](https://www.deepseek.com/) | [pricing](https://api-docs.deepseek.com/quick_start/pricing) | [docs](https://api-docs.deepseek.com/) |
+| xAI (`xai`) | [x.ai](https://x.ai/) | [models & pricing](https://docs.x.ai/docs/models) | [docs](https://docs.x.ai/) |
+| Perplexity (`perplexity`) | [perplexity.ai](https://www.perplexity.ai/) | [pricing](https://docs.perplexity.ai/guides/pricing) | [docs](https://docs.perplexity.ai/) |
+| Ollama (`ollama`) | [ollama.com](https://ollama.com/) | local — $0 | [docs](https://github.com/ollama/ollama/blob/main/docs/api.md) |
+| NVIDIA NIM (`nvidia`) | [build.nvidia.com](https://build.nvidia.com/) | [free tier + credits](https://build.nvidia.com/explore/discover) | [docs](https://docs.api.nvidia.com/) |
+| Cerebras (`cerebras`) | [cerebras.ai](https://cerebras.ai/) | [pricing](https://cerebras.ai/inference) | [docs](https://inference-docs.cerebras.ai/) |
+| Azure OpenAI (`azure`) | [azure.microsoft.com/openai](https://azure.microsoft.com/products/ai-services/openai-service) | [pricing](https://azure.microsoft.com/pricing/details/cognitive-services/openai-service/) | [docs](https://learn.microsoft.com/azure/ai-services/openai/) |
+
+> **`azure` vs `microsoft`**: use `PROXY_PROVIDER=azure` for Azure OpenAI Service
+> (api-key header, per-deployment URL, `api-version` query — proxy handles all of
+> it). `microsoft` is a legacy alias that uses OpenAI's wire format against
+> `api.openai.com` and is kept only for back-compat.
+| AnLinkAI (`anlinkai`) | [anlinkai.com](https://anlinkai.com/) | private beta | — |
+
+
 ### Anthropic (Claude API)
+
+[Anthropic](https://www.anthropic.com/) — [pricing](https://www.anthropic.com/pricing) · [docs](https://docs.anthropic.com/)
 
 ```env
 UPSTREAM_URL=https://api.anthropic.com
@@ -180,6 +340,8 @@ Your SDK keeps sending `x-api-key` and `anthropic-version` — the proxy forward
 
 ### OpenAI
 
+[OpenAI](https://openai.com/) — [pricing](https://openai.com/api/pricing/) · [docs](https://platform.openai.com/docs)
+
 ```env
 UPSTREAM_URL=https://api.openai.com/v1
 PROXY_PATH_PREFIX=/proxy
@@ -189,6 +351,8 @@ The `/v1` is part of the upstream URL so your SDK's `baseURL` ends at `/proxy`. 
 
 ### Google Gemini
 
+[Google AI](https://ai.google.dev/) — [pricing](https://ai.google.dev/pricing) · [docs](https://ai.google.dev/gemini-api/docs)
+
 ```env
 UPSTREAM_URL=https://generativelanguage.googleapis.com
 PROXY_PATH_PREFIX=/proxy
@@ -197,6 +361,8 @@ PROXY_PATH_PREFIX=/proxy
 Gemini accepts the API key as `?key=…` query string or the `x-goog-api-key` header. Both are forwarded.
 
 ### OpenRouter
+
+[OpenRouter](https://openrouter.ai/) — [pricing](https://openrouter.ai/models) · [docs](https://openrouter.ai/docs)
 
 ```env
 UPSTREAM_URL=https://openrouter.ai/api/v1
@@ -218,6 +384,32 @@ CEREBRAS_API_KEY=your-key-here
 [Cerebras](https://cerebras.ai/) runs inference on dedicated wafer-scale hardware.
 Wire format is OpenAI-compatible (`Authorization: Bearer ...`), so any OpenAI SDK works.
 Pricing is per-model; bundled entries cover `llama3.1-8b` and `qwen-3-235b-a22b`.
+
+### Azure OpenAI Service
+
+```env
+UPSTREAM_URL=https://<resource>.openai.azure.com
+PROXY_PATH_PREFIX=/proxy
+PROXY_PROVIDER=azure
+AZURE_OPENAI_API_VERSION=2024-10-21
+```
+
+[Azure OpenAI](https://azure.microsoft.com/products/ai-services/openai-service) speaks
+the OpenAI wire format with two quirks the proxy handles automatically:
+
+1. **Auth header is `api-key: <key>`** (not `Authorization: Bearer …`). Your SDK
+   already sends it — the proxy forwards it untouched.
+2. **`?api-version=YYYY-MM-DD` is mandatory on every request.** AIRelay appends
+   it from `AZURE_OPENAI_API_VERSION` when the request omits it; a caller-supplied
+   `api-version` query is preserved verbatim. Set `AZURE_OPENAI_API_VERSION=` (empty)
+   to disable auto-append.
+
+Per-deployment URL pattern still applies — point your SDK's `baseURL` at
+`<host>/proxy/openai/deployments/<deployment>` and the proxy forwards to
+`<resource>.openai.azure.com/openai/deployments/<deployment>/...?api-version=…`.
+
+Pricing is keyed under `azure` so cost reporting is separate from raw OpenAI;
+bundled entries: `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`, `o1`, `o3-mini`.
 
 ### AnLinkAI (private beta)
 

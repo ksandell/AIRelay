@@ -1,7 +1,85 @@
-# AIRelay E2E Test Plan — Mistral upstream
+# AIRelay E2E Test Plan
 
-Authoritative end-to-end test playbook for the dashboard + proxy. Uses **Mistral**
-as the upstream provider:
+Two complementary layers:
+
+| Layer | Tool | When | Cost |
+|---|---|---|---|
+| **Automated browser E2E** (new in v0.3.0) | Playwright + in-process test server | Every push to main; locally with `npm run test:e2e` | Free, ~30 s |
+| **Visual regression** (new in v0.3.0) | Playwright `toHaveScreenshot()` | Every push to main (Linux baselines) | Free, ~30 s |
+| **Backend integration** | vitest, real HTTP, fake upstream | Every push (already in `npm test`) | Free, ~10 s |
+| **Manual real-LLM playbook** (this doc, below) | Human + real Mistral key | Before each release | Real API spend |
+
+## Automated layer — Playwright
+
+```bash
+# Run functional E2E (browser flows across all 4 tabs)
+npm run test:e2e
+
+# Run visual regression (pixel diff vs committed baselines)
+npm run test:e2e:visual
+
+# Re-bless visual baselines after intentional UI changes
+npm run test:e2e:visual:bless
+
+# Interactive debug UI
+npm run test:e2e:ui
+```
+
+Server boot is in-process: `tests/e2e/fixtures/test-server.js` spawns a
+deterministic fake LLM upstream + AIRelay on port 3100. **No Docker required**
+— Playwright's `webServer` block handles lifecycle. The fake upstream returns
+a fixed Mistral-shaped chat completion so token + cost extraction populate
+realistic numbers without spending real API budget.
+
+Specs live under `tests/e2e/`:
+
+```
+tests/e2e/
+├── fixtures/
+│   ├── test-server.js     in-process bootstrap
+│   └── seed-traffic.js    deterministic seeding helpers
+├── functional/
+│   ├── setup-tab.spec.js
+│   ├── logs-tab.spec.js
+│   ├── metrics-tab.spec.js
+│   └── compactor-tab.spec.js
+├── visual/
+│   └── dashboard.visual.spec.js
+└── __screenshots__/       Linux baselines, committed
+```
+
+Determinism techniques used:
+- `?testMode=1` query param disables Chart.js animations and CSS transitions
+  (see `public/app.js` `TEST_MODE` block + `style.css` `data-test-mode`).
+- Fake upstream returns fixed token counts (`prompt:12, completion:2`) so
+  KPI values are predictable across runs.
+- `fullyParallel: false` + `workers: 1` because the in-process server has
+  shared metrics-ring-buffer state.
+- Visual diffs allow `maxDiffPixelRatio: 0.01` to absorb font-rendering noise.
+- CI pins `ubuntu-22.04` to match committed baselines; locally on Windows
+  visual diffs may be noisy — use `npm run test:e2e` (functional only).
+
+## Chrome MCP visual scenarios (manual, real LLM)
+
+A third layer for **operators with a Claude Code + Chrome MCP session**:
+real LLM traffic, real Mistral, live dashboard inspection. Distinct from
+the automated Playwright suite (which uses a fake upstream).
+
+Runbook: **[compactor/scenarios.md](compactor/scenarios.md)**
+
+Walks 6 bloated-payload scenarios (git diff with lockfile, `ls -l`, npm
+install log, Node stacktrace, 600-line file, base64 image) and verifies
+each targeted compressor fires on real data. Captures evidence screenshots
+under `docs/compactor/evidence/` (not committed by default).
+
+Use this as the final human-in-the-loop validation before tagging a release.
+
+## Manual real-LLM playbook — Mistral upstream
+
+Below is the legacy manual playbook. Use **only** before a release, when you
+want to validate against the real provider:
+
+
 
 ```
 UPSTREAM_URL=https://api.mistral.ai

@@ -34,6 +34,11 @@ describe('loadProvider', () => {
     expect(loadProvider('cerebras')).toBeInstanceOf(CerebrasProvider)
   })
 
+  it('returns AzureOpenAIProvider for "azure"', async () => {
+    const { AzureOpenAIProvider } = await import('../../src/providers/azure.js')
+    expect(loadProvider('azure')).toBeInstanceOf(AzureOpenAIProvider)
+  })
+
   it('returns GenericProvider for unknown name', async () => {
     const { GenericProvider } = await import('../../src/providers/generic.js')
     expect(loadProvider('unknown-xyz')).toBeInstanceOf(GenericProvider)

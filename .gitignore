@@ -7,3 +7,10 @@ dist/
 !tests/fixtures/*.log
 .claude/worktrees/
 coverage/
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+/blob-report/
+scripts/.mcp-*

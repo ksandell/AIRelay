@@ -7,22 +7,38 @@ import { errorHandler } from './middleware/errorHandler.js'
 import healthRouter from './api/health.js'
 import logsRouter from './api/logs.js'
 import metricsRouter from './api/metrics.js'
+import compactorRouter from './api/compactor.js'
+import guardrailsRouter from './api/guardrails.js'
 import { createProxyHandler } from './proxy/proxy.js'
+import { createCompactorMiddleware } from './compactor/middleware.js'
+import { createGuardrailsMiddleware } from './guardrails/middleware.js'
+import { getRoutes } from './routes/registry.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export function createApp() {
   const app = express()
 
-  // Disable etag/x-powered-by for predictability under load.
   app.disable('x-powered-by')
   app.set('etag', false)
 
-  // PROXY MUST BE FIRST.
-  // Mounted before json/static/requestLogger so the bytes flow through unmodified
-  // and the per-request sync logger does not run on the proxy hot path.
-  if (config.upstreamUrl) {
-    app.use(config.proxyPathPrefix, createProxyHandler())
+  // PROXY MUST BE FIRST. Mounted before json/static/requestLogger so the bytes
+  // flow through unmodified and the per-request sync logger does not run on
+  // the proxy hot path.
+  //
+  // Multi-upstream (v0.4.0): iterate each route from getRoutes() and mount the
+  // Compactor + Guardrails middleware (when enabled) and the proxy handler
+  // under that route's prefix. Routes are pre-sorted by descending prefix
+  // length so Express's longest-prefix-wins matching does the right thing.
+  const routes = getRoutes()
+  for (const route of routes) {
+    if (config.compactorEnabled) {
+      app.use(route.prefix, createCompactorMiddleware())
+    }
+    if (config.guardrailsEnabled) {
+      app.use(route.prefix, createGuardrailsMiddleware())
+    }
+    app.use(route.prefix, createProxyHandler(route))
   }
 
   app.use(express.json())
@@ -32,6 +48,8 @@ export function createApp() {
   app.use(healthRouter)
   app.use(logsRouter)
   app.use(metricsRouter)
+  app.use(compactorRouter)
+  app.use(guardrailsRouter)
 
   app.use(errorHandler)
 

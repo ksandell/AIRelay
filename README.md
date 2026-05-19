@@ -7,25 +7,33 @@
 [![Tests: Vitest](https://img.shields.io/badge/tests-vitest-6E9F18.svg?logo=vitest&logoColor=white)](https://vitest.dev)
 [![Status](https://img.shields.io/badge/status-alpha-orange.svg)]()
 
-**An API proxy for AI.** Sits between your codebase and any AI/LLM HTTP API (Anthropic, OpenAI, Gemini, OpenRouter, self-hosted). Forwards bytes unchanged. Surfaces live logs + per-request metrics in a browser dashboard.
+**An API proxy for AI** — with an **opt-in prompt compressor** that shaves bloated tool output before it hits your LLM. Sits between your codebase and any AI/LLM HTTP API (Anthropic, OpenAI, Gemini, OpenRouter, self-hosted). Forwards bytes unchanged by default; transparently shrinks them when you flip the switch. Live logs + per-request metrics in a browser dashboard.
 
 > **What this is not:** a desktop chat client, a CLI assistant, or a browser extension. The target traffic is server-to-API SDK calls from a codebase.
+
+![AIRelay Compressors dashboard](docs/screenshots/compressors.png)
+*The Compressors dashboard — live view of byte savings per compressor, recent events stream, and cumulative ratios.*
+
+![AIRelay metrics dashboard](docs/screenshots/metrics.png)
+*The Metrics dashboard — RPS, latency, token throughput, per-model breakdown, and most-expensive requests.*
 
 ---
 
 ## What you get
 
-- **Transparent passthrough.** Streaming AI responses (SSE / chunked) flow through unmodified — your SDK doesn't know the proxy is there.
-- **Live dashboard.** RPS, p50/p95/p99, error rate, status pills, network + token throughput (In/Out), tokens/sec, recent-requests feed — updated in real time.
+- **Prompt Compressor** — opt-in, deterministic prompt compression. 10 compressors shrink bloated `tool_result` content (git diffs, lockfile diffs, `ls -l`, `npm install` logs, ANSI noise, stack traces, base64 blobs) before forwarding to the LLM. Per-compressor metrics, per-request bypass via `X-Compactor: off`, default off. See [docs/COMPACTOR.md](docs/COMPACTOR.md) — including the [Before / After gallery](docs/COMPACTOR.md#41-before--after-gallery) with concrete byte + token savings per compressor.
+- **Guardrails** — opt-in prompt safety. Detect secrets (AWS / GitHub / Anthropic / OpenAI keys, JWTs, private keys), PII (email, phone, credit-card with Luhn), and prompt-injection patterns in JSON request bodies. Three modes per category: **alert** (record + forward), **block** (reject 422), **redact** (replace match with `<redacted:NAME>` and forward). Per-request bypass via `X-Guardrails: off`, default off. Includes an always-on log sanitizer that strips secret-shaped tokens from persisted logs regardless of the master switch. See [docs/GUARDRAILS.md](docs/GUARDRAILS.md).
+- **Multi-upstream routing** — opt-in routes table (JSON file or inline env JSON) lets one AIRelay instance fan out to multiple providers, e.g. `/proxy/anthropic/* → api.anthropic.com` and `/proxy/openai/* → api.openai.com`. Per-route provider, trust-forwarded override, longest-prefix match. Backwards-compatible with the single-upstream v0.3.0 config. See [docs/ROUTING.md](docs/ROUTING.md).
+- **SQLite metric history, rollups, and CSV export** — opt-in persistence (`METRICS_DB_PATH`) writes every event to a local SQLite database via a batched write-behind queue. Unlocks `/api/metrics/history`, `/api/metrics/rollups?period=hour|day|week`, and `/api/metrics/export.csv`. Dashboard gains a route filter, time-window selector (Live / 5m / 10m / 15m / 30m / 1h / 3h / 6h / 12h / 24h / 7d — drives both the recent table and the RPS / latency / token charts), and CSV download button. See [CONFIGURATION.md §Metric persistence](CONFIGURATION.md#metric-persistence-v040).
+- **Token & cost tracking** — per-request input/output tokens + USD cost for 17 providers ([full list in CONFIGURATION.md](CONFIGURATION.md#token--cost-tracking)). Per-model breakdown via `/api/metrics/models`, sortable by spend.
+- **17 providers** out of the box — Anthropic, OpenAI, Azure, Gemini, xAI, OpenRouter, Together, Fireworks, Groq, Cerebras, DeepSeek, Perplexity, Mistral, NVIDIA, Microsoft, AnLinkAI, Ollama — plus a `generic` mode for anything else.
+- **Live dashboard.** RPS, p50/p95/p99, error rate, status pills, network + token throughput (In/Out), tokens/sec, recent-requests feed, Compressors panel — updated in real time.
+- **Transparent passthrough** by default. Streaming AI responses (SSE / chunked) flow through unmodified — your SDK doesn't know the proxy is there.
 - **Guided setup.** First time you open the dashboard, a Setup tab walks you through generating the right `.env` for your provider.
-- **Token & cost tracking** — per-request input/output tokens + USD cost for 15 providers ([full list in CONFIGURATION.md](CONFIGURATION.md#token--cost-tracking)).
-- **Per-model breakdown** — cost/token aggregates via `/api/metrics/models`, sortable by spend.
-- **Single Docker container.** No DB, no Redis, no system cron. Bring `UPSTREAM_URL` and go.
-- **Cross-platform.** Identical on Windows Docker Desktop, macOS, and Linux.
+- **Single Docker container.** No DB, no Redis, no system cron. Bring `UPSTREAM_URL` and go. Identical on Windows Docker Desktop, macOS, and Linux.
+- **Automated E2E** — Playwright covers Logs, Metrics, Compressors (+ hash-routed Setup) in ~8 s. No Docker required for CI: `npm run test:e2e`. See [docs/e2e-test-plan.md](docs/e2e-test-plan.md).
 
 What shipped in each release: [CHANGELOG.md](CHANGELOG.md). What's coming next: [ROADMAP.md](ROADMAP.md).
-
-![AIRelay metrics dashboard](docs/screenshots/metrics.png)
 
 ---
 
@@ -51,6 +59,8 @@ const client = new Anthropic({
 ```
 
 That's it. Every request now flows through the proxy and shows up on the dashboard.
+
+To enable the Compressor, flip `COMPACTOR_ENABLED=true` in `.env` and restart — env vars are pre-plumbed in `docker-compose.yml`, no side-car required. Full reference: [docs/COMPACTOR.md](docs/COMPACTOR.md).
 
 ### Smoke-test with mock upstream
 
@@ -87,6 +97,7 @@ Full instructions: [docs/e2e-test-plan.md](docs/e2e-test-plan.md)
 |---|---|---|
 | Anthropic | `https://api.anthropic.com` | `anthropic` |
 | OpenAI | `https://api.openai.com/v1` | `openai` |
+| Azure OpenAI | `https://<resource>.openai.azure.com` | `azure` |
 | Google Gemini | `https://generativelanguage.googleapis.com` | `google` |
 | xAI (Grok) | `https://api.x.ai/v1` | `xai` |
 | OpenRouter | `https://openrouter.ai/api/v1` | `openrouter` |
