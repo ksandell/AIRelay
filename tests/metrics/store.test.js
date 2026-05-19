@@ -150,6 +150,155 @@ describe('metrics/store', () => {
     expect(remaining[0].ts).toBe(recent)
   })
 
+  it('roundtrips compactor + guardrails fields', () => {
+    store.enqueue(
+      makeEvent({
+        compactorActive: true,
+        compactorBypass: false,
+        compactorSavedBytes: 1234,
+        compactorCompressors: 'pre-summary,dedup',
+        guardrailsAction: 'redact',
+        guardrailsHits: 3,
+        guardrailsDetectors: 'aws-key,pii-email',
+      }),
+    )
+    store.flushSync()
+    const out = store.queryRange({
+      from: '1970-01-01T00:00:00.000Z',
+      to: '2099-01-01T00:00:00.000Z',
+    })
+    expect(out[0].compactorActive).toBe(true)
+    expect(out[0].compactorBypass).toBe(false)
+    expect(out[0].compactorSavedBytes).toBe(1234)
+    expect(out[0].compactorCompressors).toBe('pre-summary,dedup')
+    expect(out[0].guardrailsAction).toBe('redact')
+    expect(out[0].guardrailsHits).toBe(3)
+    expect(out[0].guardrailsDetectors).toBe('aws-key,pii-email')
+  })
+
+  it('filters by compactorActive=true', () => {
+    store.enqueue(makeEvent({ route: '/proxy/a', compactorActive: true }))
+    store.enqueue(makeEvent({ route: '/proxy/b', compactorActive: false }))
+    store.enqueue(makeEvent({ route: '/proxy/c' })) // null
+    store.flushSync()
+    const out = store.queryRange({
+      from: '1970-01-01T00:00:00.000Z',
+      to: '2099-01-01T00:00:00.000Z',
+      compactorActive: true,
+    })
+    expect(out).toHaveLength(1)
+    expect(out[0].route).toBe('/proxy/a')
+  })
+
+  it('filters by guardrailsAny (hits or non-allow action)', () => {
+    store.enqueue(
+      makeEvent({ route: '/proxy/clean', guardrailsAction: 'allow', guardrailsHits: 0 }),
+    )
+    store.enqueue(makeEvent({ route: '/proxy/hit', guardrailsAction: 'redact', guardrailsHits: 2 }))
+    store.enqueue(
+      makeEvent({ route: '/proxy/block', guardrailsAction: 'block', guardrailsHits: 1 }),
+    )
+    store.enqueue(makeEvent({ route: '/proxy/none' }))
+    store.flushSync()
+    const out = store.queryRange({
+      from: '1970-01-01T00:00:00.000Z',
+      to: '2099-01-01T00:00:00.000Z',
+      guardrailsAny: true,
+    })
+    expect(out.map((e) => e.route).sort()).toEqual(['/proxy/block', '/proxy/hit'])
+  })
+
+  it('aggregates rollups by minute', () => {
+    store.enqueue(makeEvent({ ts: '2026-05-19T10:00:30.000Z' }))
+    store.enqueue(makeEvent({ ts: '2026-05-19T10:00:45.000Z' }))
+    store.enqueue(makeEvent({ ts: '2026-05-19T10:01:10.000Z' }))
+    store.flushSync()
+    const out = store.rollups({
+      period: 'minute',
+      from: '2026-05-19T00:00:00.000Z',
+      to: '2026-05-19T23:59:59.000Z',
+    })
+    expect(out).toHaveLength(2)
+    expect(out[0].bucket).toBe('2026-05-19T10:00:00Z')
+    expect(out[0].requests).toBe(2)
+    expect(out[1].bucket).toBe('2026-05-19T10:01:00Z')
+    expect(out[1].requests).toBe(1)
+  })
+
+  it('aggregates rollups by 5min', () => {
+    store.enqueue(makeEvent({ ts: '2026-05-19T10:00:00.000Z' }))
+    store.enqueue(makeEvent({ ts: '2026-05-19T10:04:59.000Z' }))
+    store.enqueue(makeEvent({ ts: '2026-05-19T10:05:00.000Z' }))
+    store.flushSync()
+    const out = store.rollups({
+      period: '5min',
+      from: '2026-05-19T00:00:00.000Z',
+      to: '2026-05-19T23:59:59.000Z',
+    })
+    expect(out).toHaveLength(2)
+    expect(out[0].requests).toBe(2)
+    expect(out[1].requests).toBe(1)
+  })
+
+  it('aggregates rollups by 15min', () => {
+    store.enqueue(makeEvent({ ts: '2026-05-19T10:00:00.000Z' }))
+    store.enqueue(makeEvent({ ts: '2026-05-19T10:14:00.000Z' }))
+    store.enqueue(makeEvent({ ts: '2026-05-19T10:15:00.000Z' }))
+    store.enqueue(makeEvent({ ts: '2026-05-19T10:29:59.000Z' }))
+    store.flushSync()
+    const out = store.rollups({
+      period: '15min',
+      from: '2026-05-19T00:00:00.000Z',
+      to: '2026-05-19T23:59:59.000Z',
+    })
+    expect(out).toHaveLength(2)
+    expect(out[0].requests).toBe(2)
+    expect(out[1].requests).toBe(2)
+  })
+
+  it('rollups include compactor + guardrails aggregates', () => {
+    store.enqueue(
+      makeEvent({
+        ts: '2026-05-19T10:00:00.000Z',
+        compactorActive: true,
+        compactorSavedBytes: 500,
+        guardrailsHits: 2,
+      }),
+    )
+    store.enqueue(
+      makeEvent({
+        ts: '2026-05-19T10:30:00.000Z',
+        compactorActive: true,
+        compactorSavedBytes: 250,
+        guardrailsAction: 'block',
+      }),
+    )
+    store.flushSync()
+    const out = store.rollups({
+      period: 'day',
+      from: '2026-05-19T00:00:00.000Z',
+      to: '2026-05-20T00:00:00.000Z',
+    })
+    expect(out[0].compactorSavedBytes).toBe(750)
+    expect(out[0].compactorRequests).toBe(2)
+    expect(out[0].guardrailsHitRequests).toBe(1)
+    expect(out[0].guardrailsBlocks).toBe(1)
+  })
+
+  it('migrate() is idempotent — reopening preserves data', async () => {
+    store.enqueue(makeEvent({ route: '/proxy/persist' }))
+    store.flushSync()
+    store.close()
+    const store2 = await import('../../src/metrics/store.js')
+    await store2.open(dbPath)
+    const out = store2.queryRange({
+      from: '1970-01-01T00:00:00.000Z',
+      to: '2099-01-01T00:00:00.000Z',
+    })
+    expect(out).toHaveLength(1)
+    expect(out[0].route).toBe('/proxy/persist')
+  })
+
   it('batched inserts via transaction match individual semantics', () => {
     for (let i = 0; i < 50; i++) {
       store.enqueue(makeEvent({ ts: new Date(Date.now() + i).toISOString() }))

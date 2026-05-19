@@ -3,6 +3,7 @@ import { scan, redact } from './scanner.js'
 import { formatBanner } from './banner.js'
 import { recordGuardrailsEvent, recordDetectorHit } from './metrics.js'
 import { categoriesActive } from './registry.js'
+import { record as recordMainEvent } from '../metrics/collector.js'
 
 const HEADER = 'x-guardrails'
 const APPLIED_HEADER = 'X-Guardrails-Applied'
@@ -75,6 +76,10 @@ function emitBypass(reason, requestId, bytesIn = 0) {
  *   - body > GUARDRAILS_MAX_REQ_BYTES  → returns 413
  *   - parse-error → forwarded as-is
  */
+function attachG(req, fields) {
+  req._guardrailsEvent = { ...(req._guardrailsEvent ?? {}), ...fields }
+}
+
 export function createGuardrailsMiddleware() {
   return async (req, res, next) => {
     // Read & strip the bypass header before forwarding so it never reaches
@@ -82,6 +87,7 @@ export function createGuardrailsMiddleware() {
     // disabled. Mirrors Compactor's strip-on-bypass behavior.
     const bypassed = isBypassValue(req.headers[HEADER])
     if (req.headers[HEADER] !== undefined) delete req.headers[HEADER]
+    if (bypassed) attachG(req, { guardrailsAction: 'bypass', guardrailsHits: 0 })
     if (!shouldRun(bypassed)) return next()
 
     if (req.method !== 'POST' && req.method !== 'PUT' && req.method !== 'PATCH') return next()
@@ -141,6 +147,7 @@ export function createGuardrailsMiddleware() {
 
     // No matches → forward original unchanged.
     if (matches.length === 0) {
+      attachG(req, { guardrailsAction: 'allow', guardrailsHits: 0, guardrailsDetectors: null })
       recordGuardrailsEvent({
         ts: nowIso(),
         requestId: req.requestId,
@@ -166,6 +173,11 @@ export function createGuardrailsMiddleware() {
       for (const m of matches) {
         recordDetectorHit({ name: m.name, hits: 1, bytesRedacted: 0 })
       }
+      attachG(req, {
+        guardrailsAction: 'block',
+        guardrailsHits: matches.length,
+        guardrailsDetectors: blockedNames.join(','),
+      })
       recordGuardrailsEvent({
         ts: nowIso(),
         requestId: req.requestId,
@@ -188,6 +200,34 @@ export function createGuardrailsMiddleware() {
           hint: 'set header X-Guardrails: off to bypass (if your policy allows)',
         }),
       )
+      // Persist the blocked request as a main metric event so the SQLite history
+      // includes guardrails blocks (which never reach the proxy → record()).
+      recordMainEvent({
+        ts: nowIso(),
+        method: req.method,
+        path: req.originalUrl ?? req.url ?? null,
+        status: 422,
+        durationMs: 0,
+        bytesIn: original.length,
+        bytesOut: 0,
+        upstream: null,
+        route: req._route?.prefix ?? null,
+        error: 'guardrails_blocked',
+        provider: null,
+        model: null,
+        inputTokens: null,
+        outputTokens: null,
+        cacheReadTokens: null,
+        cacheWriteTokens: null,
+        totalTokens: null,
+        costUsd: null,
+        toolCalls: null,
+        toolBytesIn: null,
+        toolBytesOut: null,
+        guardrailsAction: 'block',
+        guardrailsHits: matches.length,
+        guardrailsDetectors: blockedNames.join(','),
+      })
       return
     }
 
@@ -247,6 +287,11 @@ export function createGuardrailsMiddleware() {
       })
     }
     const eventMode = modes.size === 1 ? [...modes][0] : 'mixed'
+    attachG(req, {
+      guardrailsAction: eventMode,
+      guardrailsHits: matches.length,
+      guardrailsDetectors: [...new Set(matches.map((m) => m.name))].join(','),
+    })
     recordGuardrailsEvent({
       ts: nowIso(),
       requestId: req.requestId,

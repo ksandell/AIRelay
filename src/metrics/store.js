@@ -52,12 +52,51 @@ CREATE TABLE IF NOT EXISTS events (
   cost_usd REAL,
   tool_calls INTEGER,
   tool_bytes_in INTEGER,
-  tool_bytes_out INTEGER
+  tool_bytes_out INTEGER,
+  compactor_active INTEGER,
+  compactor_bypass INTEGER,
+  compactor_saved_bytes INTEGER,
+  compactor_compressors TEXT,
+  guardrails_action TEXT,
+  guardrails_hits INTEGER,
+  guardrails_detectors TEXT
 );
 CREATE INDEX IF NOT EXISTS events_ts ON events(ts);
 CREATE INDEX IF NOT EXISTS events_route_ts ON events(route, ts);
 CREATE INDEX IF NOT EXISTS events_model_ts ON events(model, ts);
+CREATE INDEX IF NOT EXISTS events_compactor_ts ON events(compactor_active, ts);
+CREATE INDEX IF NOT EXISTS events_guardrails_ts ON events(guardrails_action, ts);
 `
+
+// Idempotent migration for v0.4.x → adds new columns on databases that pre-date
+// the compactor/guardrails fields. Safe to call on every open().
+const ADD_COLUMNS = [
+  ['compactor_active', 'INTEGER'],
+  ['compactor_bypass', 'INTEGER'],
+  ['compactor_saved_bytes', 'INTEGER'],
+  ['compactor_compressors', 'TEXT'],
+  ['guardrails_action', 'TEXT'],
+  ['guardrails_hits', 'INTEGER'],
+  ['guardrails_detectors', 'TEXT'],
+]
+
+function migrate(database) {
+  const existing = new Set(
+    database
+      .prepare('PRAGMA table_info(events)')
+      .all()
+      .map((r) => r.name),
+  )
+  for (const [name, type] of ADD_COLUMNS) {
+    if (!existing.has(name)) {
+      database.exec(`ALTER TABLE events ADD COLUMN ${name} ${type}`)
+    }
+  }
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS events_compactor_ts ON events(compactor_active, ts);
+    CREATE INDEX IF NOT EXISTS events_guardrails_ts ON events(guardrails_action, ts);
+  `)
+}
 
 async function loadModule() {
   if (Database !== null) return Database
@@ -89,18 +128,23 @@ export async function open(dbPath) {
   db.pragma('journal_mode = WAL')
   db.pragma('synchronous = NORMAL')
   db.exec(SCHEMA)
+  migrate(db)
 
   insertStmt = db.prepare(`
     INSERT INTO events (
       ts, method, path, status, duration_ms, bytes_in, bytes_out,
       upstream, route, error, provider, model,
       input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, total_tokens,
-      cost_usd, tool_calls, tool_bytes_in, tool_bytes_out
+      cost_usd, tool_calls, tool_bytes_in, tool_bytes_out,
+      compactor_active, compactor_bypass, compactor_saved_bytes, compactor_compressors,
+      guardrails_action, guardrails_hits, guardrails_detectors
     ) VALUES (
       @ts, @method, @path, @status, @duration_ms, @bytes_in, @bytes_out,
       @upstream, @route, @error, @provider, @model,
       @input_tokens, @output_tokens, @cache_read_tokens, @cache_write_tokens, @total_tokens,
-      @cost_usd, @tool_calls, @tool_bytes_in, @tool_bytes_out
+      @cost_usd, @tool_calls, @tool_bytes_in, @tool_bytes_out,
+      @compactor_active, @compactor_bypass, @compactor_saved_bytes, @compactor_compressors,
+      @guardrails_action, @guardrails_hits, @guardrails_detectors
     )
   `)
 
@@ -137,6 +181,13 @@ function toRow(ev) {
     tool_calls: ev.toolCalls ?? null,
     tool_bytes_in: ev.toolBytesIn ?? null,
     tool_bytes_out: ev.toolBytesOut ?? null,
+    compactor_active: ev.compactorActive == null ? null : ev.compactorActive ? 1 : 0,
+    compactor_bypass: ev.compactorBypass == null ? null : ev.compactorBypass ? 1 : 0,
+    compactor_saved_bytes: ev.compactorSavedBytes ?? null,
+    compactor_compressors: ev.compactorCompressors ?? null,
+    guardrails_action: ev.guardrailsAction ?? null,
+    guardrails_hits: ev.guardrailsHits ?? null,
+    guardrails_detectors: ev.guardrailsDetectors ?? null,
   }
 }
 
@@ -180,7 +231,16 @@ export function pruneOlderThan(retentionDays = config.metricsRetentionDays) {
  * Query events within [from, to] ISO strings, optionally filtered by route or
  * model. Returns plain objects with the canonical event shape (camelCase).
  */
-export function queryRange({ from, to, route = null, model = null, limit = 5000 } = {}) {
+export function queryRange({
+  from,
+  to,
+  route = null,
+  model = null,
+  compactorActive = null,
+  guardrailsAction = null,
+  guardrailsAny = false,
+  limit = 5000,
+} = {}) {
   if (!opened) return []
   flushSync() // make recent writes visible
   const where = ['ts >= @from', 'ts <= @to']
@@ -192,6 +252,18 @@ export function queryRange({ from, to, route = null, model = null, limit = 5000 
   if (model) {
     where.push('model = @model')
     params.model = model
+  }
+  if (compactorActive === true) where.push('compactor_active = 1')
+  else if (compactorActive === false)
+    where.push('(compactor_active IS NULL OR compactor_active = 0)')
+  if (guardrailsAction) {
+    where.push('guardrails_action = @guardrails_action')
+    params.guardrails_action = guardrailsAction
+  }
+  if (guardrailsAny) {
+    where.push(
+      "(guardrails_hits > 0 OR (guardrails_action IS NOT NULL AND guardrails_action <> 'allow'))",
+    )
   }
   const sql = `
     SELECT * FROM events
@@ -206,7 +278,15 @@ export function queryRange({ from, to, route = null, model = null, limit = 5000 
  * Aggregate events into time buckets. Period is one of 'hour' | 'day' | 'week'.
  * Returns [{ bucket, requests, totalTokens, totalCostUsd, errors }].
  */
-export function rollups({ period = 'day', from, to, route = null, model = null }) {
+export function rollups({
+  period = 'day',
+  from,
+  to,
+  route = null,
+  model = null,
+  compactorActive = null,
+  guardrailsAny = false,
+}) {
   if (!opened) return []
   flushSync()
   const fmt = bucketFormat(period)
@@ -220,6 +300,12 @@ export function rollups({ period = 'day', from, to, route = null, model = null }
     where.push('model = @model')
     params.model = model
   }
+  if (compactorActive === true) where.push('compactor_active = 1')
+  if (guardrailsAny) {
+    where.push(
+      "(guardrails_hits > 0 OR (guardrails_action IS NOT NULL AND guardrails_action <> 'allow'))",
+    )
+  }
   // SQLite's strftime + substr work uniformly for our ISO timestamps.
   const sql = `
     SELECT
@@ -227,7 +313,11 @@ export function rollups({ period = 'day', from, to, route = null, model = null }
       COUNT(*) AS requests,
       COALESCE(SUM(total_tokens), 0) AS totalTokens,
       COALESCE(SUM(cost_usd), 0) AS totalCostUsd,
-      SUM(CASE WHEN status >= 400 OR error IS NOT NULL THEN 1 ELSE 0 END) AS errors
+      SUM(CASE WHEN status >= 400 OR error IS NOT NULL THEN 1 ELSE 0 END) AS errors,
+      COALESCE(SUM(compactor_saved_bytes), 0) AS compactorSavedBytes,
+      SUM(CASE WHEN compactor_active = 1 THEN 1 ELSE 0 END) AS compactorRequests,
+      SUM(CASE WHEN guardrails_hits > 0 THEN 1 ELSE 0 END) AS guardrailsHitRequests,
+      SUM(CASE WHEN guardrails_action = 'block' THEN 1 ELSE 0 END) AS guardrailsBlocks
     FROM events
     WHERE ${where.join(' AND ')}
     GROUP BY bucket
@@ -238,6 +328,16 @@ export function rollups({ period = 'day', from, to, route = null, model = null }
 
 function bucketFormat(period) {
   // Use substr() — fast, no parsing — keyed off the ISO-8601 prefix.
+  // ISO format: 2026-05-19T10:23:45.123Z
+  //              1234567890123456789
+  if (period === 'minute') return `substr(ts, 1, 16) || ':00Z'`
+  if (period === '5min') {
+    return `substr(ts, 1, 14) || printf('%02d', (CAST(substr(ts, 15, 2) AS INTEGER) / 5) * 5) || ':00Z'`
+  }
+  if (period === '15min') {
+    // Group by quarter-hour using integer division on the minute.
+    return `substr(ts, 1, 14) || printf('%02d', (CAST(substr(ts, 15, 2) AS INTEGER) / 15) * 15) || ':00Z'`
+  }
   if (period === 'hour') return `substr(ts, 1, 13) || ':00:00Z'`
   if (period === 'week') {
     // strftime('%Y-%W', ts) returns 'YYYY-WW' (ISO week number).
@@ -270,6 +370,13 @@ function rowToEvent(r) {
     toolCalls: r.tool_calls,
     toolBytesIn: r.tool_bytes_in,
     toolBytesOut: r.tool_bytes_out,
+    compactorActive: r.compactor_active == null ? null : !!r.compactor_active,
+    compactorBypass: r.compactor_bypass == null ? null : !!r.compactor_bypass,
+    compactorSavedBytes: r.compactor_saved_bytes,
+    compactorCompressors: r.compactor_compressors,
+    guardrailsAction: r.guardrails_action,
+    guardrailsHits: r.guardrails_hits,
+    guardrailsDetectors: r.guardrails_detectors,
   }
 }
 

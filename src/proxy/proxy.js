@@ -103,6 +103,8 @@ proxy.on('error', (err, req, res) => {
 })
 
 function baseEvent(m) {
+  const ce = m.compactorEvent ?? null
+  const ge = m.guardrailsEvent ?? null
   return {
     ts: m.ts,
     method: m.method,
@@ -125,6 +127,13 @@ function baseEvent(m) {
     toolCalls: null,
     toolBytesIn: null,
     toolBytesOut: null,
+    compactorActive: ce?.compactorActive ?? null,
+    compactorBypass: ce?.compactorBypass ?? null,
+    compactorSavedBytes: ce?.compactorSavedBytes ?? null,
+    compactorCompressors: ce?.compactorCompressors ?? null,
+    guardrailsAction: ge?.guardrailsAction ?? null,
+    guardrailsHits: ge?.guardrailsHits ?? null,
+    guardrailsDetectors: ge?.guardrailsDetectors ?? null,
   }
 }
 
@@ -274,8 +283,18 @@ export function createProxyHandler(route) {
       m.error = m.error || 'client_abort'
     })
 
-    res.on('finish', () => finalize(m, route.providerInstance))
-    res.on('close', () => finalize(m, route.providerInstance))
+    const captureMw = () => {
+      m.compactorEvent = req._compactorEvent ?? null
+      m.guardrailsEvent = req._guardrailsEvent ?? null
+    }
+    res.on('finish', () => {
+      captureMw()
+      finalize(m, route.providerInstance)
+    })
+    res.on('close', () => {
+      captureMw()
+      finalize(m, route.providerInstance)
+    })
 
     // Compactor / Guardrails: if a substitute body was buffered by either
     // middleware, feed it to http-proxy via the `buffer` option so the

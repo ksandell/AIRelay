@@ -44,6 +44,7 @@ beforeAll(async () => {
   process.env.GUARDRAILS_PII_MODE = 'alert'
   process.env.GUARDRAILS_INJECTION_MODE = 'block'
   process.env.GUARDRAILS_PHONE_ENABLED = 'false'
+  process.env.GUARDRAILS_MAX_REQ_BYTES = '1048576' // 1 MiB — pin so the oversize test is deterministic regardless of local .env
 
   const { createApp } = await import('../../src/server.js')
   const app = createApp()

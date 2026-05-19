@@ -100,7 +100,7 @@ router.get('/api/metrics/history', (req, res) => {
 })
 
 // v0.4.0 — bucketed rollups (hour | day | week)
-const VALID_PERIODS = new Set(['hour', 'day', 'week'])
+const VALID_PERIODS = new Set(['minute', '5min', '15min', 'hour', 'day', 'week'])
 router.get('/api/metrics/rollups', (req, res) => {
   if (!storeIsOpen()) {
     return res.status(503).json({

@@ -133,10 +133,46 @@ async function refreshCompactor() {
 }
 
 const compactorRefreshBtn = document.getElementById('compactorRefreshBtn')
-if (compactorRefreshBtn) compactorRefreshBtn.addEventListener('click', refreshCompactor)
+if (compactorRefreshBtn) compactorRefreshBtn.addEventListener('click', refreshCompactorAuto)
 setInterval(() => {
-  if (compactorPanel && !compactorPanel.classList.contains('hidden')) refreshCompactor()
+  if (compactorPanel && !compactorPanel.classList.contains('hidden')) refreshCompactorAuto()
 }, 5000)
+
+const compactorHistoryWindowEl = document.getElementById('compactorHistoryWindow')
+if (compactorHistoryWindowEl) {
+  compactorHistoryWindowEl.addEventListener('change', refreshCompactorAuto)
+}
+
+async function refreshCompactorAuto() {
+  const win = compactorHistoryWindowEl?.value || 'live'
+  if (win === 'live') return refreshCompactor()
+  const range = windowToRange(win)
+  if (!range) return refreshCompactor()
+  await refreshCompactor() // keep KPIs fresh from in-memory
+  const params = new URLSearchParams({ from: range.from, to: range.to, limit: '500' })
+  try {
+    const r = await fetch('/api/compactor/history?' + params)
+    if (!r.ok) return
+    const body = await r.json()
+    const rbody = document.querySelector('#compactorRecentTable tbody')
+    if (!rbody) return
+    rbody.innerHTML = ''
+    for (const ev of body.events ?? []) {
+      const tr = document.createElement('tr')
+      const filters = ev.compactorCompressors || '—'
+      tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
+        <td>request</td>
+        <td>${filters}</td>
+        <td>${ev.bytesIn ?? 0} → ${ev.bytesOut ?? 0}</td>
+        <td>${fmtBytes(ev.compactorSavedBytes ?? 0)}</td>
+        <td>—</td>
+        <td>${ev.compactorBypass ? 'header' : ''}</td>`
+      rbody.appendChild(tr)
+    }
+  } catch {
+    // ignore
+  }
+}
 
 // ─── Guardrails panel ────────────────────────────────────────
 async function refreshGuardrails() {
@@ -216,10 +252,46 @@ async function refreshGuardrails() {
 }
 
 const guardrailsRefreshBtn = document.getElementById('guardrailsRefreshBtn')
-if (guardrailsRefreshBtn) guardrailsRefreshBtn.addEventListener('click', refreshGuardrails)
+if (guardrailsRefreshBtn) guardrailsRefreshBtn.addEventListener('click', refreshGuardrailsAuto)
 setInterval(() => {
-  if (guardrailsPanel && !guardrailsPanel.classList.contains('hidden')) refreshGuardrails()
+  if (guardrailsPanel && !guardrailsPanel.classList.contains('hidden')) refreshGuardrailsAuto()
 }, 5000)
+
+const guardrailsHistoryWindowEl = document.getElementById('guardrailsHistoryWindow')
+if (guardrailsHistoryWindowEl) {
+  guardrailsHistoryWindowEl.addEventListener('change', refreshGuardrailsAuto)
+}
+
+async function refreshGuardrailsAuto() {
+  const win = guardrailsHistoryWindowEl?.value || 'live'
+  if (win === 'live') return refreshGuardrails()
+  const range = windowToRange(win)
+  if (!range) return refreshGuardrails()
+  await refreshGuardrails()
+  const params = new URLSearchParams({ from: range.from, to: range.to, limit: '500' })
+  try {
+    const r = await fetch('/api/guardrails/history?' + params)
+    if (!r.ok) return
+    const body = await r.json()
+    const rbody = document.querySelector('#guardrailsRecentTable tbody')
+    if (!rbody) return
+    rbody.innerHTML = ''
+    for (const ev of body.events ?? []) {
+      const tr = document.createElement('tr')
+      const det = ev.guardrailsDetectors || '—'
+      tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
+        <td>${ev.guardrailsAction ?? '—'}</td>
+        <td>${det}</td>
+        <td>${ev.guardrailsHits ?? 0}</td>
+        <td>${ev.bytesIn ?? 0} → ${ev.bytesOut ?? 0}</td>
+        <td>${ev.guardrailsAction === 'block' ? '✓' : ''}</td>
+        <td>${ev.guardrailsAction === 'bypass' ? 'header' : ''}</td>`
+      rbody.appendChild(tr)
+    }
+  } catch {
+    // ignore
+  }
+}
 
 // ─── Setup panel ─────────────────────────────────────────────
 // `proxyProvider` is the value of PROXY_PROVIDER for pricing/parser dispatch.
@@ -1387,16 +1459,28 @@ const routeFilterEl = document.getElementById('routeFilter')
 const historyWindowEl = document.getElementById('historyWindow')
 const csvBtn = document.getElementById('metricsCsvBtn')
 
-const HISTORY_WINDOWS = {
-  '24h': () => ({
-    from: new Date(Date.now() - 24 * 3600_000).toISOString(),
-    to: new Date().toISOString(),
-  }),
-  '7d': () => ({
-    from: new Date(Date.now() - 7 * 86400_000).toISOString(),
-    to: new Date().toISOString(),
-  }),
+const HISTORY_WINDOW_SECONDS = {
+  '5m': 5 * 60,
+  '1h': 3600,
+  '3h': 3 * 3600,
+  '6h': 6 * 3600,
+  '12h': 12 * 3600,
+  '24h': 24 * 3600,
+  '7d': 7 * 86400,
 }
+
+function windowToRange(value) {
+  const sec = HISTORY_WINDOW_SECONDS[value]
+  if (!sec) return null
+  return {
+    from: new Date(Date.now() - sec * 1000).toISOString(),
+    to: new Date().toISOString(),
+  }
+}
+
+const HISTORY_WINDOWS = Object.fromEntries(
+  Object.keys(HISTORY_WINDOW_SECONDS).map((k) => [k, () => windowToRange(k)]),
+)
 
 function currentRouteFilter() {
   return routeFilterEl?.value || ''
