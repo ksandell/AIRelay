@@ -14,7 +14,9 @@ function loadOverride(configPath) {
   try {
     return JSON.parse(readFileSync(configPath, 'utf8'))
   } catch (err) {
-    throw new Error(`Failed to load PRICING_CONFIG_PATH "${configPath}": ${err.message}`)
+    throw new Error(`Failed to load PRICING_CONFIG_PATH "${configPath}": ${err.message}`, {
+      cause: err,
+    })
   }
 }
 

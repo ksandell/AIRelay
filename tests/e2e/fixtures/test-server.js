@@ -57,7 +57,7 @@ async function startFakeUpstream() {
       raw = Buffer.concat([raw, c])
     })
     req.on('end', () => {
-      let body = null
+      let body
       try {
         body = raw.length ? JSON.parse(raw.toString('utf8')) : null
       } catch {
