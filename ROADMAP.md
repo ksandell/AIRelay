@@ -32,6 +32,8 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.2.7 | ✅ Done | Azure OpenAI adapter (api-key header + auto-appended `api-version` query) + tool-call E2E harness + chart y-axis precision fix |
 | v0.3.0 | ✅ Done | **Compactor + Playwright E2E** — opt-in prompt compression (10 compressors, default-off) + automated Playwright tests across the dashboard (no Docker for CI) |
 | v0.4.0 | ✅ Done | **Guardrails + Persistence + Multi-Upstream** — opt-in prompt safety (secrets / PII / injection detectors, alert/block/redact modes), opt-in SQLite metric history + rollups + CSV export, opt-in multi-upstream routing (per-prefix routes table), dashboard route filter / history window / CSV download, Compactor before/after gallery in docs |
+| v0.4.1 | ✅ Done | **CI green** — committed Linux Playwright baselines (v0.4.0 shipped with win32-only baselines → CI red on `main`), added `Bless visual baselines` workflow + OS-pinning docs, bumped GH Actions to Node 24-compatible v5 majors |
+| v0.4.2 | ✅ Done | **Dependency refresh + CI/security housekeeping** — Node 24 LTS, express 5, http-proxy-3, vitest/eslint/dotenv/fast-check/node-cron/playwright majors; Dependabot + CodeQL + Bless workflows; brotli/gzip token-extraction fix |
 | Future | ⚪ Deferred | Persistence + multi-upstream, Compactor v2, caching, retries, routing intelligence (no committed target release) |
 
 Per-release detail in [CHANGELOG.md](CHANGELOG.md).
@@ -57,6 +59,35 @@ recipe, README row. `pricing-completeness` test bumped to 16 required providers.
 ## v0.2.6 — v0.2.5 cleanup  ✅
 
 **Shipped:** Fix-up release for the v0.2.5 gzip-rotation work. `/api/logs/available` and `/api/logs/history` now correctly enumerate and decode `.log.gz` rotated files (#104, #105). `rotateLogs()` is fully async so Windows no longer fails the rename under an open writable fd (#107). Added `mistral-medium-latest` and `open-mistral-7b` to pricing, plus a one-shot stderr warning the first time an unknown `provider:model` is looked up (#108). `CONFIGURATION.md` and `README.md` provider count corrected to 16 (#106).
+
+---
+
+## v0.4.2 — Dependency refresh + CI/security housekeeping  ✅
+
+**Shipped** (closes GitHub milestone `v0.4.2 — Dependency refresh`, 16 PRs
+landed: [#133](https://github.com/ksandell/AIRelay/pull/133)…[#146](https://github.com/ksandell/AIRelay/pull/146)).
+
+No new product features. Brought every npm major current, replaced
+unmaintained `http-proxy` with `http-proxy-3`, lifted the runtime to Node 24
+LTS (Docker base + `engines.node`), and automated future dep bumps via
+Dependabot. Hot-path invariants (zero sync I/O on the proxy path, SSE
+streaming, raw-byte passthrough) preserved with a perf baseline before/after
+the `http-proxy` swap.
+
+Originally-deferred items — **`express` 4 → 5** and **Node 22 → 24 LTS** —
+were pulled forward into this milestone after the upstream readiness checks
+passed; v0.5.0 / v0.5.1 are now free of dep carry-over.
+
+Two real bugs caught during release sign-off and fixed in-milestone:
+- `bless-baselines.yml` YAML parse error (unindented heredoc inside `run: |`
+  block scalar silently dropped the `workflow_dispatch` trigger).
+- Token / cost metrics for non-streaming OpenAI-compatible responses
+  (Mistral et al.) were silently null when the upstream returned a
+  brotli- or gzip-compressed JSON body. Proxy now decodes `br` / `gzip` /
+  `deflate` response bodies in the post-response `queueMicrotask`, off the
+  hot path, before extraction.
+
+Release notes: [CHANGELOG.md](CHANGELOG.md).
 
 ---
 

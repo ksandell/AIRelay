@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import http from 'node:http'
 import { once } from 'node:events'
+import { gzipSync, brotliCompressSync, deflateSync } from 'node:zlib'
 
 // Each describe block sets env + resets modules so the proxy singleton picks up
 // fresh config (provider singleton is captured at module load).
@@ -287,6 +288,73 @@ describe('proxy token tracking — body exceeding tee cap', () => {
     expect(ev.costUsd).toBeNull()
   })
 })
+
+// Regression: Mistral (and other OpenAI-compatible upstreams) ship brotli-
+// or gzip-compressed JSON for non-streaming responses when the client sends
+// Accept-Encoding. Before this fix, the tee captured the raw compressed
+// bytes, JSON.parse failed, and extractTokens returned null. We now decode
+// in the post-response microtask before extraction.
+for (const [label, encoding, encode] of [
+  ['brotli', 'br', brotliCompressSync],
+  ['gzip', 'gzip', gzipSync],
+  ['deflate', 'deflate', deflateSync],
+]) {
+  describe(`proxy token tracking — decodes ${label}-encoded response bodies`, () => {
+    let upstream, proxyServer, proxyPort
+    const OPENAI_BODY = JSON.stringify({
+      id: 'cmpl_01',
+      model: 'mistral-small-latest',
+      usage: { prompt_tokens: 11, completion_tokens: 7, total_tokens: 18 },
+      choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+    })
+
+    beforeAll(async () => {
+      upstream = makeUpstream((req, res) => {
+        res.statusCode = 200
+        res.setHeader('Content-Type', 'application/json')
+        res.setHeader('Content-Encoding', encoding)
+        res.end(encode(Buffer.from(OPENAI_BODY, 'utf8')))
+      })
+      await once(upstream, 'listening')
+      const upPort = upstream.address().port
+
+      vi.resetModules()
+      process.env.UPSTREAM_URL = `http://127.0.0.1:${upPort}`
+      process.env.PROXY_PATH_PREFIX = '/proxy'
+      process.env.NODE_ENV = 'test'
+      process.env.MAX_METRIC_EVENTS = '1000'
+      process.env.PROXY_TOKEN_TRACKING = 'true'
+      process.env.PROXY_PROVIDER = 'mistral'
+
+      const { createApp } = await import('../../src/server.js')
+      const app = createApp()
+      proxyServer = app.listen(0)
+      await once(proxyServer, 'listening')
+      proxyPort = proxyServer.address().port
+
+      const { _reset } = await import('../../src/metrics/collector.js')
+      _reset()
+    })
+
+    afterAll(async () => {
+      await new Promise((r) => proxyServer.close(r))
+      await new Promise((r) => upstream.close(r))
+    })
+
+    it('extracts tokens from the decoded body', async () => {
+      const r = await request({ port: proxyPort, body: '{"model":"mistral-small-latest"}' })
+      expect(r.status).toBe(200)
+
+      const { recent } = await import('../../src/metrics/collector.js')
+      const ev = await waitForEvent(recent, (e) => e.model === 'mistral-small-latest')
+      expect(ev).not.toBeNull()
+      expect(ev.provider).toBe('mistral')
+      expect(ev.inputTokens).toBe(11)
+      expect(ev.outputTokens).toBe(7)
+      expect(ev.totalTokens).toBe(18)
+    })
+  })
+}
 
 describe('proxy token tracking — provider failure isolation', () => {
   let upstream, proxyServer, proxyPort

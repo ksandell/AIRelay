@@ -5,6 +5,38 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] — 2026-05-19 — Dependency refresh + CI/security housekeeping
+
+No new product features. Coordinated dep + housekeeping bump driven by an
+audit of the Node.js runtime and npm dependencies. All hot-path invariants
+(zero sync I/O on the proxy path, SSE streaming, raw-byte passthrough) were
+preserved with a perf baseline before/after the `http-proxy` swap.
+
+(Version `0.4.1` was skipped to align with the milestone label.)
+
+### Added
+- **Dependabot** weekly grouped npm + GitHub Actions + Docker base PRs ([#138](https://github.com/ksandell/AIRelay/pull/138)).
+- **CodeQL** default JavaScript workflow ([#139](https://github.com/ksandell/AIRelay/pull/139)).
+- **Bless visual baselines** workflow (`workflow_dispatch`) to regenerate the Linux Playwright snapshots from CI ([#143](https://github.com/ksandell/AIRelay/pull/143)).
+- **`scripts/perf-baseline.mjs`** — quick before/after RPS + p95 harness used when swapping core libs ([#146](https://github.com/ksandell/AIRelay/pull/146)).
+- **ADRs 0001 + 0002 + 0002-perf** documenting the `node-cron` and `http-proxy` replacement decisions and the perf gate ([#141](https://github.com/ksandell/AIRelay/pull/141), [#146](https://github.com/ksandell/AIRelay/pull/146)).
+
+### Changed
+- **Node.js 22 → 24 LTS** — Docker base bumped to `node:24.15-alpine3.22` (fully pinned, no floating tag) and `engines.node` bumped to `>=24.0.0` ([#140](https://github.com/ksandell/AIRelay/pull/140), [#144](https://github.com/ksandell/AIRelay/pull/144)).
+- **`express` 4 → 5** — async error propagation, path-to-regexp v8 ([#145](https://github.com/ksandell/AIRelay/pull/145)).
+- **`http-proxy` → `http-proxy-3`** — actively maintained fork; identical proxyRes hot-path semantics, perf baseline regression-free ([#146](https://github.com/ksandell/AIRelay/pull/146)).
+- **`vitest` + `@vitest/coverage-v8` 3 → 4** ([#137](https://github.com/ksandell/AIRelay/pull/137)).
+- **`eslint` 9 → 10** + fix new lint rules ([#134](https://github.com/ksandell/AIRelay/pull/134)).
+- **`dotenv` 16 → 17** + parse-equivalence test ([#135](https://github.com/ksandell/AIRelay/pull/135)).
+- **`fast-check` 3 → 4** ([#136](https://github.com/ksandell/AIRelay/pull/136)).
+- **`node-cron` 3 → 4** ([#142](https://github.com/ksandell/AIRelay/pull/142)).
+- **`@playwright/test` 1.49 → 1.60** + CI image bumped to `mcr.microsoft.com/playwright:v1.60.0-jammy` ([#133](https://github.com/ksandell/AIRelay/pull/133)).
+
+### Fixed
+- **`npm audit`** — moderate transitive `brace-expansion` advisory (GHSA-jxxr-4gwj-5jf2) resolved via `npm audit fix` ([#133](https://github.com/ksandell/AIRelay/pull/133)).
+- **`.github/workflows/bless-baselines.yml`** — repair YAML parse error caused by an unindented heredoc inside a `run: |` block scalar, which silently dropped the `workflow_dispatch` trigger and made the workflow undispatchable.
+- **Token / cost metrics for non-streaming OpenAI-compatible responses** (Mistral et al.) were not captured when the upstream returned a compressed JSON body. The proxy now decodes `br` / `gzip` / `deflate` response bodies in the post-response `queueMicrotask` (still off the hot path) before extraction. Streaming SSE was unaffected because servers skip compression for `text/event-stream`.
+
 ## [0.4.0] — 2026-05-19 — Guardrails + Persistence + Multi-Upstream
 
 ### Added

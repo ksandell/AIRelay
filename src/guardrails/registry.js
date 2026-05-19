@@ -166,7 +166,9 @@ function loadCustom() {
     }))
   } catch (err) {
     // Loud-fail so misconfig is obvious at startup, not on first request.
-    throw new Error(`failed to load GUARDRAILS_CUSTOM_PATTERNS_FILE=${path}: ${err.message}`)
+    throw new Error(`failed to load GUARDRAILS_CUSTOM_PATTERNS_FILE=${path}: ${err.message}`, {
+      cause: err,
+    })
   }
   return customCache
 }
