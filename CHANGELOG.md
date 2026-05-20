@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **API rate limiting** — `/health` and `/api/*` routes are now capped per IP via `express-rate-limit` (`API_RATE_LIMIT_WINDOW_MS`, `API_RATE_LIMIT_MAX`; default 600 req/min). The proxy hot path is never rate-limited and continues to absorb unbounded concurrency.
 
+### Changed
+- **CI: CodeQL Action `v3` → `v4`** ([#150](https://github.com/ksandell/AIRelay/issues/150)) — GitHub deprecates the v3 action in December 2026; `.github/workflows/codeql.yml` now pins `init`/`analyze` to `@v4`.
+
 ### Fixed
 - **Log rotation TOCTOU** — `rotation.js` no longer does check-then-use (`existsSync` → `rename`/`writeFile`); it acts directly and handles `ENOENT`, closing a file-system race between the daily cron rotation and the size guard.
 - **CodeQL code-scanning alerts cleared** — predictable temp-file paths in `tests/` replaced with `fs.mkdtempSync` private dirs; removed dead `makeDualLineChart` and an always-true guard in `public/app.js`.
