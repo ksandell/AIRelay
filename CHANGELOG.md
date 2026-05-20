@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **CI: CodeQL Action `v3` → `v4`** ([#150](https://github.com/ksandell/AIRelay/issues/150)) — GitHub deprecates the v3 action in December 2026; `.github/workflows/codeql.yml` now pins `init`/`analyze` to `@v4`.
+- **CI: `actions/checkout` + `actions/setup-node` `v4` → `v5`** ([#153](https://github.com/ksandell/AIRelay/issues/153)) — Node 20-based action majors are deprecated (runners force Node 24 from June 2026); bumped across `codeql.yml`, `e2e.yml`, `bless-baselines.yml`.
 
 ### Fixed
 - **Log rotation TOCTOU** — `rotation.js` no longer does check-then-use (`existsSync` → `rename`/`writeFile`); it acts directly and handles `ENOENT`, closing a file-system race between the daily cron rotation and the size guard.
