@@ -59,6 +59,8 @@ Every variable, what it does, and when you'd touch it. Defaults match `.env.exam
 | `NODE_ENV` | `development` | `production` skips `dotenv` loading and turns on production niceties. |
 | `PUBLIC_BASE_URL` | _(unset)_ | Informational only — appears in `/health` and the dashboard footer. Has no effect on routing. |
 | `TZ` | `UTC` | **Do not change.** All timestamps and rotation logic assume UTC. |
+| `API_RATE_LIMIT_WINDOW_MS` | `60000` | Rolling window for the `/health` + `/api/*` rate limiter. The proxy hot path is never rate-limited. |
+| `API_RATE_LIMIT_MAX` | `600` | Max requests per IP per window to `/health` + `/api/*`. Over the limit returns `429`. |
 | `SHUTDOWN_TIMEOUT_MS` | `30000` | How long to wait for in-flight requests to drain on `SIGTERM` before forced exit. |
 
 ### Proxy

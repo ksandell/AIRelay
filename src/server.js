@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { config } from './config.js'
 import { requestLogger } from './middleware/requestLogger.js'
+import { apiRateLimiter } from './middleware/rateLimiter.js'
 import { errorHandler } from './middleware/errorHandler.js'
 import healthRouter from './api/health.js'
 import logsRouter from './api/logs.js'
@@ -45,6 +46,7 @@ export function createApp() {
   app.use(requestLogger)
   app.use(express.static(path.join(__dirname, '..', 'public')))
 
+  app.use(apiRateLimiter)
   app.use(healthRouter)
   app.use(logsRouter)
   app.use(metricsRouter)

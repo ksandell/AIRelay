@@ -64,7 +64,8 @@ describe('routes/registry', () => {
   })
 
   it('loads routes from a config file when ROUTES_CONFIG_PATH is set', async () => {
-    const tmp = path.join(os.tmpdir(), `airelay-routes-${Date.now()}.json`)
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'airelay-'))
+    const tmp = path.join(dir, 'routes.json')
     fs.writeFileSync(
       tmp,
       JSON.stringify({
@@ -79,12 +80,13 @@ describe('routes/registry', () => {
       expect(routes).toHaveLength(1)
       expect(routes[0].upstream).toBe('http://a.local')
     } finally {
-      fs.unlinkSync(tmp)
+      fs.rmSync(dir, { recursive: true, force: true })
     }
   })
 
   it('PROXY_ROUTES wins over ROUTES_CONFIG_PATH', async () => {
-    const tmp = path.join(os.tmpdir(), `airelay-routes-${Date.now()}.json`)
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'airelay-'))
+    const tmp = path.join(dir, 'routes.json')
     fs.writeFileSync(
       tmp,
       JSON.stringify({ routes: [{ prefix: '/file', upstream: 'http://file.local' }] }),
@@ -99,7 +101,7 @@ describe('routes/registry', () => {
       expect(routes).toHaveLength(1)
       expect(routes[0].prefix).toBe('/env')
     } finally {
-      fs.unlinkSync(tmp)
+      fs.rmSync(dir, { recursive: true, force: true })
     }
   })
 

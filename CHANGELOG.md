@@ -5,6 +5,15 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **API rate limiting** — `/health` and `/api/*` routes are now capped per IP via `express-rate-limit` (`API_RATE_LIMIT_WINDOW_MS`, `API_RATE_LIMIT_MAX`; default 600 req/min). The proxy hot path is never rate-limited and continues to absorb unbounded concurrency.
+
+### Fixed
+- **Log rotation TOCTOU** — `rotation.js` no longer does check-then-use (`existsSync` → `rename`/`writeFile`); it acts directly and handles `ENOENT`, closing a file-system race between the daily cron rotation and the size guard.
+- **CodeQL code-scanning alerts cleared** — predictable temp-file paths in `tests/` replaced with `fs.mkdtempSync` private dirs; removed dead `makeDualLineChart` and an always-true guard in `public/app.js`.
+
 ## [0.4.3] — 2026-05-19 — CI: Linux Playwright baselines (the missing piece)
 
 ### Fixed
