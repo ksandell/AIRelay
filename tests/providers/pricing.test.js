@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { writeFileSync, unlinkSync, readFileSync } from 'node:fs'
+import { writeFileSync, mkdtempSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -42,12 +42,13 @@ describe('loadPricing', () => {
 
   it('deep-merges override file over bundled defaults', () => {
     const override = { providers: { openai: { 'gpt-custom': { input: 99.0, output: 99.0 } } } }
-    const tmpPath = join(tmpdir(), 'test-pricing-override.json')
+    const dir = mkdtempSync(join(tmpdir(), 'airelay-'))
+    const tmpPath = join(dir, 'pricing-override.json')
     writeFileSync(tmpPath, JSON.stringify(override))
     const pricing = loadPricing('openai', tmpPath)
     expect(pricing['gpt-custom']).toMatchObject({ input: 99.0 })
     expect(pricing['gpt-4o']).toBeDefined()
-    unlinkSync(tmpPath)
+    rmSync(dir, { recursive: true, force: true })
   })
 })
 

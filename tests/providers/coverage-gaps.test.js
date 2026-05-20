@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { writeFileSync, unlinkSync } from 'node:fs'
+import { writeFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { loadPricing } from '../../src/providers/pricing.js'
@@ -17,11 +17,12 @@ describe('pricing override error path', () => {
   })
 
   it('accepts override without providers wrapper', () => {
-    const tmpPath = join(tmpdir(), 'test-pricing-flat.json')
+    const dir = mkdtempSync(join(tmpdir(), 'airelay-'))
+    const tmpPath = join(dir, 'pricing-flat.json')
     writeFileSync(tmpPath, JSON.stringify({ openai: { 'foo-model': { input: 1, output: 2 } } }))
     const p = loadPricing('openai', tmpPath)
     expect(p['foo-model']).toMatchObject({ input: 1, output: 2 })
-    unlinkSync(tmpPath)
+    rmSync(dir, { recursive: true, force: true })
   })
 })
 

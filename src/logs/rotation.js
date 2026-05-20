@@ -53,16 +53,20 @@ export async function rotateLogs() {
   const date = todayUTC()
 
   beginRotation()
-  let rotatedDest = null
+  let rotatedDest
   try {
     // 1. Fully close the active write stream BEFORE the rename. On Windows an
     //    open write handle holds a kernel lock that blocks rename; closing
     //    sync isn't enough — must await fd release via the stream 'close' event.
     await closeActiveStream()
 
-    if (fs.existsSync(active)) {
-      rotatedDest = uniqueRotatedPath(date)
+    rotatedDest = uniqueRotatedPath(date)
+    try {
       fs.renameSync(active, rotatedDest)
+    } catch (err) {
+      if (err.code !== 'ENOENT') throw err
+      // No active log to rotate — nothing was renamed.
+      rotatedDest = null
     }
     // 2. Recreate active file and reopen the sink IMMEDIATELY after rename so
     //    the rotation drop-window (during which logger writes are skipped) is
@@ -105,13 +109,15 @@ export function cleanupOldLogs() {
 export async function rotateLogsIfNeeded() {
   const active = activeLog()
 
-  if (!fs.existsSync(active)) {
+  let stat
+  try {
+    stat = fs.statSync(active)
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err
     fs.mkdirSync(config.logDir, { recursive: true })
     fs.writeFileSync(active, '', 'utf8')
     return
   }
-
-  const stat = fs.statSync(active)
   const lastModDate = stat.mtime.toISOString().slice(0, 10)
   const today = todayUTC()
 

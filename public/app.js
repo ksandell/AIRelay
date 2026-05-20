@@ -1018,61 +1018,6 @@ function makeLineChart(canvasId, color) {
 const chartRps = makeLineChart('chartRps', '#58a6ff')
 const chartLat = makeLineChart('chartLat', '#d29922')
 
-function makeDualLineChart(canvasId, color1, color2, label1, label2) {
-  return new Chart(document.getElementById(canvasId), {
-    type: 'line',
-    data: {
-      labels: tickLabels,
-      datasets: [
-        {
-          label: label1,
-          data: [],
-          borderColor: color1,
-          backgroundColor: color1 + '22',
-          fill: false,
-          tension: 0.25,
-          pointRadius: 0,
-          borderWidth: 1.5,
-        },
-        {
-          label: label2,
-          data: [],
-          borderColor: color2,
-          backgroundColor: color2 + '22',
-          fill: false,
-          tension: 0.25,
-          pointRadius: 0,
-          borderWidth: 1.5,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      plugins: {
-        legend: {
-          display: true,
-          position: 'top',
-          labels: { color: '#8b949e', font: { size: 10 }, boxWidth: 12 },
-        },
-        tooltip: { mode: 'index', intersect: false },
-      },
-      scales: {
-        x: {
-          ticks: { color: '#8b949e', maxTicksLimit: 6, font: { size: 10 } },
-          grid: { color: '#21262d' },
-        },
-        y: {
-          ticks: { color: '#8b949e', font: { size: 10 }, callback: fmtAxis },
-          grid: { color: '#21262d' },
-          beginAtZero: true,
-        },
-      },
-    },
-  })
-}
-
 function makeDivergingTokensChart(canvasId) {
   return new Chart(document.getElementById(canvasId), {
     type: 'line',
@@ -1579,7 +1524,7 @@ async function refreshRecentForWindow() {
   const events = await loadHistoryEvents()
   if (events === null) {
     // live mode — fall back to the existing ring-buffer fetch
-    if (typeof loadRecent === 'function') loadRecent()
+    loadRecent()
     return
   }
   recentTbody.innerHTML = ''
