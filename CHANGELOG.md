@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-06-04 — Zero-config provider routing
+
 ### Added
+- **Provider-prefixed routing alias** — when a single upstream is configured the legacy way (`UPSTREAM_URL` + `PROXY_PROVIDER`), AIRelay now mounts a `<PROXY_PATH_PREFIX>/<provider>` alias alongside the bare prefix. An SDK pointed at `http://airelay.local:3000/proxy/mistral` reaches the upstream with **zero extra config** — previously the trailing `/mistral` was forwarded verbatim and the upstream returned a confusing 404. The bare `/proxy` path keeps working unchanged. Skipped for `provider=generic` (no meaningful name) and when the prefix already ends in the provider name. Explicit `PROXY_ROUTES` / `ROUTES_CONFIG_PATH` configs are never auto-aliased. See [docs/ROUTING.md](docs/ROUTING.md).
 - **API rate limiting** — `/health` and `/api/*` routes are now capped per IP via `express-rate-limit` (`API_RATE_LIMIT_WINDOW_MS`, `API_RATE_LIMIT_MAX`; default 600 req/min). The proxy hot path is never rate-limited and continues to absorb unbounded concurrency.
 
 ### Changed
