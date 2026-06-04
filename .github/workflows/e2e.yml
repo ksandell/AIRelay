@@ -5,6 +5,11 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      update_snapshots:
+        description: 'Re-bless visual baselines on the runner and upload them as an artifact'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -36,7 +41,20 @@ jobs:
         run: npm run test:e2e
 
       - name: Visual regression
+        if: ${{ github.event.inputs.update_snapshots != 'true' }}
         run: npm run test:e2e:visual
+
+      - name: Re-bless visual baselines
+        if: ${{ github.event.inputs.update_snapshots == 'true' }}
+        run: npm run test:e2e:visual:bless
+
+      - name: Upload re-blessed baselines
+        if: ${{ github.event.inputs.update_snapshots == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baselines
+          path: tests/e2e/visual/**/*-snapshots/**
+          retention-days: 7
 
       - name: Upload Playwright report on failure
         if: failure()
