@@ -35,7 +35,7 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.4.1 | ✅ Done | **CI green** — committed Linux Playwright baselines (v0.4.0 shipped with win32-only baselines → CI red on `main`), added `Bless visual baselines` workflow + OS-pinning docs, bumped GH Actions to Node 24-compatible v5 majors |
 | v0.4.2 | ✅ Done | **Dependency refresh + CI/security housekeeping** — Node 24 LTS, express 5, http-proxy-3, vitest/eslint/dotenv/fast-check/node-cron/playwright majors; Dependabot + CodeQL + Bless workflows; brotli/gzip token-extraction fix |
 | v0.4.3 | ✅ Done | **CI: Linux Playwright baselines** — committed the 5 missing `*-visual-linux.png` baselines so the `ubuntu-22.04` visual e2e job is green; documented the OS-pinning gotcha in [docs/e2e-test-plan.md](docs/e2e-test-plan.md) |
-| v0.4.next | 🚧 Active | **CodeQL & security housekeeping** — cleared all open code-scanning alerts (insecure temp files, log-rotation FS race, dead code), added per-IP rate limiting on `/health` + `/api/*`, bumped CodeQL Action `v3` → `v4` |
+| v0.5.0 | ✅ Done | **Zero-config provider routing** — single-upstream deployments auto-mount a `/proxy/<provider>` alias so SDKs pointed at the provider-named path work without writing `PROXY_ROUTES`; folds in the prior v0.4.next housekeeping (per-IP rate limiting on `/health` + `/api/*`, cleared CodeQL alerts, log-rotation TOCTOU fix, CodeQL Action `v3` → `v4`) |
 | Future | ⚪ Deferred | Persistence + multi-upstream, Compactor v2, caching, retries, routing intelligence (no committed target release) |
 
 Per-release detail in [CHANGELOG.md](CHANGELOG.md).
