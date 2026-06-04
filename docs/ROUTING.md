@@ -23,6 +23,25 @@ Two sources, evaluated in priority order:
 If neither is set, the v0.3.0 single-route fallback runs from
 `UPSTREAM_URL` + `PROXY_PATH_PREFIX` + `PROXY_PROVIDER`.
 
+### Provider-prefix alias (v0.5.0)
+
+In the single-route fallback, AIRelay mounts **two** prefixes when a concrete
+provider is set:
+
+| Prefix | Example request | Forwarded to |
+|---|---|---|
+| `PROXY_PATH_PREFIX` (bare) | `/proxy/v1/models` | `<UPSTREAM_URL>/v1/models` |
+| `PROXY_PATH_PREFIX`/`<provider>` (alias) | `/proxy/mistral/v1/models` | `<UPSTREAM_URL>/v1/models` |
+
+So with `UPSTREAM_URL=https://api.mistral.ai` and `PROXY_PROVIDER=mistral`, an
+SDK pointed at either `…:3000/proxy` **or** `…:3000/proxy/mistral` reaches the
+upstream — no `PROXY_ROUTES` needed. The alias is skipped when
+`PROXY_PROVIDER=generic` (no meaningful name) or when `PROXY_PATH_PREFIX`
+already ends in the provider name (e.g. `PROXY_PATH_PREFIX=/proxy/mistral`).
+
+Explicit `PROXY_ROUTES` / `ROUTES_CONFIG_PATH` configs are **never**
+auto-aliased — you control the prefixes verbatim.
+
 ### File schema
 
 ```json

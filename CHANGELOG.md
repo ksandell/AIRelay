@@ -5,6 +5,30 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.5.0] — 2026-06-04 — Zero-config provider routing
+
+### Added
+- **Provider-prefixed routing alias** — when a single upstream is configured the legacy way (`UPSTREAM_URL` + `PROXY_PROVIDER`), AIRelay now mounts a `<PROXY_PATH_PREFIX>/<provider>` alias alongside the bare prefix. An SDK pointed at `http://airelay.local:3000/proxy/mistral` reaches the upstream with **zero extra config** — previously the trailing `/mistral` was forwarded verbatim and the upstream returned a confusing 404. The bare `/proxy` path keeps working unchanged. Skipped for `provider=generic` (no meaningful name) and when the prefix already ends in the provider name. Explicit `PROXY_ROUTES` / `ROUTES_CONFIG_PATH` configs are never auto-aliased. See [docs/ROUTING.md](docs/ROUTING.md).
+- **API rate limiting** — `/health` and `/api/*` routes are now capped per IP via `express-rate-limit` (`API_RATE_LIMIT_WINDOW_MS`, `API_RATE_LIMIT_MAX`; default 600 req/min). The proxy hot path is never rate-limited and continues to absorb unbounded concurrency.
+
+### Changed
+- **CI: CodeQL Action `v3` → `v4`** ([#150](https://github.com/ksandell/AIRelay/issues/150)) — GitHub deprecates the v3 action in December 2026; `.github/workflows/codeql.yml` now pins `init`/`analyze` to `@v4`.
+- **CI: `actions/checkout` + `actions/setup-node` `v4` → `v5`** ([#153](https://github.com/ksandell/AIRelay/issues/153)) — Node 20-based action majors are deprecated (runners force Node 24 from June 2026); bumped across `codeql.yml`, `e2e.yml`, `bless-baselines.yml`.
+
+### Fixed
+- **Log rotation TOCTOU** — `rotation.js` no longer does check-then-use (`existsSync` → `rename`/`writeFile`); it acts directly and handles `ENOENT`, closing a file-system race between the daily cron rotation and the size guard.
+- **CodeQL code-scanning alerts cleared** — predictable temp-file paths in `tests/` replaced with `fs.mkdtempSync` private dirs; removed dead `makeDualLineChart` and an always-true guard in `public/app.js`.
+
+## [0.4.3] — 2026-05-19 — CI: Linux Playwright baselines (the missing piece)
+
+### Fixed
+- **Visual e2e job green on `ubuntu-22.04`** ([#148](https://github.com/ksandell/AIRelay/pull/148)) — v0.4.0 shipped with only `*-visual-win32.png` baselines, so every Linux runner wrote actuals and the visual step failed all 5 dashboard specs. This commits the 5 missing `*-visual-linux.png` baselines generated inside `mcr.microsoft.com/playwright:v1.60.0-jammy` so they match the CI image exactly. (Salvaged from the now-closed [#119](https://github.com/ksandell/AIRelay/pull/119), with the obsolete v0.4.1 metadata dropped because v0.4.2 had already overtaken it.)
+
+### Changed
+- **`docs/e2e-test-plan.md`** documents the OS-pinning gotcha (Playwright suffixes baselines per-OS) and points at the already-shipped [.github/workflows/bless-baselines.yml](.github/workflows/bless-baselines.yml) for regenerating Linux baselines after intentional UI changes.
+
 ## [0.4.2] — 2026-05-19 — Dependency refresh + CI/security housekeeping
 
 No new product features. Coordinated dep + housekeeping bump driven by an

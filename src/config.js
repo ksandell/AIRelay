@@ -27,6 +27,11 @@ export const config = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   publicBaseUrl: process.env.PUBLIC_BASE_URL ?? null,
 
+  // API rate limiting — caps requests per IP to the dashboard/API routes
+  // (/health, /api/*). The proxy hot path is never rate-limited.
+  apiRateLimitWindowMs: int('API_RATE_LIMIT_WINDOW_MS', 60_000),
+  apiRateLimitMax: int('API_RATE_LIMIT_MAX', 600),
+
   // Logging
   logDir: process.env.LOG_DIR ?? './data/logs',
   logRetentionDays: int('LOG_RETENTION_DAYS', 7),

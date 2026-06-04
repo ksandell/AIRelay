@@ -34,9 +34,33 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.4.0 | ✅ Done | **Guardrails + Persistence + Multi-Upstream** — opt-in prompt safety (secrets / PII / injection detectors, alert/block/redact modes), opt-in SQLite metric history + rollups + CSV export, opt-in multi-upstream routing (per-prefix routes table), dashboard route filter / history window / CSV download, Compactor before/after gallery in docs |
 | v0.4.1 | ✅ Done | **CI green** — committed Linux Playwright baselines (v0.4.0 shipped with win32-only baselines → CI red on `main`), added `Bless visual baselines` workflow + OS-pinning docs, bumped GH Actions to Node 24-compatible v5 majors |
 | v0.4.2 | ✅ Done | **Dependency refresh + CI/security housekeeping** — Node 24 LTS, express 5, http-proxy-3, vitest/eslint/dotenv/fast-check/node-cron/playwright majors; Dependabot + CodeQL + Bless workflows; brotli/gzip token-extraction fix |
+| v0.4.3 | ✅ Done | **CI: Linux Playwright baselines** — committed the 5 missing `*-visual-linux.png` baselines so the `ubuntu-22.04` visual e2e job is green; documented the OS-pinning gotcha in [docs/e2e-test-plan.md](docs/e2e-test-plan.md) |
+| v0.5.0 | ✅ Done | **Zero-config provider routing** — single-upstream deployments auto-mount a `/proxy/<provider>` alias so SDKs pointed at the provider-named path work without writing `PROXY_ROUTES`; folds in the prior v0.4.next housekeeping (per-IP rate limiting on `/health` + `/api/*`, cleared CodeQL alerts, log-rotation TOCTOU fix, CodeQL Action `v3` → `v4`) |
 | Future | ⚪ Deferred | Persistence + multi-upstream, Compactor v2, caching, retries, routing intelligence (no committed target release) |
 
 Per-release detail in [CHANGELOG.md](CHANGELOG.md).
+
+---
+
+## v0.4.next — CodeQL & security housekeeping  🚧
+
+**In progress** (GitHub milestone `v0.4.next` — gathers all next-version work).
+
+No new product features. A code-scanning-driven hardening pass plus a CI
+action bump:
+
+- **CodeQL code-scanning alerts cleared** — every open alert resolved.
+  Insecure temp-file paths in `tests/` swapped to `fs.mkdtempSync` private
+  dirs; the `rotation.js` `existsSync` check-then-use replaced with direct
+  ops + `ENOENT` handling (closes the cron-vs-sizeGuard file-system race);
+  dead `makeDualLineChart` and an always-true guard removed from `app.js`.
+- **API rate limiting** — `express-rate-limit` on `/health` + `/api/*`
+  (`API_RATE_LIMIT_*`, default 600 req/min). The proxy hot path is never
+  rate-limited.
+- **CI: CodeQL Action `v3` → `v4`** ([#150](https://github.com/ksandell/AIRelay/issues/150)) —
+  ahead of GitHub's December 2026 v3 deprecation.
+
+Release notes: [CHANGELOG.md](CHANGELOG.md) `[Unreleased]` section.
 
 ---
 
@@ -192,7 +216,7 @@ section above for details.
 - **Per-API-key budgets** — daily $ limit per inbound key with a 429 when exceeded.
 - **WebSocket / Realtime API support** — `server.on('upgrade')` passthrough.
 - **Auth on the dashboard** — basic auth or OIDC, only if leaving the homelab.
-- **Rate limiting** — per-IP / per-key / global throttling middleware for the proxy prefix. (Considered with Guardrails v0.4.0, deferred.)
+- **Rate limiting** — per-IP / per-key / global throttling for the **proxy prefix**. (Considered with Guardrails v0.4.0, deferred. Note: per-IP limiting for the `/health` + `/api/*` dashboard routes shipped in v0.4.next; the proxy hot path remains deliberately unthrottled.)
 - **Guardrails v2** — response-side detectors (model-output PII / secret leakage), streaming-aware partial scans, per-category metrics splits by detector.
 
 > ✅ Shipped in v0.4.0: **prompt redaction in stored logs** (always-on log

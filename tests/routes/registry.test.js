@@ -31,18 +31,59 @@ async function fresh() {
 }
 
 describe('routes/registry', () => {
-  it('synthesizes a single route from legacy env vars', async () => {
+  it('synthesizes base + provider-alias routes from legacy env vars', async () => {
     process.env.UPSTREAM_URL = 'https://api.anthropic.com'
     process.env.PROXY_PATH_PREFIX = '/proxy'
     process.env.PROXY_PROVIDER = 'anthropic'
+    delete process.env.PROXY_ROUTES
+    delete process.env.ROUTES_CONFIG_PATH
+    const { getRoutes, routeForPath } = await fresh()
+    const routes = getRoutes()
+    // Base `/proxy` plus an auto-alias `/proxy/anthropic`, sorted longest-first.
+    expect(routes).toHaveLength(2)
+    expect(routes.map((r) => r.prefix)).toEqual(['/proxy/anthropic', '/proxy'])
+    for (const r of routes) {
+      expect(r.upstream).toBe('https://api.anthropic.com')
+      expect(r.provider).toBe('anthropic')
+    }
+    // Both the bare prefix and the provider-named prefix reach the upstream.
+    expect(routeForPath('/proxy/v1/messages').prefix).toBe('/proxy')
+    expect(routeForPath('/proxy/anthropic/v1/messages').prefix).toBe('/proxy/anthropic')
+  })
+
+  it('does not add a provider alias for the generic provider', async () => {
+    process.env.UPSTREAM_URL = 'https://api.example.com'
+    process.env.PROXY_PATH_PREFIX = '/proxy'
+    process.env.PROXY_PROVIDER = 'generic'
     delete process.env.PROXY_ROUTES
     delete process.env.ROUTES_CONFIG_PATH
     const { getRoutes } = await fresh()
     const routes = getRoutes()
     expect(routes).toHaveLength(1)
     expect(routes[0].prefix).toBe('/proxy')
-    expect(routes[0].upstream).toBe('https://api.anthropic.com')
-    expect(routes[0].provider).toBe('anthropic')
+  })
+
+  it('does not duplicate the alias when the prefix already names the provider', async () => {
+    process.env.UPSTREAM_URL = 'https://api.mistral.ai'
+    process.env.PROXY_PATH_PREFIX = '/proxy/mistral'
+    process.env.PROXY_PROVIDER = 'mistral'
+    delete process.env.PROXY_ROUTES
+    delete process.env.ROUTES_CONFIG_PATH
+    const { getRoutes } = await fresh()
+    const routes = getRoutes()
+    expect(routes).toHaveLength(1)
+    expect(routes[0].prefix).toBe('/proxy/mistral')
+  })
+
+  it('does not auto-alias explicit PROXY_ROUTES', async () => {
+    process.env.PROXY_ROUTES = JSON.stringify([
+      { prefix: '/proxy', upstream: 'https://api.mistral.ai', provider: 'mistral' },
+    ])
+    delete process.env.ROUTES_CONFIG_PATH
+    const { getRoutes } = await fresh()
+    const routes = getRoutes()
+    expect(routes).toHaveLength(1)
+    expect(routes[0].prefix).toBe('/proxy')
   })
 
   it('parses inline PROXY_ROUTES JSON', async () => {
@@ -64,7 +105,8 @@ describe('routes/registry', () => {
   })
 
   it('loads routes from a config file when ROUTES_CONFIG_PATH is set', async () => {
-    const tmp = path.join(os.tmpdir(), `airelay-routes-${Date.now()}.json`)
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'airelay-'))
+    const tmp = path.join(dir, 'routes.json')
     fs.writeFileSync(
       tmp,
       JSON.stringify({
@@ -79,12 +121,13 @@ describe('routes/registry', () => {
       expect(routes).toHaveLength(1)
       expect(routes[0].upstream).toBe('http://a.local')
     } finally {
-      fs.unlinkSync(tmp)
+      fs.rmSync(dir, { recursive: true, force: true })
     }
   })
 
   it('PROXY_ROUTES wins over ROUTES_CONFIG_PATH', async () => {
-    const tmp = path.join(os.tmpdir(), `airelay-routes-${Date.now()}.json`)
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'airelay-'))
+    const tmp = path.join(dir, 'routes.json')
     fs.writeFileSync(
       tmp,
       JSON.stringify({ routes: [{ prefix: '/file', upstream: 'http://file.local' }] }),
@@ -99,7 +142,7 @@ describe('routes/registry', () => {
       expect(routes).toHaveLength(1)
       expect(routes[0].prefix).toBe('/env')
     } finally {
-      fs.unlinkSync(tmp)
+      fs.rmSync(dir, { recursive: true, force: true })
     }
   })
 

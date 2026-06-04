@@ -1,0 +1,11 @@
+import rateLimit from 'express-rate-limit'
+import { config } from '../config.js'
+
+// Rate limiter for the dashboard/API routes (/health, /api/*). The proxy hot
+// path is intentionally NOT rate-limited — it must absorb unbounded concurrency.
+export const apiRateLimiter = rateLimit({
+  windowMs: config.apiRateLimitWindowMs,
+  limit: config.apiRateLimitMax,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+})

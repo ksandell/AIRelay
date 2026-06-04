@@ -1,6 +1,6 @@
 {
   "name": "airelay",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "AIRelay — transparent passthrough proxy for AI/LLM HTTP APIs with live observability dashboard",
   "type": "module",
   "engines": {
@@ -26,6 +26,7 @@
   "dependencies": {
     "better-sqlite3": "^12.10.0",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2",
     "http-proxy-3": "^1.23.2",
     "node-cron": "^4.2.1"
   },

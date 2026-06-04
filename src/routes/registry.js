@@ -94,15 +94,24 @@ function build() {
   } else if (routesPath) {
     raw = loadFromFile(routesPath)
   } else if (legacyUpstream) {
-    // Backwards-compat: synthesize a single route from the v0.3.0 env vars.
-    raw = [
-      {
-        prefix: legacyPrefix,
-        upstream: legacyUpstream,
-        provider: legacyProvider,
-        trustForwarded: config.proxyTrustForwarded,
-      },
-    ]
+    // Backwards-compat: synthesize a route from the v0.3.0 env vars. The bare
+    // `PROXY_PATH_PREFIX` (e.g. `/proxy`) is always mounted. When a concrete
+    // provider is configured we ALSO mount a `/<prefix>/<provider>` alias
+    // (e.g. `/proxy/mistral`) so SDKs pointed at the provider-named path work
+    // with zero extra config. `generic` has no meaningful name, so it is skipped,
+    // as is the case where the prefix already ends in the provider name.
+    const base = {
+      prefix: legacyPrefix,
+      upstream: legacyUpstream,
+      provider: legacyProvider,
+      trustForwarded: config.proxyTrustForwarded,
+    }
+    raw = [base]
+    const normalizedPrefix = legacyPrefix.replace(/\/+$/, '')
+    const aliasPrefix = `${normalizedPrefix}/${legacyProvider}`
+    if (legacyProvider !== 'generic' && !normalizedPrefix.endsWith(`/${legacyProvider}`)) {
+      raw.push({ ...base, prefix: aliasPrefix })
+    }
   } else {
     // No upstream configured at all — proxy disabled.
     return []
