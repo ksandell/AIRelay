@@ -12,4 +12,4 @@ services:
       LOG_DIR: /data/logs
       LOG_LEVEL: debug
     command: ["node", "--watch", "src/index.js"]
-    restart: "no"
+    restart: unless-stopped

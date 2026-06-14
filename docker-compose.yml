@@ -83,7 +83,7 @@ services:
       options:
         max-size: "10m"
         max-file: "5"
-    restart: unless-stopped
+    restart: always
 
 volumes:
   log-data:
