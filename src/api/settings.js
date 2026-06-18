@@ -37,6 +37,14 @@ const SCHEMA = {
   guardrailsRoleOverrideEnabled: 'boolean',
   guardrailsSystemPromptLeakEnabled: 'boolean',
   guardrailsToolOverrideEnabled: 'boolean',
+  cacheEnabled: 'boolean',
+  cacheExactMatchEnabled: 'boolean',
+  cacheExactTtlSeconds: 'integer',
+  cacheDedupEnabled: 'boolean',
+  cacheSpendEnabled: 'boolean',
+  cacheSpendDailyLimitUsd: 'number',
+  cacheSpendMonthlyLimitUsd: 'number',
+  cacheSseFanoutEnabled: 'boolean',
 }
 
 const ENV_DEFAULTS = {
@@ -73,6 +81,14 @@ const ENV_DEFAULTS = {
   guardrailsRoleOverrideEnabled: true,
   guardrailsSystemPromptLeakEnabled: true,
   guardrailsToolOverrideEnabled: true,
+  cacheEnabled: false,
+  cacheExactMatchEnabled: true,
+  cacheExactTtlSeconds: 3600,
+  cacheDedupEnabled: true,
+  cacheSpendEnabled: false,
+  cacheSpendDailyLimitUsd: null,
+  cacheSpendMonthlyLimitUsd: null,
+  cacheSseFanoutEnabled: false,
 }
 
 function buildEffective() {
@@ -110,6 +126,14 @@ function buildEffective() {
     guardrailsRoleOverrideEnabled: config.guardrails.roleOverride,
     guardrailsSystemPromptLeakEnabled: config.guardrails.systemPromptLeak,
     guardrailsToolOverrideEnabled: config.guardrails.toolOverride,
+    cacheEnabled: config.cacheEnabled,
+    cacheExactMatchEnabled: config.cacheExactMatchEnabled,
+    cacheExactTtlSeconds: config.cacheExactTtlSeconds,
+    cacheDedupEnabled: config.cacheDedupEnabled,
+    cacheSpendEnabled: config.cacheSpendEnabled,
+    cacheSpendDailyLimitUsd: config.cacheSpendDailyLimitUsd,
+    cacheSpendMonthlyLimitUsd: config.cacheSpendMonthlyLimitUsd,
+    cacheSseFanoutEnabled: config.cacheSseFanoutEnabled,
   }
 }
 
@@ -145,6 +169,20 @@ router.post('/api/settings', async (req, res) => {
         return res
           .status(400)
           .json({ error: `Invalid value for ${key}: expected one of off|alert|block|redact` })
+      }
+    }
+    if (type === 'integer') {
+      if (!Number.isInteger(value)) {
+        return res
+          .status(400)
+          .json({ error: `Invalid value for ${key}: expected integer, got ${typeof value}` })
+      }
+    }
+    if (type === 'number') {
+      if (typeof value !== 'number' && value !== null) {
+        return res
+          .status(400)
+          .json({ error: `Invalid value for ${key}: expected number or null` })
       }
     }
   }
