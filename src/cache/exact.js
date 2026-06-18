@@ -29,5 +29,9 @@ export async function exactSet(sha256, entry) {
 
 export async function exactKeyCount() {
   if (!isConnected()) return 0
-  try { return await getClient().dbsize() } catch { return 0 }
+  try {
+    return await getClient().dbsize()
+  } catch {
+    return 0
+  }
 }

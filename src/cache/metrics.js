@@ -42,17 +42,22 @@ export function recordCacheEvent(event) {
   const bytes = event.bytes ?? 0
   switch (event.type) {
     case 'HIT':
-      lifetime.exactHits++; win1m.exactHits++
-      lifetime.bytesFromCache += bytes; win1m.bytesFromCache += bytes
+      lifetime.exactHits++
+      win1m.exactHits++
+      lifetime.bytesFromCache += bytes
+      win1m.bytesFromCache += bytes
       break
     case 'MISS':
-      lifetime.exactMisses++; win1m.exactMisses++
+      lifetime.exactMisses++
+      win1m.exactMisses++
       break
     case 'DEDUP':
-      lifetime.dedupCoalesced++; win1m.dedupCoalesced++
+      lifetime.dedupCoalesced++
+      win1m.dedupCoalesced++
       break
     case 'SPEND-REJECT':
-      lifetime.spendRejected++; win1m.spendRejected++
+      lifetime.spendRejected++
+      win1m.spendRejected++
       break
   }
 }
@@ -87,8 +92,21 @@ export function* iterRecent(limit = 20) {
 
 export function _resetCacheMetrics() {
   for (let i = 0; i < SIZE; i++) buf[i] = undefined
-  head = 0; count = 0
-  Object.assign(lifetime, { exactHits: 0, exactMisses: 0, dedupCoalesced: 0, spendRejected: 0, bytesFromCache: 0 })
-  Object.assign(win1m, { exactHits: 0, exactMisses: 0, dedupCoalesced: 0, spendRejected: 0, bytesFromCache: 0 })
+  head = 0
+  count = 0
+  Object.assign(lifetime, {
+    exactHits: 0,
+    exactMisses: 0,
+    dedupCoalesced: 0,
+    spendRejected: 0,
+    bytesFromCache: 0,
+  })
+  Object.assign(win1m, {
+    exactHits: 0,
+    exactMisses: 0,
+    dedupCoalesced: 0,
+    spendRejected: 0,
+    bytesFromCache: 0,
+  })
   win1mReset = Date.now()
 }

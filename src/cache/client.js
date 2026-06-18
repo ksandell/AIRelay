@@ -27,7 +27,9 @@ export async function initClient() {
     _connected = true
     _warnedOnce = false
   })
-  _client.on('close', () => { _connected = false })
+  _client.on('close', () => {
+    _connected = false
+  })
   _client.on('error', (err) => {
     _connected = false
     if (!_warnedOnce) {
@@ -45,7 +47,11 @@ export async function initClient() {
 
 export async function closeClient() {
   if (_client) {
-    try { await _client.quit() } catch { /* ignore */ }
+    try {
+      await _client.quit()
+    } catch {
+      /* ignore */
+    }
     _client = null
     _connected = false
   }

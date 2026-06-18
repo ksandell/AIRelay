@@ -14,7 +14,12 @@ describe('normalizeBody', () => {
   })
 
   it('keeps model, messages, tools, temperature, max_tokens', () => {
-    const body = { model: 'claude-3', messages: [{ role: 'user', content: 'hi' }], temperature: 0.7, max_tokens: 100 }
+    const body = {
+      model: 'claude-3',
+      messages: [{ role: 'user', content: 'hi' }],
+      temperature: 0.7,
+      max_tokens: 100,
+    }
     const result = normalizeBody(body)
     expect(result).toMatchObject(body)
   })

@@ -3,7 +3,10 @@ import { getClient, isConnected } from './client.js'
 import { config } from '../config.js'
 
 function keyHash(apiKey) {
-  return createHash('sha256').update(apiKey ?? 'anonymous').digest('hex').slice(0, 16)
+  return createHash('sha256')
+    .update(apiKey ?? 'anonymous')
+    .digest('hex')
+    .slice(0, 16)
 }
 
 const dailyKey = (h) => `airelay:spend:${h}:daily:${new Date().toISOString().slice(0, 10)}`
@@ -20,10 +23,20 @@ export async function checkSpendLimit(req) {
     const client = getClient()
     const [daily, monthly] = await Promise.all([
       config.cacheSpendDailyLimitUsd != null ? client.get(dailyKey(hash)) : Promise.resolve(null),
-      config.cacheSpendMonthlyLimitUsd != null ? client.get(monthlyKey(hash)) : Promise.resolve(null),
+      config.cacheSpendMonthlyLimitUsd != null
+        ? client.get(monthlyKey(hash))
+        : Promise.resolve(null),
     ])
-    if (config.cacheSpendDailyLimitUsd != null && parseFloat(daily ?? '0') >= config.cacheSpendDailyLimitUsd) return 'daily'
-    if (config.cacheSpendMonthlyLimitUsd != null && parseFloat(monthly ?? '0') >= config.cacheSpendMonthlyLimitUsd) return 'monthly'
+    if (
+      config.cacheSpendDailyLimitUsd != null &&
+      parseFloat(daily ?? '0') >= config.cacheSpendDailyLimitUsd
+    )
+      return 'daily'
+    if (
+      config.cacheSpendMonthlyLimitUsd != null &&
+      parseFloat(monthly ?? '0') >= config.cacheSpendMonthlyLimitUsd
+    )
+      return 'monthly'
   } catch {
     // fail-open: Redis error → allow request
   }

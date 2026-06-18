@@ -1,0 +1,151 @@
+<h2>Settings page — full mockup</h2>
+<p class="subtitle">Runtime overrides only. Changes staged until Save is clicked. Persisted to <code>data/settings.json</code>.</p>
+
+<div class="mockup">
+  <div class="mockup-header">AIRelay — Settings</div>
+  <div class="mockup-body" style="padding:0">
+
+    <!-- Tab bar -->
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--bg-secondary);padding:0 12px">
+      <div style="padding:8px 14px;font-size:11px;color:var(--text-muted)">Dashboard</div>
+      <div style="padding:8px 14px;font-size:11px;color:var(--text-muted)">Logs</div>
+      <div style="padding:8px 14px;font-size:11px;color:var(--text-muted)">Metrics</div>
+      <div style="padding:8px 14px;font-size:11px;color:var(--text-muted)">Compressors</div>
+      <div style="padding:8px 14px;font-size:11px;color:var(--text-muted)">Guardrails</div>
+      <div style="padding:8px 14px;font-size:11px;font-weight:700;color:var(--accent);border-bottom:2px solid var(--accent);margin-bottom:-1px;margin-left:auto">Settings</div>
+    </div>
+
+    <div style="padding:16px;display:flex;flex-direction:column;gap:20px">
+
+      <!-- Unsaved changes banner (shown when dirty) -->
+      <div style="background:#f59e0b11;border:1px solid #f59e0b55;border-radius:6px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:11px;color:#f59e0b;font-weight:600">⚠ Unsaved changes</span>
+        <div style="display:flex;gap:8px">
+          <button style="font-size:11px;padding:4px 12px;border-radius:4px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer">Discard</button>
+          <button style="font-size:11px;padding:4px 14px;border-radius:4px;border:none;background:var(--accent);color:white;font-weight:600;cursor:pointer">Save changes</button>
+        </div>
+      </div>
+
+      <!-- ── COMPACTOR SECTION ── -->
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--text-primary)">Compactor</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Token-saving compression applied before forwarding to upstream</div>
+          </div>
+          <!-- Master toggle -->
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:10px;color:var(--text-muted)">Enabled</span>
+            <div style="width:36px;height:20px;background:var(--accent);border-radius:10px;position:relative;cursor:pointer">
+              <div style="width:16px;height:16px;background:white;border-radius:50%;position:absolute;top:2px;right:2px"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scope toggles -->
+        <div style="background:var(--bg-secondary);border-radius:6px;border:1px solid var(--border);padding:12px;margin-bottom:10px">
+          <div style="font-size:10px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Scope</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:11px;color:var(--text-secondary)">Request body</span>
+              <div style="width:32px;height:18px;background:var(--accent);border-radius:9px;position:relative;cursor:pointer"><div style="width:14px;height:14px;background:white;border-radius:50%;position:absolute;top:2px;right:2px"></div></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:11px;color:var(--text-secondary)">Response body</span>
+              <div style="width:32px;height:18px;background:#6b7280;border-radius:9px;position:relative;cursor:pointer"><div style="width:14px;height:14px;background:white;border-radius:50%;position:absolute;top:2px;left:2px"></div></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:11px;color:var(--text-secondary)">Tool results only <span style="font-size:9px;color:var(--text-muted)">(tighter scope)</span></span>
+              <div style="width:32px;height:18px;background:var(--accent);border-radius:9px;position:relative;cursor:pointer"><div style="width:14px;height:14px;background:white;border-radius:50%;position:absolute;top:2px;right:2px"></div></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:11px;color:var(--text-secondary)">Allow risky compressors <span style="font-size:9px;color:#f59e0b">⚠ may alter meaning</span></span>
+              <div style="width:32px;height:18px;background:#6b7280;border-radius:9px;position:relative;cursor:pointer"><div style="width:14px;height:14px;background:white;border-radius:50%;position:absolute;top:2px;left:2px"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Individual compressors (collapsed) -->
+        <div style="background:var(--bg-secondary);border-radius:6px;border:1px solid var(--border);padding:10px 12px;cursor:pointer">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:11px;color:var(--text-secondary)">Individual compressors <span style="font-size:10px;color:var(--text-muted)">(6 of 10 active)</span></span>
+            <span style="font-size:10px;color:var(--accent)">▸ Expand</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── GUARDRAILS SECTION ── -->
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--text-primary)">Guardrails</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Detect and act on secrets, PII, and prompt injection in requests</div>
+          </div>
+          <!-- Master toggle (OFF) -->
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:10px;color:var(--text-muted)">Disabled</span>
+            <div style="width:36px;height:20px;background:#6b7280;border-radius:10px;position:relative;cursor:pointer">
+              <div style="width:16px;height:16px;background:white;border-radius:50%;position:absolute;top:2px;left:2px"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Category cards (option C style) -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;opacity:0.5">
+
+          <div style="background:var(--bg-secondary);border-radius:6px;padding:12px;border:1px solid var(--border)">
+            <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:4px">Secrets</div>
+            <div style="font-size:9px;color:var(--text-muted);margin-bottom:8px">AWS keys, GitHub PATs, tokens, passwords</div>
+            <div style="display:flex;gap:3px;flex-wrap:wrap">
+              <span style="padding:3px 7px;border-radius:3px;font-size:10px;background:var(--bg-primary);color:var(--text-muted);border:1px solid var(--border)">off</span>
+              <span style="padding:3px 7px;border-radius:3px;font-size:10px;background:var(--bg-primary);color:var(--text-muted);border:1px solid var(--border)">alert</span>
+              <span style="padding:3px 7px;border-radius:3px;font-size:10px;background:var(--bg-primary);color:var(--text-muted);border:1px solid var(--border)">block</span>
+              <span style="padding:3px 7px;border-radius:3px;font-size:10px;background:var(--bg-primary);color:var(--text-muted);border:1px solid var(--border)">redact</span>
+            </div>
+          </div>
+
+          <div style="background:var(--bg-secondary);border-radius:6px;padding:12px;border:1px solid var(--border)">
+            <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:4px">PII</div>
+            <div style="font-size:9px;color:var(--text-muted);margin-bottom:8px">Names, emails, phone numbers, addresses</div>
+            <div style="display:flex;gap:3px;flex-wrap:wrap">
+              <span style="padding:3px 7px;border-radius:3px;font-size:10px;background:var(--bg-primary);color:var(--text-muted);border:1px solid var(--border)">off</span>
+              <span style="padding:3px 7px;border-radius:3px;font-size:10px;background:var(--bg-primary);color:var(--text-muted);border:1px solid var(--border)">alert</span>
+              <span style="padding:3px 7px;border-radius:3px;font-size:10px;background:var(--bg-primary);color:var(--text-muted);border:1px solid var(--border)">block</span>
+              <span style="padding:3px 7px;border-radius:3px;font-size:10px;background:var(--bg-primary);color:var(--text-muted);border:1px solid var(--border)">redact</span>
+            </div>
+          </div>
+
+          <div style="background:var(--bg-secondary);border-radius:6px;padding:12px;border:1px solid var(--border)">
+            <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:4px">Prompt Injection</div>
+            <div style="font-size:9px;color:var(--text-muted);margin-bottom:8px">Jailbreaks and instruction overrides</div>
+            <div style="display:flex;gap:3px;flex-wrap:wrap">
+              <span style="padding:3px 7px;border-radius:3px;font-size:10px;background:var(--bg-primary);color:var(--text-muted);border:1px solid var(--border)">off</span>
+              <span style="padding:3px 7px;border-radius:3px;font-size:10px;background:var(--bg-primary);color:var(--text-muted);border:1px solid var(--border)">alert</span>
+              <span style="padding:3px 7px;border-radius:3px;font-size:10px;background:var(--bg-primary);color:var(--text-muted);border:1px solid var(--border)">block</span>
+              <span style="padding:3px 7px;border-radius:3px;font-size:10px;background:var(--bg-primary);color:var(--text-muted);border:1px solid var(--border)">redact</span>
+            </div>
+          </div>
+
+        </div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:6px">Enable Guardrails above to configure detector modes.</div>
+
+        <!-- Individual detectors (collapsed) -->
+        <div style="background:var(--bg-secondary);border-radius:6px;border:1px solid var(--border);padding:10px 12px;cursor:pointer;margin-top:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:11px;color:var(--text-secondary)">Individual detectors <span style="font-size:10px;color:var(--text-muted)">(0 of 11 active)</span></span>
+            <span style="font-size:10px;color:var(--accent)">▸ Expand</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer note -->
+      <div style="font-size:10px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:12px">
+        Changes saved to <code style="background:var(--bg-secondary);padding:1px 4px;border-radius:3px">data/settings.json</code>.
+        Base config in <code style="background:var(--bg-secondary);padding:1px 4px;border-radius:3px">.env</code> is never modified. Restart not required.
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px">Does this layout work? Note: category cards are greyed out while Guardrails master toggle is off.</p>

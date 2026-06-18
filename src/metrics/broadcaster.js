@@ -50,9 +50,7 @@ export function startMetricsBroadcaster() {
     }
     hubBroadcast(CHANNEL, tickData, 'tick')
     // Fan-out to other instances via Redis pub/sub (no-op when fanout disabled)
-    import('../cache/fanout.js')
-      .then(({ publishTick }) => publishTick(tickData))
-      .catch(() => {})
+    import('../cache/fanout.js').then(({ publishTick }) => publishTick(tickData)).catch(() => {})
   }, config.metricsTickMs)
 
   return stopMetricsBroadcaster

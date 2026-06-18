@@ -22,6 +22,6 @@ function canonicalJSON(obj) {
   if (typeof obj !== 'object' || Array.isArray(obj)) return JSON.stringify(obj)
 
   const keys = Object.keys(obj).sort()
-  const pairs = keys.map(k => `"${k}":${canonicalJSON(obj[k])}`)
+  const pairs = keys.map((k) => `"${k}":${canonicalJSON(obj[k])}`)
   return '{' + pairs.join(',') + '}'
 }

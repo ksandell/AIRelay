@@ -39,7 +39,12 @@ describe('exactGet', () => {
   })
 
   it('returns parsed object on hit', async () => {
-    const stored = { body: '{"text":"hello"}', statusCode: 200, contentType: 'application/json', cachedAt: 1000 }
+    const stored = {
+      body: '{"text":"hello"}',
+      statusCode: 200,
+      contentType: 'application/json',
+      cachedAt: 1000,
+    }
     mockClient.get.mockResolvedValue(JSON.stringify(stored))
     const result = await exactGet('abc')
     expect(result).toMatchObject({ body: '{"text":"hello"}', statusCode: 200 })
@@ -55,12 +60,7 @@ describe('exactSet', () => {
   it('calls client.set with EX TTL', async () => {
     mockClient.set.mockResolvedValue('OK')
     await exactSet('abc', { body: 'data', statusCode: 200, contentType: 'application/json' })
-    expect(mockClient.set).toHaveBeenCalledWith(
-      'airelay:exact:abc',
-      expect.any(String),
-      'EX',
-      3600,
-    )
+    expect(mockClient.set).toHaveBeenCalledWith('airelay:exact:abc', expect.any(String), 'EX', 3600)
   })
 
   it('no-ops when not connected', async () => {
@@ -71,6 +71,8 @@ describe('exactSet', () => {
 
   it('swallows Redis errors', async () => {
     mockClient.set.mockRejectedValue(new Error('ECONNRESET'))
-    await expect(exactSet('abc', { body: 'data', statusCode: 200, contentType: 'application/json' })).resolves.not.toThrow()
+    await expect(
+      exactSet('abc', { body: 'data', statusCode: 200, contentType: 'application/json' }),
+    ).resolves.not.toThrow()
   })
 })

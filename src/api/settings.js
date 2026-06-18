@@ -180,9 +180,7 @@ router.post('/api/settings', async (req, res) => {
     }
     if (type === 'number') {
       if (typeof value !== 'number' && value !== null) {
-        return res
-          .status(400)
-          .json({ error: `Invalid value for ${key}: expected number or null` })
+        return res.status(400).json({ error: `Invalid value for ${key}: expected number or null` })
       }
     }
   }

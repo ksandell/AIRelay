@@ -35,6 +35,10 @@ function activateTab(name) {
   metricsPanel.classList.toggle('hidden', name !== 'metrics')
   if (compactorPanel) compactorPanel.classList.toggle('hidden', name !== 'compactor')
   if (guardrailsPanel) guardrailsPanel.classList.toggle('hidden', name !== 'guardrails')
+  const cachePanel = document.getElementById('cachePanel')
+  const cacheControls = document.getElementById('cacheControls')
+  if (cachePanel) cachePanel.classList.toggle('hidden', name !== 'cache')
+  if (cacheControls) cacheControls.classList.toggle('hidden', name !== 'cache')
   setupControls.classList.toggle('hidden', name !== 'setup')
   logsControls.classList.toggle('hidden', name !== 'logs')
   metricsControls.classList.toggle('hidden', name !== 'metrics')
@@ -61,6 +65,7 @@ function activateTab(name) {
   }
   if (name === 'dashboard') refreshDashboard().catch(() => {})
   if (name === 'settings') refreshSettings().catch(() => {})
+  if (name === 'cache') refreshCache().catch(() => {})
 }
 tabs.forEach((t) => t.addEventListener('click', () => activateTab(t.dataset.tab)))
 
@@ -368,7 +373,7 @@ function setHealthDot(id, state) {
   el.className = `health-dot dot-${state}`
 }
 
-function buildRecommendations(health, compactorSummary, guardrailsSummary) {
+function buildRecommendations(health, compactorSummary, guardrailsSummary, cacheData) {
   const recs = []
   if (!guardrailsSummary?.enabled) {
     recs.push({ text: '⚠ Guardrails disabled — enable at least alert mode', tab: 'settings' })
@@ -381,6 +386,12 @@ function buildRecommendations(health, compactorSummary, guardrailsSummary) {
   }
   if (health && health.status !== 'ok') {
     recs.push({ text: '✕ Proxy health check failing — check upstream URL', tab: null })
+  }
+  if (cacheData?.enabled && !cacheData?.connected) {
+    recs.push({
+      text: '✕ Cache enabled but Dragonfly disconnected — check CACHE_REDIS_URL',
+      tab: null,
+    })
   }
   return recs
 }
@@ -407,6 +418,18 @@ function renderKpiRow(summary, compactor) {
   return p95
 }
 
+function renderCacheKpi(cacheData) {
+  const cacheKpiCard = document.getElementById('dashKpiCacheCard')
+  if (!cacheKpiCard) return
+  if (cacheData?.enabled) {
+    cacheKpiCard.hidden = false
+    const rate = cacheData.lifetime?.hitRate ?? 0
+    document.getElementById('dashKpiCacheHitRate').textContent = (rate * 100).toFixed(1) + '%'
+  } else {
+    cacheKpiCard.hidden = true
+  }
+}
+
 function renderRecentTable(recent) {
   const tbody = document.querySelector('#dashRecentTable tbody')
   if (!tbody) return
@@ -423,7 +446,7 @@ function renderRecentTable(recent) {
   }
 }
 
-function renderHealthSidebar(health, compactor, guardrails) {
+function renderHealthSidebar(health, compactor, guardrails, cacheData) {
   const proxyOk = health.status === 'ok'
   setHealthDot('dashHealthProxy', proxyOk ? 'ok' : 'error')
   document.getElementById('dashHealthProxyLabel').textContent = proxyOk
@@ -445,10 +468,23 @@ function renderHealthSidebar(health, compactor, guardrails) {
   document.getElementById('dashHealthGuardrailsLabel').textContent = grEnabled
     ? `On (${grActive}/${grAll} active)`
     : 'Off'
+
+  const cacheEnabled = cacheData?.enabled ?? false
+  const cacheConnected = cacheData?.connected ?? false
+  const cacheState = !cacheEnabled ? 'neutral' : cacheConnected ? 'ok' : 'error'
+  setHealthDot('dashHealthCache', cacheState)
+  const cacheLabel = document.getElementById('dashHealthCacheLabel')
+  if (cacheLabel) {
+    cacheLabel.textContent = !cacheEnabled
+      ? 'Off'
+      : cacheConnected
+        ? `Connected (${cacheData.keyCount ?? 0} keys)`
+        : 'Disconnected'
+  }
 }
 
-function renderRecommendations(health, compactor, guardrails) {
-  const recs = buildRecommendations(health, compactor, guardrails)
+function renderRecommendations(health, compactor, guardrails, cacheData) {
+  const recs = buildRecommendations(health, compactor, guardrails, cacheData)
   const recCard = document.getElementById('dashRecommendationsCard')
   const recList = document.getElementById('dashRecommendationsList')
   if (!recCard || !recList) return
@@ -473,13 +509,15 @@ async function refreshDashboard() {
   const statusEl = document.getElementById('dashboardStatus')
   try {
     initDashSparkline()
-    const [healthRes, summaryRes, recentRes, compactorRes, guardrailsRes] = await Promise.all([
-      fetch('/health'),
-      fetch('/api/metrics/summary'),
-      fetch('/api/metrics/recent?limit=5'),
-      fetch('/api/compactor/summary'),
-      fetch('/api/guardrails/summary'),
-    ])
+    const [healthRes, summaryRes, recentRes, compactorRes, guardrailsRes, cacheRes] =
+      await Promise.all([
+        fetch('/health'),
+        fetch('/api/metrics/summary'),
+        fetch('/api/metrics/recent?limit=5'),
+        fetch('/api/compactor/summary'),
+        fetch('/api/guardrails/summary'),
+        fetch('/api/cache/summary'),
+      ])
     if (!healthRes.ok) throw new Error('health fetch failed')
     const health = await healthRes.json()
     if (!summaryRes.ok) console.warn('refreshDashboard: summary fetch failed', summaryRes.status)
@@ -492,6 +530,7 @@ async function refreshDashboard() {
     const recent = recentRes.ok ? await recentRes.json() : []
     const compactor = compactorRes.ok ? await compactorRes.json() : null
     const guardrails = guardrailsRes.ok ? await guardrailsRes.json() : null
+    const cacheData = cacheRes.ok ? await cacheRes.json() : null
 
     if (statusEl) {
       statusEl.textContent = 'Live'
@@ -499,10 +538,114 @@ async function refreshDashboard() {
     }
 
     const p95 = renderKpiRow(summary, compactor)
+    renderCacheKpi(cacheData)
     pushDashPoint(summary?.window_1m?.rps ?? 0, p95 ?? 0)
     renderRecentTable(recent)
-    renderHealthSidebar(health, compactor, guardrails)
-    renderRecommendations(health, compactor, guardrails)
+    renderHealthSidebar(health, compactor, guardrails, cacheData)
+    renderRecommendations(health, compactor, guardrails, cacheData)
+  } catch {
+    if (statusEl) {
+      statusEl.textContent = 'Error'
+      statusEl.className = 'status disconnected'
+    }
+  }
+}
+
+// ─── Cache tab ────────────────────────────────────────
+function cacheFmt(n) {
+  return n == null ? '—' : n.toLocaleString()
+}
+function cacheFmtPct(r) {
+  return r == null ? '—' : (r * 100).toFixed(1) + '%'
+}
+function cacheFmtBytes(b) {
+  if (b == null) return '—'
+  if (b >= 1_048_576) return (b / 1_048_576).toFixed(1) + ' MB'
+  if (b >= 1024) return (b / 1024).toFixed(1) + ' KB'
+  return b + ' B'
+}
+
+async function refreshCache() {
+  const statusEl = document.getElementById('cacheStatus')
+  try {
+    const [summaryRes, recentRes] = await Promise.all([
+      fetch('/api/cache/summary'),
+      fetch('/api/cache/recent?limit=20'),
+    ])
+    if (!summaryRes.ok) throw new Error('cache summary fetch failed')
+    const s = await summaryRes.json()
+    const recent = recentRes.ok ? await recentRes.json() : []
+
+    const enabled = s.enabled
+    const connected = s.connected
+
+    if (statusEl) {
+      statusEl.textContent = !enabled ? 'Disabled' : connected ? 'Connected' : 'Disconnected'
+      statusEl.className =
+        'status ' + (!enabled ? 'disconnected' : connected ? 'connected' : 'disconnected')
+    }
+
+    const dot = document.getElementById('cacheConnDot')
+    const label = document.getElementById('cacheConnLabel')
+    if (dot)
+      dot.className =
+        'health-dot ' + (!enabled ? 'dot-neutral' : connected ? 'dot-ok' : 'dot-error')
+    if (label)
+      label.textContent = !enabled
+        ? 'Cache disabled'
+        : connected
+          ? `Connected (${s.keyCount ?? 0} keys)`
+          : 'Disconnected — check CACHE_REDIS_URL'
+
+    const setPill = (id, on, text) => {
+      const el = document.getElementById(id)
+      if (!el) return
+      el.textContent = text
+      el.className = 'cache-status-pill ' + (on ? 'pill-on' : 'pill-off')
+    }
+    setPill(
+      'cacheExactPill',
+      s.exactMatch?.enabled,
+      `Exact ${s.exactMatch?.enabled ? 'on' : 'off'}`,
+    )
+    setPill('cacheDedupPill', s.dedup?.enabled, `Dedup ${s.dedup?.enabled ? 'on' : 'off'}`)
+    setPill('cacheSpendPill', s.spend?.enabled, `Spend limits ${s.spend?.enabled ? 'on' : 'off'}`)
+
+    document.getElementById('cacheKpiHits1m').textContent = cacheFmt(s.window_1m?.exactHits)
+    document.getElementById('cacheKpiHitRate').textContent = cacheFmtPct(s.window_1m?.hitRate)
+    document.getElementById('cacheKpiBytesFromCache').textContent = cacheFmtBytes(
+      s.window_1m?.bytesFromCache,
+    )
+    document.getElementById('cacheKpiDedup').textContent = cacheFmt(s.window_1m?.dedupCoalesced)
+    document.getElementById('cacheKpiSpendRejects').textContent = cacheFmt(
+      s.window_1m?.spendRejected,
+    )
+    document.getElementById('cacheKpiHitsLifetime').textContent = cacheFmt(s.lifetime?.exactHits)
+    document.getElementById('cacheKpiHitRateLifetime').textContent = cacheFmtPct(
+      s.lifetime?.hitRate,
+    )
+    document.getElementById('cacheKpiKeyCount').textContent = cacheFmt(s.keyCount)
+    document.getElementById('cacheKpiInflight').textContent = cacheFmt(s.dedup?.inflight)
+
+    const notice = document.getElementById('cacheDisabledNotice')
+    const recentCard = document.getElementById('cacheRecentCard')
+    if (notice) notice.hidden = enabled
+    if (recentCard) recentCard.hidden = !enabled
+
+    const tbody = document.querySelector('#cacheRecentTable tbody')
+    if (tbody) {
+      tbody.innerHTML = ''
+      for (const ev of recent) {
+        const tr = document.createElement('tr')
+        const type = ev.type ?? '—'
+        tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
+          <td><span class="cache-type-badge cache-${String(type).toLowerCase()}">${escHtml(type)}</span></td>
+          <td><code>${escHtml(ev.keyPrefix ?? '—')}</code></td>
+          <td>${ev.keyAgeS ?? '—'}</td>
+          <td>${ev.bytes != null ? cacheFmtBytes(ev.bytes) : '—'}</td>`
+        tbody.appendChild(tr)
+      }
+    }
   } catch {
     if (statusEl) {
       statusEl.textContent = 'Error'

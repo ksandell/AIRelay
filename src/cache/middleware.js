@@ -62,7 +62,11 @@ export function createCacheMiddleware() {
         if (cached) {
           res.set('X-Cache', 'DEDUP')
           res.set('Content-Type', cached.contentType ?? 'application/json')
-          recordCacheEvent({ ts: new Date().toISOString(), type: 'DEDUP', keyPrefix: sha256.slice(0, 8) })
+          recordCacheEvent({
+            ts: new Date().toISOString(),
+            type: 'DEDUP',
+            keyPrefix: sha256.slice(0, 8),
+          })
           return res.status(cached.statusCode ?? 200).send(cached.body)
         }
       }

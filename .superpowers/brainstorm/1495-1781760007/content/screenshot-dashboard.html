@@ -1,0 +1,177 @@
+<h2>Dashboard — full mockup (Layout B)</h2>
+<p class="subtitle">This is how the landing tab will look. Left: metrics + activity. Right: health + recommendations.</p>
+
+<div class="mockup">
+  <div class="mockup-header">AIRelay — Dashboard</div>
+  <div class="mockup-body" style="padding:0">
+
+    <!-- Simulated tab bar -->
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--bg-secondary);padding:0 12px">
+      <div style="padding:8px 14px;font-size:11px;font-weight:700;color:var(--accent);border-bottom:2px solid var(--accent);margin-bottom:-1px">Dashboard</div>
+      <div style="padding:8px 14px;font-size:11px;color:var(--text-muted)">Logs</div>
+      <div style="padding:8px 14px;font-size:11px;color:var(--text-muted)">Metrics</div>
+      <div style="padding:8px 14px;font-size:11px;color:var(--text-muted)">Compressors</div>
+      <div style="padding:8px 14px;font-size:11px;color:var(--text-muted)">Guardrails</div>
+      <div style="padding:8px 14px;font-size:11px;color:var(--text-muted);margin-left:auto">Settings</div>
+    </div>
+
+    <!-- Two column layout -->
+    <div style="display:flex;gap:0;padding:14px;gap:14px">
+
+      <!-- LEFT: metrics + charts (2/3) -->
+      <div style="flex:2;display:flex;flex-direction:column;gap:12px">
+
+        <!-- KPI row -->
+        <div style="display:flex;gap:8px">
+          <div style="flex:1;background:var(--bg-secondary);border-radius:6px;padding:10px;text-align:center;border:1px solid var(--border)">
+            <div style="font-size:20px;font-weight:700;color:var(--accent)">1,204</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Requests today</div>
+          </div>
+          <div style="flex:1;background:var(--bg-secondary);border-radius:6px;padding:10px;text-align:center;border:1px solid var(--border)">
+            <div style="font-size:20px;font-weight:700;color:var(--accent)">$0.42</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Cost today</div>
+          </div>
+          <div style="flex:1;background:var(--bg-secondary);border-radius:6px;padding:10px;text-align:center;border:1px solid var(--border)">
+            <div style="font-size:20px;font-weight:700;color:var(--accent)">312ms</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px">p95 latency</div>
+          </div>
+          <div style="flex:1;background:var(--bg-secondary);border-radius:6px;padding:10px;text-align:center;border:1px solid var(--border)">
+            <div style="font-size:20px;font-weight:700;color:#22c55e">14.2%</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Bytes saved</div>
+          </div>
+        </div>
+
+        <!-- Mini chart area -->
+        <div style="background:var(--bg-secondary);border-radius:6px;border:1px solid var(--border);padding:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span style="font-size:11px;font-weight:600;color:var(--text-secondary)">Activity — last 30 min</span>
+            <span style="font-size:10px;color:var(--text-muted)">Live</span>
+          </div>
+          <!-- Fake sparkline -->
+          <svg viewBox="0 0 300 60" style="width:100%;height:60px">
+            <polyline points="0,50 30,45 60,40 90,30 120,35 150,20 180,25 210,15 240,22 270,18 300,10"
+              fill="none" stroke="var(--accent)" stroke-width="2" opacity="0.8"/>
+            <polyline points="0,55 30,52 60,50 90,48 120,52 150,46 180,50 210,44 240,48 270,42 300,40"
+              fill="none" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="3,2" opacity="0.6"/>
+          </svg>
+          <div style="display:flex;gap:16px;margin-top:4px">
+            <span style="font-size:9px;color:var(--accent)">— RPS</span>
+            <span style="font-size:9px;color:#22c55e">- - p95 latency</span>
+          </div>
+        </div>
+
+        <!-- Recent requests -->
+        <div style="background:var(--bg-secondary);border-radius:6px;border:1px solid var(--border);padding:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span style="font-size:11px;font-weight:600;color:var(--text-secondary)">Recent requests</span>
+            <a style="font-size:10px;color:var(--accent);text-decoration:none">View all in Logs →</a>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:10px">
+            <thead>
+              <tr style="color:var(--text-muted)">
+                <th style="text-align:left;padding:3px 6px;font-weight:500">Time</th>
+                <th style="text-align:left;padding:3px 6px;font-weight:500">Model</th>
+                <th style="text-align:right;padding:3px 6px;font-weight:500">Tokens</th>
+                <th style="text-align:right;padding:3px 6px;font-weight:500">Cost</th>
+                <th style="text-align:right;padding:3px 6px;font-weight:500">Latency</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-top:1px solid var(--border);color:var(--text-secondary)">
+                <td style="padding:4px 6px">12:34:01</td>
+                <td style="padding:4px 6px">claude-sonnet-4-6</td>
+                <td style="padding:4px 6px;text-align:right">2,841</td>
+                <td style="padding:4px 6px;text-align:right">$0.003</td>
+                <td style="padding:4px 6px;text-align:right">287ms</td>
+              </tr>
+              <tr style="border-top:1px solid var(--border);color:var(--text-secondary)">
+                <td style="padding:4px 6px">12:33:47</td>
+                <td style="padding:4px 6px">claude-sonnet-4-6</td>
+                <td style="padding:4px 6px;text-align:right">1,204</td>
+                <td style="padding:4px 6px;text-align:right">$0.001</td>
+                <td style="padding:4px 6px;text-align:right">412ms</td>
+              </tr>
+              <tr style="border-top:1px solid var(--border);color:var(--text-secondary)">
+                <td style="padding:4px 6px">12:33:12</td>
+                <td style="padding:4px 6px">claude-haiku-4-5</td>
+                <td style="padding:4px 6px;text-align:right">890</td>
+                <td style="padding:4px 6px;text-align:right">$0.0004</td>
+                <td style="padding:4px 6px;text-align:right">91ms</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+      <!-- RIGHT: health + recommendations (1/3) -->
+      <div style="flex:1;display:flex;flex-direction:column;gap:10px">
+
+        <!-- System health -->
+        <div style="background:var(--bg-secondary);border-radius:6px;border:1px solid var(--border);padding:12px">
+          <div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:10px">System health</div>
+
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:11px;color:var(--text-primary)">Proxy</span>
+              <span style="font-size:10px;background:#22c55e22;color:#22c55e;padding:2px 8px;border-radius:10px;border:1px solid #22c55e44">● OK</span>
+            </div>
+            <div style="font-size:9px;color:var(--text-muted);margin-top:-4px">→ api.anthropic.com</div>
+
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
+              <span style="font-size:11px;color:var(--text-primary)">Compactor</span>
+              <span style="font-size:10px;background:#22c55e22;color:#22c55e;padding:2px 8px;border-radius:10px;border:1px solid #22c55e44">● On</span>
+            </div>
+            <div style="font-size:9px;color:var(--text-muted);margin-top:-4px">6 of 10 compressors active</div>
+
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
+              <span style="font-size:11px;color:var(--text-primary)">Guardrails</span>
+              <span style="font-size:10px;background:#6b728022;color:var(--text-muted);padding:2px 8px;border-radius:10px;border:1px solid var(--border)">○ Off</span>
+            </div>
+            <div style="font-size:9px;color:var(--text-muted);margin-top:-4px">All detectors inactive</div>
+
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
+              <span style="font-size:11px;color:var(--text-primary)">In-flight</span>
+              <span style="font-size:10px;color:var(--accent);font-weight:600">3 requests</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recommendations -->
+        <div style="background:var(--bg-secondary);border-radius:6px;border:1px solid var(--border);padding:12px">
+          <div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:10px">Recommendations</div>
+
+          <div style="display:flex;flex-direction:column;gap:8px">
+
+            <div style="background:#f59e0b11;border:1px solid #f59e0b44;border-radius:5px;padding:9px">
+              <div style="font-size:10px;font-weight:600;color:#f59e0b;margin-bottom:3px">⚠ Guardrails disabled</div>
+              <div style="font-size:10px;color:var(--text-secondary);line-height:1.4">Secrets or PII could be forwarded to upstream. Enable at least alert mode.</div>
+              <a style="font-size:10px;color:var(--accent);text-decoration:none;display:block;margin-top:5px">→ Open Settings</a>
+            </div>
+
+            <div style="background:#3b82f611;border:1px solid #3b82f644;border-radius:5px;padding:9px">
+              <div style="font-size:10px;font-weight:600;color:#3b82f6;margin-bottom:3px">ℹ Tool-result-only off</div>
+              <div style="font-size:10px;color:var(--text-secondary);line-height:1.4">Compressor targets full request body. Enable tool-result-only for tighter scope.</div>
+              <a style="font-size:10px;color:var(--accent);text-decoration:none;display:block;margin-top:5px">→ Open Settings</a>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Quick links -->
+        <div style="background:var(--bg-secondary);border-radius:6px;border:1px solid var(--border);padding:12px">
+          <div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:8px">Jump to</div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <a style="font-size:11px;color:var(--accent);text-decoration:none">Detailed metrics →</a>
+            <a style="font-size:11px;color:var(--accent);text-decoration:none">Compressor stats →</a>
+            <a style="font-size:11px;color:var(--accent);text-decoration:none">Guardrail events →</a>
+            <a style="font-size:11px;color:var(--accent);text-decoration:none">Live logs →</a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px">Does this structure feel right, or anything you'd move/add/remove?</p>
