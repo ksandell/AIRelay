@@ -2209,6 +2209,7 @@ const HASH_TO_TAB = {
   '#setup': 'setup',
   '#compactor': 'compactor',
   '#guardrails': 'guardrails',
+  '#cache': 'cache',
   '#logs': 'logs',
   '#settings': 'settings',
 }

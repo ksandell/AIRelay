@@ -924,6 +924,10 @@ footer {
   gap: 0.25rem;
 }
 
+.kpi-card[hidden] {
+  display: none;
+}
+
 .kpi-label {
   font-size: 0.75rem;
   color: var(--text-muted);

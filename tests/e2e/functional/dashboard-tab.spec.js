@@ -9,8 +9,10 @@ test.describe('Dashboard tab', () => {
 
   test('KPI cards rendered', async ({ page }) => {
     await page.goto('/?testMode=1#dashboard')
-    const cards = page.locator('.kpi-card')
-    await expect(cards).toHaveCount(4)
+    // 4 always-visible cards + 1 cache hit-rate card (hidden when cache off)
+    const cards = page.locator('#dashboardPanel .kpi-card')
+    await expect(cards).toHaveCount(5)
+    await expect(page.locator('#dashKpiCacheCard')).toBeHidden()
   })
 
   test('sparkline canvas exists', async ({ page }) => {
