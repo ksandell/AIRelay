@@ -985,6 +985,33 @@ footer {
   font-weight: 600;
 }
 
+/* Dashboard recent-requests table — give columns real spacing (it had none,
+   so Time/Model/Tokens/Cost/Latency ran together). */
+#dashRecentTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+#dashRecentTable th,
+#dashRecentTable td {
+  padding: 5px 16px 5px 0;
+  text-align: left;
+  white-space: nowrap;
+}
+#dashRecentTable thead th {
+  color: var(--muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+#dashRecentTable td:nth-child(3),
+#dashRecentTable th:nth-child(3),
+#dashRecentTable td:nth-child(4),
+#dashRecentTable th:nth-child(4),
+#dashRecentTable td:nth-child(5),
+#dashRecentTable th:nth-child(5) {
+  text-align: right;
+}
+
 .health-list {
   list-style: none;
   padding: 0;

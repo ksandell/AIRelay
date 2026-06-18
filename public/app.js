@@ -159,6 +159,14 @@ setInterval(() => {
   if (cp && !cp.classList.contains('hidden')) refreshCache().catch(() => {})
 }, 5000)
 
+// Keep the Dashboard live while it's the active panel. Without this the activity
+// sparkline only ever receives a single data point (taken on tab-open) and
+// renders as a flat line; periodic refresh feeds pushDashPoint over time.
+setInterval(() => {
+  const dp = document.getElementById('dashboardPanel')
+  if (dp && !dp.classList.contains('hidden')) refreshDashboard().catch(() => {})
+}, 5000)
+
 const compactorHistoryWindowEl = document.getElementById('compactorHistoryWindow')
 if (compactorHistoryWindowEl) {
   compactorHistoryWindowEl.addEventListener('change', refreshCompactorAuto)
