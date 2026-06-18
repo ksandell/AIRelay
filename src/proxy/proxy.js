@@ -329,7 +329,7 @@ export function createProxyHandler(route) {
     // middleware, feed it to http-proxy via the `buffer` option so the
     // (possibly mutated) bytes go upstream instead of the already-consumed
     // request stream. Guardrails runs after Compactor and its body supersedes.
-    const substituteBody = req._guardrailsBody ?? req._compactorBody
+    const substituteBody = req._guardrailsBody ?? req._compactorBody ?? req._cacheBodyBuffer
     const proxyOpts = {
       target: route.upstream,
       agent,
