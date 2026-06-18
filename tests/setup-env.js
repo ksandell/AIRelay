@@ -4,3 +4,6 @@
 // regardless of whether the dev stack has the Dragonfly cache enabled.
 process.env.CACHE_ENABLED = 'false'
 process.env.CACHE_REDIS_URL = ''
+// Prevent test-generated log entries (e.g. errorHandler test throws) from
+// writing to the real data/logs/app.log on the developer's machine.
+process.env.LOG_SINK = 'noop'
