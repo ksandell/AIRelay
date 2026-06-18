@@ -381,7 +381,7 @@ function buildRecommendations(health, compactorSummary, guardrailsSummary) {
     recs.push({ text: 'ℹ Tool-result-only off — tighter scope available', tab: 'settings' })
   }
   if (health && !health.proxy?.enabled) {
-    recs.push({ text: '✕ No upstream configured', tab: 'setup' })
+    recs.push({ text: '✕ No upstream configured', tab: 'settings' })
   }
   if (health && health.status !== 'ok') {
     recs.push({ text: '✕ Proxy health check failing — check upstream URL', tab: null })
