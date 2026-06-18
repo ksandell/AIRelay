@@ -28,6 +28,7 @@ test.describe('Settings tab', () => {
     await expect(page.locator('#settingGuardrailsEnabled')).toBeAttached()
     await expect(page.locator('#guardrailsSubsection')).toBeAttached()
     await expect(page.locator('#detectorGrid')).toBeVisible()
+    await expect(page.locator('.category-cards .category-card')).toHaveCount(3)
   })
 
   test('settings footer text present', async ({ page }) => {
@@ -51,10 +52,8 @@ test.describe('Settings tab', () => {
   })
 
   test('Save button triggers POST /api/settings', async ({ page }) => {
-    let savedBody = null
     await page.route('**/api/settings', async (route) => {
       if (route.request().method() === 'POST') {
-        savedBody = route.request().postDataJSON()
         await route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' })
       } else {
         await route.continue()
@@ -65,8 +64,13 @@ test.describe('Settings tab', () => {
     // Make a change to enable the Save button
     await page.locator('#settingCompactorEnabled').click()
     await expect(page.locator('#settingsSaveBtn')).toBeVisible()
+
+    const settingsRequest = page.waitForRequest(
+      req => req.url().includes('/api/settings') && req.method() === 'POST'
+    )
     await page.locator('#settingsSaveBtn').click()
-    // POST should have been intercepted
-    expect(savedBody).not.toBeNull()
+    const req = await settingsRequest
+    const body = req.postDataJSON()
+    expect(body).toBeDefined()
   })
 })

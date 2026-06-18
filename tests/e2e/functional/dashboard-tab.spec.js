@@ -31,6 +31,13 @@ test.describe('Dashboard tab', () => {
     await expect(page.locator('#dashHealthGuardrails')).toBeAttached()
   })
 
+  test('"View all in Logs →" link navigates to Logs panel', async ({ page }) => {
+    await page.goto('/?testMode=1#dashboard')
+    await page.locator('#dashLogsLink').click()
+    await expect(page.locator('#logsPanel')).toBeVisible()
+    await expect(page.locator('.tab[data-tab="logs"]')).toHaveClass(/active/)
+  })
+
   test('navigating via #dashboard hash shows dashboard panel', async ({ page }) => {
     await page.goto('/?testMode=1#logs')
     await expect(page.locator('#logsPanel')).toBeVisible()
