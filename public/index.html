@@ -31,6 +31,9 @@
           <button class="tab" data-tab="guardrails">
             <i aria-hidden="true" data-lucide="shield"></i>Guardrails
           </button>
+          <button class="tab" data-tab="cache">
+            <i aria-hidden="true" data-lucide="database"></i>Cache
+          </button>
           <button class="tab" data-tab="settings">
             <i aria-hidden="true" data-lucide="sliders-horizontal"></i>Settings
           </button>
@@ -132,6 +135,12 @@
         >
       </div>
 
+      <div class="controls hidden" id="cacheControls">
+        <span id="cacheStatus" class="status disconnected" role="status" aria-live="polite"
+          >Disabled</span
+        >
+      </div>
+
       <div class="controls hidden" id="settingsControls">
         <span class="pill" id="settingsDirtyPill" hidden>⚠ Unsaved changes</span>
         <button id="settingsSaveBtn" hidden>Save</button>
@@ -157,6 +166,10 @@
         <div class="kpi-card" id="dashKpiBytesSavedCard">
           <span class="kpi-label">Bytes saved</span>
           <span class="kpi-value" id="dashKpiBytesSaved">—</span>
+        </div>
+        <div class="kpi-card" id="dashKpiCacheCard" hidden>
+          <span class="kpi-label">Cache hit rate</span>
+          <span class="kpi-value" id="dashKpiCacheHitRate">—</span>
         </div>
       </div>
 
@@ -206,6 +219,10 @@
                 <span id="dashHealthGuardrailsLabel">—</span>
               </li>
               <li>
+                <span class="health-dot" id="dashHealthCache"></span> Cache
+                <span id="dashHealthCacheLabel">—</span>
+              </li>
+              <li>
                 <span class="health-dot dot-neutral"></span> In-flight
                 <span id="dashInFlight">0</span>
               </li>
@@ -221,6 +238,7 @@
               <li><a href="#metrics" class="tab-link" data-tab="metrics">Metrics</a></li>
               <li><a href="#compactor" class="tab-link" data-tab="compactor">Compressors</a></li>
               <li><a href="#guardrails" class="tab-link" data-tab="guardrails">Guardrails</a></li>
+              <li><a href="#cache" class="tab-link" data-tab="cache">Cache</a></li>
               <li><a href="#logs" class="tab-link" data-tab="logs">Logs</a></li>
             </ul>
           </div>
@@ -822,6 +840,86 @@ npm run dev</pre
       </section>
     </main>
 
+    <main id="cachePanel" class="panel hidden">
+      <!-- Status row -->
+      <div class="cache-status-row" id="cacheStatusRow">
+        <span class="health-dot" id="cacheConnDot"></span>
+        <span id="cacheConnLabel">Cache disabled</span>
+        <span class="cache-status-pill" id="cacheExactPill">Exact match —</span>
+        <span class="cache-status-pill" id="cacheDedupPill">Dedup —</span>
+        <span class="cache-status-pill" id="cacheSpendPill">Spend limits —</span>
+      </div>
+
+      <!-- KPI row (1m window) -->
+      <div class="kpi-row" id="cacheKpiRow">
+        <div class="kpi-card">
+          <span class="kpi-label">Cache hits (1m)</span>
+          <span class="kpi-value" id="cacheKpiHits1m">—</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Hit rate</span>
+          <span class="kpi-value" id="cacheKpiHitRate">—</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Bytes from cache</span>
+          <span class="kpi-value" id="cacheKpiBytesFromCache">—</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Dedup coalesced</span>
+          <span class="kpi-value" id="cacheKpiDedup">—</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Spend rejects</span>
+          <span class="kpi-value" id="cacheKpiSpendRejects">—</span>
+        </div>
+      </div>
+
+      <!-- Lifetime KPIs -->
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <span class="kpi-label">Cache hits (lifetime)</span>
+          <span class="kpi-value" id="cacheKpiHitsLifetime">—</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Hit rate (lifetime)</span>
+          <span class="kpi-value" id="cacheKpiHitRateLifetime">—</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Keys cached</span>
+          <span class="kpi-value" id="cacheKpiKeyCount">—</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">In-flight dedup</span>
+          <span class="kpi-value" id="cacheKpiInflight">—</span>
+        </div>
+      </div>
+
+      <!-- Disabled notice -->
+      <div class="card" id="cacheDisabledNotice">
+        <p>
+          Cache is disabled. Set <code>CACHE_ENABLED=true</code> and configure
+          <code>CACHE_REDIS_URL</code>, then enable via Settings.
+        </p>
+      </div>
+
+      <!-- Recent events -->
+      <div class="card" id="cacheRecentCard" hidden>
+        <h3>Recent cache events</h3>
+        <table id="cacheRecentTable">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Type</th>
+              <th>Key prefix</th>
+              <th>Key age (s)</th>
+              <th>Bytes</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </main>
+
     <main id="settingsPanel" class="panel hidden">
       <h2>Runtime Settings</h2>
       <p class="settings-note">
@@ -1141,6 +1239,47 @@ npm run dev</pre
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Cache section -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <h3>Cache</h3>
+          <label class="toggle-label">
+            <input type="checkbox" id="settingCacheEnabled" data-key="cacheEnabled" />
+            <span>Enable</span>
+          </label>
+        </div>
+
+        <div class="settings-subsection" id="cacheSubsection">
+          <h4>Features</h4>
+          <div class="toggle-grid">
+            <label class="toggle-label"
+              ><input type="checkbox" data-key="cacheExactMatchEnabled" /><span
+                >Exact-match cache</span
+              ></label
+            >
+            <label class="toggle-label"
+              ><input type="checkbox" data-key="cacheDedupEnabled" /><span
+                >Request deduplication</span
+              ></label
+            >
+            <label class="toggle-label"
+              ><input type="checkbox" data-key="cacheSpendEnabled" /><span
+                >Per-key spend limits</span
+              ></label
+            >
+            <label class="toggle-label"
+              ><input type="checkbox" data-key="cacheSseFanoutEnabled" /><span
+                >Multi-instance SSE fan-out</span
+              ></label
+            >
+          </div>
+          <p class="settings-note">
+            TTL and spend thresholds are set via <code>CACHE_*</code> env vars or
+            <code>POST /api/settings</code>. Requires <code>CACHE_REDIS_URL</code> + Dragonfly.
+          </p>
         </div>
       </div>
 
