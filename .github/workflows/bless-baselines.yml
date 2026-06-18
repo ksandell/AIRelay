@@ -54,7 +54,7 @@ jobs:
             echo "No baseline changes — nothing to commit."
             exit 0
           fi
-          git add 'tests/e2e/visual/*-snapshots'
+          git add tests/e2e/visual/
           TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           git commit -m "ci: bless Linux Playwright visual baselines" -m "Regenerated via .github/workflows/bless-baselines.yml on ${TS}."
           git push origin HEAD:${{ inputs.branch || github.ref_name }}
