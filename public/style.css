@@ -72,13 +72,16 @@ header {
   flex-shrink: 0;
   display: block;
 }
+.brand-identity {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
 .app-version {
   font-size: 0.72rem;
   color: var(--muted);
   letter-spacing: 0.02em;
-  margin-left: -10px;
-  align-self: flex-end;
-  padding-bottom: 4px;
+  padding-bottom: 5px;
   white-space: nowrap;
 }
 h1 {
