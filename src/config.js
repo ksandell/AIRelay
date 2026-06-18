@@ -327,6 +327,23 @@ export const config = {
     }
   },
 
+  // Cache (v0.6.0) — optional Redis-backed exact-match & normalized caching
+  // See docs/CACHE.md.
+  cacheRedisUrl: process.env.CACHE_REDIS_URL ?? null,
+  get cacheExactMatchEnabled() {
+    return _overrides.cacheExactMatchEnabled ?? process.env.CACHE_EXACT_MATCH_ENABLED === 'true'
+  },
+  cacheExactTtlSeconds: int('CACHE_EXACT_TTL_SECONDS', 3600),
+  get cacheNormalizedEnabled() {
+    return _overrides.cacheNormalizedEnabled ?? process.env.CACHE_NORMALIZED_ENABLED === 'true'
+  },
+  cacheNormalizedTtlSeconds: int('CACHE_NORMALIZED_TTL_SECONDS', 86400),
+  get cacheSpendEnabled() {
+    return _overrides.cacheSpendEnabled ?? process.env.CACHE_SPEND_ENABLED === 'true'
+  },
+  cacheSpendDailyLimitUsd: +((process.env.CACHE_SPEND_DAILY_LIMIT_USD ?? _overrides.cacheSpendDailyLimitUsd) ?? null),
+  cacheSpendMonthlyLimitUsd: +((process.env.CACHE_SPEND_MONTHLY_LIMIT_USD ?? _overrides.cacheSpendMonthlyLimitUsd) ?? null),
+
   // Shutdown
   shutdownTimeoutMs: int('SHUTDOWN_TIMEOUT_MS', 30_000),
 }
