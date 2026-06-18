@@ -115,34 +115,38 @@ async function refreshCompactor() {
     pushSpark('compactorBypasses', s.lifetime.requestsBypassed)
 
     const tbody = document.querySelector('#compactorTable tbody')
-    tbody.innerHTML = ''
-    const activeSet = new Set(s.compressors.active)
-    for (const name of s.compressors.all) {
-      const agg = s.lifetime.byCompressor[name]
-      const tr = document.createElement('tr')
-      const fires = agg?.fires ?? 0
-      const saved = agg?.bytesSaved ?? 0
-      const avgMicros = fires > 0 ? Math.round(agg.durationMicros / fires) : 0
-      tr.innerHTML = `<td><code>${escHtml(name)}</code></td>
-        <td>${activeSet.has(name) ? '✓' : '—'}</td>
-        <td>${fires}</td>
-        <td>${fmtBytes(saved)}</td>
-        <td>${avgMicros}</td>`
-      tbody.appendChild(tr)
+    if (tableNeedsRebuild(tbody, s.compressors.all[0])) {
+      tbody.innerHTML = ''
+      const activeSet = new Set(s.compressors.active)
+      for (const name of s.compressors.all) {
+        const agg = s.lifetime.byCompressor[name]
+        const tr = document.createElement('tr')
+        const fires = agg?.fires ?? 0
+        const saved = agg?.bytesSaved ?? 0
+        const avgMicros = fires > 0 ? Math.round(agg.durationMicros / fires) : 0
+        tr.innerHTML = `<td><code>${escHtml(name)}</code></td>
+          <td>${activeSet.has(name) ? '✓' : '—'}</td>
+          <td>${fires}</td>
+          <td>${fmtBytes(saved)}</td>
+          <td>${avgMicros}</td>`
+        tbody.appendChild(tr)
+      }
     }
 
     const rbody = document.querySelector('#compactorRecentTable tbody')
-    rbody.innerHTML = ''
-    for (const ev of recent) {
-      const tr = document.createElement('tr')
-      tr.innerHTML = `<td>${fmtTimeShort(ev.ts)}</td>
-        <td>${escHtml(ev.scope)}</td>
-        <td>${escHtml(ev.filtersFired.join(', ') || '—')}</td>
-        <td>${ev.bytesIn} → ${ev.bytesOut}</td>
-        <td>${fmtBytes(ev.bytesSaved)}</td>
-        <td>${ev.durationMicros}</td>
-        <td>${escHtml(ev.bypassReason ?? '')}</td>`
-      rbody.appendChild(tr)
+    if (tableNeedsRebuild(rbody, recent[0]?.ts ? fmtTime(recent[0].ts) : '')) {
+      rbody.innerHTML = ''
+      for (const ev of recent) {
+        const tr = document.createElement('tr')
+        tr.innerHTML = `<td>${fmtTimeShort(ev.ts)}</td>
+          <td>${escHtml(ev.scope)}</td>
+          <td>${escHtml(ev.filtersFired.join(', ') || '—')}</td>
+          <td>${ev.bytesIn} → ${ev.bytesOut}</td>
+          <td>${fmtBytes(ev.bytesSaved)}</td>
+          <td>${ev.durationMicros}</td>
+          <td>${escHtml(ev.bypassReason ?? '')}</td>`
+        rbody.appendChild(tr)
+      }
     }
   } catch {
     if (statusEl) {
@@ -255,36 +259,40 @@ async function refreshGuardrails() {
     pushSpark('guardrailsBypassesLifetime', s.lifetime.requestsBypassed)
 
     const tbody = document.querySelector('#guardrailsTable tbody')
-    tbody.innerHTML = ''
-    const activeMap = new Map(s.detectors.active.map((d) => [d.name, d]))
-    for (const name of s.detectors.all) {
-      const active = activeMap.get(name)
-      const agg = s.lifetime.byDetector[name]
-      const tr = document.createElement('tr')
-      const fires = agg?.fires ?? 0
-      const hits = agg?.hits ?? 0
-      const bytesRedacted = agg?.bytesRedacted ?? 0
-      tr.innerHTML = `<td><code>${escHtml(name)}</code></td>
-        <td>${escHtml(active ? active.category : '—')}</td>
-        <td>${escHtml(active ? active.mode : 'off')}</td>
-        <td>${fires}</td>
-        <td>${hits}</td>
-        <td>${fmtBytes(bytesRedacted)}</td>`
-      tbody.appendChild(tr)
+    if (tableNeedsRebuild(tbody, s.detectors.all[0])) {
+      tbody.innerHTML = ''
+      const activeMap = new Map(s.detectors.active.map((d) => [d.name, d]))
+      for (const name of s.detectors.all) {
+        const active = activeMap.get(name)
+        const agg = s.lifetime.byDetector[name]
+        const tr = document.createElement('tr')
+        const fires = agg?.fires ?? 0
+        const hits = agg?.hits ?? 0
+        const bytesRedacted = agg?.bytesRedacted ?? 0
+        tr.innerHTML = `<td><code>${escHtml(name)}</code></td>
+          <td>${escHtml(active ? active.category : '—')}</td>
+          <td>${escHtml(active ? active.mode : 'off')}</td>
+          <td>${fires}</td>
+          <td>${hits}</td>
+          <td>${fmtBytes(bytesRedacted)}</td>`
+        tbody.appendChild(tr)
+      }
     }
 
     const rbody = document.querySelector('#guardrailsRecentTable tbody')
-    rbody.innerHTML = ''
-    for (const ev of recent) {
-      const tr = document.createElement('tr')
-      tr.innerHTML = `<td>${fmtTimeShort(ev.ts)}</td>
-        <td>${escHtml(ev.mode)}</td>
-        <td>${escHtml(ev.detectorsFired.join(', ') || '—')}</td>
-        <td>${ev.hits}</td>
-        <td>${ev.bytesIn} → ${ev.bytesOut}</td>
-        <td>${ev.blocked ? '✓' : ''}</td>
-        <td>${escHtml(ev.bypassReason ?? '')}</td>`
-      rbody.appendChild(tr)
+    if (tableNeedsRebuild(rbody, recent[0]?.ts ? fmtTime(recent[0].ts) : '')) {
+      rbody.innerHTML = ''
+      for (const ev of recent) {
+        const tr = document.createElement('tr')
+        tr.innerHTML = `<td>${fmtTimeShort(ev.ts)}</td>
+          <td>${escHtml(ev.mode)}</td>
+          <td>${escHtml(ev.detectorsFired.join(', ') || '—')}</td>
+          <td>${ev.hits}</td>
+          <td>${ev.bytesIn} → ${ev.bytesOut}</td>
+          <td>${ev.blocked ? '✓' : ''}</td>
+          <td>${escHtml(ev.bypassReason ?? '')}</td>`
+        rbody.appendChild(tr)
+      }
     }
   } catch {
     if (statusEl) {
@@ -551,10 +559,10 @@ function dashRecentRow(ev) {
 function renderRecentTable(recent) {
   const tbody = document.querySelector('#dashRecentTable tbody')
   if (!tbody) return
-  tbody.innerHTML = ''
-  // API returns oldest-first; reverse so newest appears at top (matches updateDashRecent).
   const src = Array.isArray(recent) ? recent : (recent.events ?? [])
   const rows = src.slice().reverse().slice(0, 5)
+  if (!tableNeedsRebuild(tbody, rows[0]?.ts ? fmtTime(rows[0].ts) : '')) return
+  tbody.innerHTML = ''
   for (const ev of rows) tbody.appendChild(dashRecentRow(ev))
 }
 
@@ -784,7 +792,7 @@ async function refreshCache() {
     if (recentCard) recentCard.hidden = !enabled
 
     const tbody = document.querySelector('#cacheRecentTable tbody')
-    if (tbody) {
+    if (tbody && tableNeedsRebuild(tbody, recent[0]?.ts ? fmtTime(recent[0].ts) : '')) {
       tbody.innerHTML = ''
       for (const ev of recent) {
         const tr = document.createElement('tr')
@@ -1635,22 +1643,28 @@ function fmtNum(n, decimals = 0) {
 
 // UTC timestamp with millisecond precision: `YYYY-MM-DD HH:MM:SS.mmm UTC`.
 // All timestamps in the UI are UTC, 24-hour format.
+// Full UTC timestamp for all log/table cells: `YYYY-MM-DD HH:MM:SS.mmm`
+// No "UTC" suffix — column headers state the timezone.
 function fmtTime(ts) {
   const d = new Date(ts)
   if (isNaN(d.getTime())) return ''
   const p = (n, w = 2) => String(n).padStart(w, '0')
   return (
     `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ` +
-    `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}.${p(d.getUTCMilliseconds(), 3)} UTC`
+    `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}.${p(d.getUTCMilliseconds(), 3)}`
   )
 }
 
-// Short UTC time for table cells: `HH:MM:SS`.
+// All table cells use the same format — date + time + ms, no UTC suffix.
 function fmtTimeShort(ts) {
-  const d = new Date(ts)
-  if (isNaN(d.getTime())) return ''
-  const p = (n) => String(n).padStart(2, '0')
-  return `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`
+  return fmtTime(ts)
+}
+
+// Returns true when a tbody needs rebuilding. Compares the top-row key
+// against the first <td> so periodic polls skip DOM thrashing when nothing changed.
+function tableNeedsRebuild(tbody, topKey) {
+  if (!tbody || !tbody.rows.length) return true
+  return tbody.querySelector('tr:first-child td:first-child')?.textContent?.trim() !== String(topKey ?? '')
 }
 
 // Chart-only x-axis formatter (UTC). Outputs `HH:MM:SS`, with a `DD.MM.YYYY ` prefix

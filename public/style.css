@@ -201,7 +201,7 @@ button.active {
 
 .log-entry {
   display: grid;
-  grid-template-columns: 190px 74px 1fr;
+  grid-template-columns: 210px 74px 1fr;
   gap: 0 12px;
   padding: 2px 16px;
   line-height: 1.6;
