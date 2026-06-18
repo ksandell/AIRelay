@@ -305,17 +305,13 @@ async function refreshGuardrailsAuto() {
 
 // ─── Dashboard panel ─────────────────────────────────────────
 let dashSparklineChart = null
-const dashRpsHistory = []
-const dashP95History = []
+let dashRpsHistory = []
+let dashP95History = []
 const DASH_SPARKLINE_POINTS = 30
 
 function pushDashPoint(rps, p95) {
-  dashRpsHistory.push(rps)
-  dashP95History.push(p95)
-  if (dashRpsHistory.length > DASH_SPARKLINE_POINTS) {
-    dashRpsHistory.shift()
-    dashP95History.shift()
-  }
+  dashRpsHistory = [...dashRpsHistory, rps].slice(-DASH_SPARKLINE_POINTS)
+  dashP95History = [...dashP95History, p95].slice(-DASH_SPARKLINE_POINTS)
   if (dashSparklineChart) {
     dashSparklineChart.data.labels = dashRpsHistory.map((_, i) => i)
     dashSparklineChart.data.datasets[0].data = [...dashRpsHistory]
@@ -389,6 +385,90 @@ function buildRecommendations(health, compactorSummary, guardrailsSummary) {
   return recs
 }
 
+function renderKpiRow(summary, compactor) {
+  const total = summary?.lifetime?.total
+  document.getElementById('dashKpiRequests').textContent =
+    typeof total === 'number' ? total.toLocaleString() : '—'
+  const cost = summary?.lifetime?.totalCostUsd
+  document.getElementById('dashKpiCost').textContent =
+    typeof cost === 'number' ? '$' + cost.toFixed(4) : '—'
+  const p95 = summary?.window_1m?.p95
+  document.getElementById('dashKpiP95').textContent = typeof p95 === 'number' ? p95 + ' ms' : '—'
+  const bytesSavedCard = document.getElementById('dashKpiBytesSavedCard')
+  if (compactor?.enabled && bytesSavedCard) {
+    bytesSavedCard.hidden = false
+    const saved = compactor.lifetime?.bytesSaved ?? 0
+    const bytesIn = compactor.lifetime?.bytesIn ?? 0
+    const pct = bytesIn > 0 ? Math.round((saved / bytesIn) * 100) : 0
+    document.getElementById('dashKpiBytesSaved').textContent = pct + '%'
+  } else if (bytesSavedCard) {
+    bytesSavedCard.hidden = true
+  }
+  return p95
+}
+
+function renderRecentTable(recent) {
+  const tbody = document.querySelector('#dashRecentTable tbody')
+  if (!tbody) return
+  tbody.innerHTML = ''
+  const rows = Array.isArray(recent) ? recent.slice(0, 5) : (recent.events ?? []).slice(0, 5)
+  for (const ev of rows) {
+    const tr = document.createElement('tr')
+    tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
+      <td><code>${ev.model ?? '—'}</code></td>
+      <td>${(ev.tokensIn ?? 0) + (ev.tokensOut ?? 0)}</td>
+      <td>${ev.costUsd != null ? '$' + ev.costUsd.toFixed(5) : '—'}</td>
+      <td>${ev.durationMs != null ? ev.durationMs + ' ms' : '—'}</td>`
+    tbody.appendChild(tr)
+  }
+}
+
+function renderHealthSidebar(health, compactor, guardrails) {
+  const proxyOk = health.status === 'ok'
+  setHealthDot('dashHealthProxy', proxyOk ? 'ok' : 'error')
+  document.getElementById('dashHealthProxyLabel').textContent = proxyOk
+    ? 'OK'
+    : (health.status ?? 'Unknown')
+
+  const compEnabled = compactor?.enabled ?? false
+  const compActive = compactor?.compressors?.active?.length ?? 0
+  const compAll = compactor?.compressors?.all?.length ?? 0
+  setHealthDot('dashHealthCompactor', compEnabled ? 'ok' : 'neutral')
+  document.getElementById('dashHealthCompactorLabel').textContent = compEnabled
+    ? `On (${compActive}/${compAll} active)`
+    : 'Off'
+
+  const grEnabled = guardrails?.enabled ?? false
+  const grActive = guardrails?.detectors?.active?.length ?? 0
+  const grAll = guardrails?.detectors?.all?.length ?? 0
+  setHealthDot('dashHealthGuardrails', grEnabled ? 'ok' : 'warn')
+  document.getElementById('dashHealthGuardrailsLabel').textContent = grEnabled
+    ? `On (${grActive}/${grAll} active)`
+    : 'Off'
+}
+
+function renderRecommendations(health, compactor, guardrails) {
+  const recs = buildRecommendations(health, compactor, guardrails)
+  const recCard = document.getElementById('dashRecommendationsCard')
+  const recList = document.getElementById('dashRecommendationsList')
+  if (!recCard || !recList) return
+  recCard.hidden = recs.length === 0
+  recList.innerHTML = ''
+  for (const rec of recs) {
+    const li = document.createElement('li')
+    if (rec.tab) {
+      const btn = document.createElement('button')
+      btn.className = 'rec-link'
+      btn.textContent = rec.text + ' →'
+      btn.addEventListener('click', () => activateTab(rec.tab))
+      li.appendChild(btn)
+    } else {
+      li.textContent = rec.text
+    }
+    recList.appendChild(li)
+  }
+}
+
 async function refreshDashboard() {
   const statusEl = document.getElementById('dashboardStatus')
   try {
@@ -402,97 +482,45 @@ async function refreshDashboard() {
     ])
     if (!healthRes.ok) throw new Error('health fetch failed')
     const health = await healthRes.json()
+    if (!summaryRes.ok) console.warn('refreshDashboard: summary fetch failed', summaryRes.status)
+    if (!recentRes.ok) console.warn('refreshDashboard: recent fetch failed', recentRes.status)
+    if (!compactorRes.ok)
+      console.warn('refreshDashboard: compactor fetch failed', compactorRes.status)
+    if (!guardrailsRes.ok)
+      console.warn('refreshDashboard: guardrails fetch failed', guardrailsRes.status)
     const summary = summaryRes.ok ? await summaryRes.json() : null
     const recent = recentRes.ok ? await recentRes.json() : []
     const compactor = compactorRes.ok ? await compactorRes.json() : null
     const guardrails = guardrailsRes.ok ? await guardrailsRes.json() : null
 
-    if (statusEl) { statusEl.textContent = 'Live'; statusEl.className = 'status connected' }
-
-    // KPI row
-    const total = summary?.lifetime?.total
-    document.getElementById('dashKpiRequests').textContent = typeof total === 'number' ? total.toLocaleString() : '—'
-    const cost = summary?.lifetime?.totalCostUsd
-    document.getElementById('dashKpiCost').textContent = typeof cost === 'number' ? '$' + cost.toFixed(4) : '—'
-    const p95 = summary?.window_1m?.p95
-    document.getElementById('dashKpiP95').textContent = typeof p95 === 'number' ? p95 + ' ms' : '—'
-    const bytesSavedCard = document.getElementById('dashKpiBytesSavedCard')
-    if (compactor?.enabled && bytesSavedCard) {
-      bytesSavedCard.hidden = false
-      const saved = compactor.lifetime?.bytesSaved ?? 0
-      const bytesIn = compactor.lifetime?.bytesIn ?? 0
-      const pct = bytesIn > 0 ? Math.round((saved / bytesIn) * 100) : 0
-      document.getElementById('dashKpiBytesSaved').textContent = pct + '%'
-    } else if (bytesSavedCard) {
-      bytesSavedCard.hidden = true
+    if (statusEl) {
+      statusEl.textContent = 'Live'
+      statusEl.className = 'status connected'
     }
 
-    // Sparkline seed
+    const p95 = renderKpiRow(summary, compactor)
     pushDashPoint(summary?.window_1m?.rps ?? 0, p95 ?? 0)
-
-    // Recent requests table
-    const tbody = document.querySelector('#dashRecentTable tbody')
-    if (tbody) {
-      tbody.innerHTML = ''
-      const rows = Array.isArray(recent) ? recent.slice(0, 5) : (recent.events ?? []).slice(0, 5)
-      for (const ev of rows) {
-        const tr = document.createElement('tr')
-        tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
-          <td><code>${ev.model ?? '—'}</code></td>
-          <td>${(ev.tokensIn ?? 0) + (ev.tokensOut ?? 0)}</td>
-          <td>${ev.costUsd != null ? '$' + ev.costUsd.toFixed(5) : '—'}</td>
-          <td>${ev.durationMs != null ? ev.durationMs + ' ms' : '—'}</td>`
-        tbody.appendChild(tr)
-      }
-    }
-
-    // Health sidebar
-    const proxyOk = health.status === 'ok'
-    setHealthDot('dashHealthProxy', proxyOk ? 'ok' : 'error')
-    document.getElementById('dashHealthProxyLabel').textContent = proxyOk ? 'OK' : (health.status ?? 'Unknown')
-
-    const compEnabled = compactor?.enabled ?? false
-    const compActive = compactor?.compressors?.active?.length ?? 0
-    const compAll = compactor?.compressors?.all?.length ?? 0
-    setHealthDot('dashHealthCompactor', compEnabled ? 'ok' : 'neutral')
-    document.getElementById('dashHealthCompactorLabel').textContent = compEnabled ? `On (${compActive}/${compAll} active)` : 'Off'
-
-    const grEnabled = guardrails?.enabled ?? false
-    const grActive = guardrails?.detectors?.active?.length ?? 0
-    const grAll = guardrails?.detectors?.all?.length ?? 0
-    setHealthDot('dashHealthGuardrails', grEnabled ? 'ok' : 'warn')
-    document.getElementById('dashHealthGuardrailsLabel').textContent = grEnabled ? `On (${grActive}/${grAll} active)` : 'Off'
-
-    // Recommendations
-    const recs = buildRecommendations(health, compactor, guardrails)
-    const recCard = document.getElementById('dashRecommendationsCard')
-    const recList = document.getElementById('dashRecommendationsList')
-    if (recCard && recList) {
-      recCard.hidden = recs.length === 0
-      recList.innerHTML = ''
-      for (const r of recs) {
-        const li = document.createElement('li')
-        if (r.tab) {
-          li.innerHTML = `${r.text} <a href="#${r.tab}" class="tab-link" data-tab="${r.tab}">→ ${r.tab}</a>`
-        } else {
-          li.textContent = r.text
-        }
-        recList.appendChild(li)
-      }
-    }
+    renderRecentTable(recent)
+    renderHealthSidebar(health, compactor, guardrails)
+    renderRecommendations(health, compactor, guardrails)
   } catch {
-    if (statusEl) { statusEl.textContent = 'Error'; statusEl.className = 'status disconnected' }
+    if (statusEl) {
+      statusEl.textContent = 'Error'
+      statusEl.className = 'status disconnected'
+    }
   }
 }
 
 // Wire "View all in Logs →" link
 document.getElementById('dashLogsLink')?.addEventListener('click', (e) => {
-  e.preventDefault(); activateTab('logs')
+  e.preventDefault()
+  activateTab('logs')
 })
 // Wire Quick links
 document.querySelectorAll('.tab-link[data-tab]').forEach((a) => {
   a.addEventListener('click', (e) => {
-    e.preventDefault(); activateTab(a.dataset.tab)
+    e.preventDefault()
+    activateTab(a.dataset.tab)
   })
 })
 
@@ -516,7 +544,9 @@ function updateDirtyBanner() {
 
 function applySettingsToUI(effective) {
   // Checkboxes
-  for (const input of document.querySelectorAll('#settingsPanel input[type="checkbox"][data-key]')) {
+  for (const input of document.querySelectorAll(
+    '#settingsPanel input[type="checkbox"][data-key]',
+  )) {
     const key = input.dataset.key
     if (key in effective) input.checked = effective[key]
   }
@@ -553,11 +583,12 @@ async function refreshSettings() {
     const res = await fetch('/api/settings')
     if (!res.ok) throw new Error('settings fetch failed')
     const data = await res.json()
-    _serverSettings = data.effective
+    _serverSettings = { ...data.effective }
     _pendingChanges = {}
     applySettingsToUI(data.effective)
     updateDirtyBanner()
-  } catch {
+  } catch (err) {
+    console.error('refreshSettings failed:', err)
     // retain current UI state on error
   }
 }
@@ -600,7 +631,7 @@ document.getElementById('settingsSaveBtn')?.addEventListener('click', async () =
       return
     }
     const data = await res.json()
-    _serverSettings = data.effective
+    _serverSettings = { ...data.effective }
     _pendingChanges = {}
     applySettingsToUI(data.effective)
     updateDirtyBanner()
