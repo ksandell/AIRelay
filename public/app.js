@@ -40,6 +40,14 @@ function activateTab(name) {
   metricsControls.classList.toggle('hidden', name !== 'metrics')
   if (compactorControls) compactorControls.classList.toggle('hidden', name !== 'compactor')
   if (guardrailsControls) guardrailsControls.classList.toggle('hidden', name !== 'guardrails')
+  const dashboardPanel = document.getElementById('dashboardPanel')
+  const dashboardControls = document.getElementById('dashboardControls')
+  const settingsPanel = document.getElementById('settingsPanel')
+  const settingsControls = document.getElementById('settingsControls')
+  if (dashboardPanel) dashboardPanel.classList.toggle('hidden', name !== 'dashboard')
+  if (dashboardControls) dashboardControls.classList.toggle('hidden', name !== 'dashboard')
+  if (settingsPanel) settingsPanel.classList.toggle('hidden', name !== 'settings')
+  if (settingsControls) settingsControls.classList.toggle('hidden', name !== 'settings')
   location.hash = name
   if (name === 'compactor') refreshCompactor()
   if (name === 'guardrails') refreshGuardrails()
@@ -51,6 +59,8 @@ function activateTab(name) {
   if (name === 'metrics' && typeof loadRecent === 'function') {
     loadRecent().catch(() => {})
   }
+  if (name === 'dashboard') refreshDashboard().catch(() => {})
+  if (name === 'settings') refreshSettings().catch(() => {})
 }
 tabs.forEach((t) => t.addEventListener('click', () => activateTab(t.dataset.tab)))
 
@@ -292,6 +302,319 @@ async function refreshGuardrailsAuto() {
     // ignore
   }
 }
+
+// ─── Dashboard panel ─────────────────────────────────────────
+let dashSparklineChart = null
+const dashRpsHistory = []
+const dashP95History = []
+const DASH_SPARKLINE_POINTS = 30
+
+function pushDashPoint(rps, p95) {
+  dashRpsHistory.push(rps)
+  dashP95History.push(p95)
+  if (dashRpsHistory.length > DASH_SPARKLINE_POINTS) {
+    dashRpsHistory.shift()
+    dashP95History.shift()
+  }
+  if (dashSparklineChart) {
+    dashSparklineChart.data.labels = dashRpsHistory.map((_, i) => i)
+    dashSparklineChart.data.datasets[0].data = [...dashRpsHistory]
+    dashSparklineChart.data.datasets[1].data = [...dashP95History]
+    dashSparklineChart.update('none')
+  }
+}
+
+function initDashSparkline() {
+  const canvas = document.getElementById('dashSparkline')
+  if (!canvas || dashSparklineChart) return
+  dashSparklineChart = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        {
+          label: 'RPS',
+          data: [],
+          borderColor: '#6366f1',
+          borderWidth: 2,
+          fill: false,
+          tension: 0.3,
+          pointRadius: 0,
+        },
+        {
+          label: 'p95 (ms)',
+          data: [],
+          borderColor: '#f59e0b',
+          borderWidth: 2,
+          borderDash: [4, 3],
+          fill: false,
+          tension: 0.3,
+          pointRadius: 0,
+        },
+      ],
+    },
+    options: {
+      animation: TEST_MODE ? false : { duration: 200 },
+      plugins: { legend: { display: true, position: 'bottom' } },
+      scales: {
+        x: { display: false },
+        y: { beginAtZero: true },
+      },
+      responsive: true,
+      maintainAspectRatio: false,
+    },
+  })
+}
+
+function setHealthDot(id, state) {
+  const el = document.getElementById(id)
+  if (!el) return
+  el.className = `health-dot dot-${state}`
+}
+
+function buildRecommendations(health, compactorSummary, guardrailsSummary) {
+  const recs = []
+  if (!guardrailsSummary?.enabled) {
+    recs.push({ text: '⚠ Guardrails disabled — enable at least alert mode', tab: 'settings' })
+  }
+  if (compactorSummary?.enabled && compactorSummary?.settings?.toolResultOnly === false) {
+    recs.push({ text: 'ℹ Tool-result-only off — tighter scope available', tab: 'settings' })
+  }
+  if (health && !health.proxy?.enabled) {
+    recs.push({ text: '✕ No upstream configured', tab: 'setup' })
+  }
+  if (health && health.status !== 'ok') {
+    recs.push({ text: '✕ Proxy health check failing — check upstream URL', tab: null })
+  }
+  return recs
+}
+
+async function refreshDashboard() {
+  const statusEl = document.getElementById('dashboardStatus')
+  try {
+    initDashSparkline()
+    const [healthRes, summaryRes, recentRes, compactorRes, guardrailsRes] = await Promise.all([
+      fetch('/health'),
+      fetch('/api/metrics/summary'),
+      fetch('/api/metrics/recent?limit=5'),
+      fetch('/api/compactor/summary'),
+      fetch('/api/guardrails/summary'),
+    ])
+    if (!healthRes.ok) throw new Error('health fetch failed')
+    const health = await healthRes.json()
+    const summary = summaryRes.ok ? await summaryRes.json() : null
+    const recent = recentRes.ok ? await recentRes.json() : []
+    const compactor = compactorRes.ok ? await compactorRes.json() : null
+    const guardrails = guardrailsRes.ok ? await guardrailsRes.json() : null
+
+    if (statusEl) { statusEl.textContent = 'Live'; statusEl.className = 'status connected' }
+
+    // KPI row
+    const total = summary?.lifetime?.total
+    document.getElementById('dashKpiRequests').textContent = typeof total === 'number' ? total.toLocaleString() : '—'
+    const cost = summary?.lifetime?.totalCostUsd
+    document.getElementById('dashKpiCost').textContent = typeof cost === 'number' ? '$' + cost.toFixed(4) : '—'
+    const p95 = summary?.window_1m?.p95
+    document.getElementById('dashKpiP95').textContent = typeof p95 === 'number' ? p95 + ' ms' : '—'
+    const bytesSavedCard = document.getElementById('dashKpiBytesSavedCard')
+    if (compactor?.enabled && bytesSavedCard) {
+      bytesSavedCard.hidden = false
+      const saved = compactor.lifetime?.bytesSaved ?? 0
+      const bytesIn = compactor.lifetime?.bytesIn ?? 0
+      const pct = bytesIn > 0 ? Math.round((saved / bytesIn) * 100) : 0
+      document.getElementById('dashKpiBytesSaved').textContent = pct + '%'
+    } else if (bytesSavedCard) {
+      bytesSavedCard.hidden = true
+    }
+
+    // Sparkline seed
+    pushDashPoint(summary?.window_1m?.rps ?? 0, p95 ?? 0)
+
+    // Recent requests table
+    const tbody = document.querySelector('#dashRecentTable tbody')
+    if (tbody) {
+      tbody.innerHTML = ''
+      const rows = Array.isArray(recent) ? recent.slice(0, 5) : (recent.events ?? []).slice(0, 5)
+      for (const ev of rows) {
+        const tr = document.createElement('tr')
+        tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
+          <td><code>${ev.model ?? '—'}</code></td>
+          <td>${(ev.tokensIn ?? 0) + (ev.tokensOut ?? 0)}</td>
+          <td>${ev.costUsd != null ? '$' + ev.costUsd.toFixed(5) : '—'}</td>
+          <td>${ev.durationMs != null ? ev.durationMs + ' ms' : '—'}</td>`
+        tbody.appendChild(tr)
+      }
+    }
+
+    // Health sidebar
+    const proxyOk = health.status === 'ok'
+    setHealthDot('dashHealthProxy', proxyOk ? 'ok' : 'error')
+    document.getElementById('dashHealthProxyLabel').textContent = proxyOk ? 'OK' : (health.status ?? 'Unknown')
+
+    const compEnabled = compactor?.enabled ?? false
+    const compActive = compactor?.compressors?.active?.length ?? 0
+    const compAll = compactor?.compressors?.all?.length ?? 0
+    setHealthDot('dashHealthCompactor', compEnabled ? 'ok' : 'neutral')
+    document.getElementById('dashHealthCompactorLabel').textContent = compEnabled ? `On (${compActive}/${compAll} active)` : 'Off'
+
+    const grEnabled = guardrails?.enabled ?? false
+    const grActive = guardrails?.detectors?.active?.length ?? 0
+    const grAll = guardrails?.detectors?.all?.length ?? 0
+    setHealthDot('dashHealthGuardrails', grEnabled ? 'ok' : 'warn')
+    document.getElementById('dashHealthGuardrailsLabel').textContent = grEnabled ? `On (${grActive}/${grAll} active)` : 'Off'
+
+    // Recommendations
+    const recs = buildRecommendations(health, compactor, guardrails)
+    const recCard = document.getElementById('dashRecommendationsCard')
+    const recList = document.getElementById('dashRecommendationsList')
+    if (recCard && recList) {
+      recCard.hidden = recs.length === 0
+      recList.innerHTML = ''
+      for (const r of recs) {
+        const li = document.createElement('li')
+        if (r.tab) {
+          li.innerHTML = `${r.text} <a href="#${r.tab}" class="tab-link" data-tab="${r.tab}">→ ${r.tab}</a>`
+        } else {
+          li.textContent = r.text
+        }
+        recList.appendChild(li)
+      }
+    }
+  } catch {
+    if (statusEl) { statusEl.textContent = 'Error'; statusEl.className = 'status disconnected' }
+  }
+}
+
+// Wire "View all in Logs →" link
+document.getElementById('dashLogsLink')?.addEventListener('click', (e) => {
+  e.preventDefault(); activateTab('logs')
+})
+// Wire Quick links
+document.querySelectorAll('.tab-link[data-tab]').forEach((a) => {
+  a.addEventListener('click', (e) => {
+    e.preventDefault(); activateTab(a.dataset.tab)
+  })
+})
+
+// ─── Settings tab ─────────────────────────────────────────────
+let _serverSettings = {}
+let _pendingChanges = {}
+
+function settingsIsDirty() {
+  return Object.keys(_pendingChanges).length > 0
+}
+
+function updateDirtyBanner() {
+  const pill = document.getElementById('settingsDirtyPill')
+  const save = document.getElementById('settingsSaveBtn')
+  const discard = document.getElementById('settingsDiscardBtn')
+  const dirty = settingsIsDirty()
+  if (pill) pill.hidden = !dirty
+  if (save) save.hidden = !dirty
+  if (discard) discard.hidden = !dirty
+}
+
+function applySettingsToUI(effective) {
+  // Checkboxes
+  for (const input of document.querySelectorAll('#settingsPanel input[type="checkbox"][data-key]')) {
+    const key = input.dataset.key
+    if (key in effective) input.checked = effective[key]
+  }
+  // Mode pills
+  for (const group of document.querySelectorAll('#settingsPanel .mode-pills[data-key]')) {
+    const key = group.dataset.key
+    const val = effective[key]
+    for (const pill of group.querySelectorAll('.mode-pill')) {
+      pill.classList.toggle('active', pill.dataset.mode === val)
+    }
+    const card = group.closest('.category-card')
+    if (card) card.className = `category-card mode-${val ?? 'off'}`
+  }
+  // Dim compressor cards
+  for (const card of document.querySelectorAll('#compressorGrid .compressor-card')) {
+    const key = card.dataset.key
+    if (key in effective) card.classList.toggle('off', !effective[key])
+  }
+  // Dim detector cards
+  for (const card of document.querySelectorAll('#detectorGrid .compressor-card')) {
+    const key = card.dataset.key
+    if (key in effective) card.classList.toggle('off', !effective[key])
+  }
+  // Compactor subsection dimming
+  const compSub = document.getElementById('compactorSubsection')
+  if (compSub) compSub.style.opacity = effective.compactorEnabled ? '1' : '0.5'
+  // Guardrails subsection dimming
+  const grSub = document.getElementById('guardrailsSubsection')
+  if (grSub) grSub.style.opacity = effective.guardrailsEnabled ? '1' : '0.5'
+}
+
+async function refreshSettings() {
+  try {
+    const res = await fetch('/api/settings')
+    if (!res.ok) throw new Error('settings fetch failed')
+    const data = await res.json()
+    _serverSettings = data.effective
+    _pendingChanges = {}
+    applySettingsToUI(data.effective)
+    updateDirtyBanner()
+  } catch {
+    // retain current UI state on error
+  }
+}
+
+// Wire checkbox changes
+document.querySelectorAll('#settingsPanel input[type="checkbox"][data-key]').forEach((input) => {
+  input.addEventListener('change', () => {
+    const key = input.dataset.key
+    _pendingChanges[key] = input.checked
+    applySettingsToUI({ ..._serverSettings, ..._pendingChanges })
+    updateDirtyBanner()
+  })
+})
+
+// Wire mode pill clicks
+document.querySelectorAll('#settingsPanel .mode-pill').forEach((pill) => {
+  pill.addEventListener('click', () => {
+    const group = pill.closest('.mode-pills')
+    if (!group) return
+    const key = group.dataset.key
+    const mode = pill.dataset.mode
+    _pendingChanges[key] = mode
+    applySettingsToUI({ ..._serverSettings, ..._pendingChanges })
+    updateDirtyBanner()
+  })
+})
+
+// Save button
+document.getElementById('settingsSaveBtn')?.addEventListener('click', async () => {
+  if (!settingsIsDirty()) return
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(_pendingChanges),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      alert('Save failed: ' + (err.error ?? 'unknown error'))
+      return
+    }
+    const data = await res.json()
+    _serverSettings = data.effective
+    _pendingChanges = {}
+    applySettingsToUI(data.effective)
+    updateDirtyBanner()
+  } catch {
+    alert('Save failed: network error')
+  }
+})
+
+// Discard button
+document.getElementById('settingsDiscardBtn')?.addEventListener('click', () => {
+  _pendingChanges = {}
+  applySettingsToUI(_serverSettings)
+  updateDirtyBanner()
+})
 
 // ─── Setup panel ─────────────────────────────────────────────
 // `proxyProvider` is the value of PROXY_PROVIDER for pricing/parser dispatch.
@@ -1369,7 +1692,20 @@ function connectMetricsSSE() {
   }
   es.addEventListener('tick', (e) => {
     try {
-      pushTick(JSON.parse(e.data))
+      const tick = JSON.parse(e.data)
+      pushTick(tick)
+      const dashPanel = document.getElementById('dashboardPanel')
+      if (!dashPanel?.classList.contains('hidden')) {
+        const p95 = tick.p95 ?? tick.window_1m?.p95 ?? 0
+        const rps = tick.rps ?? tick.window_1m?.rps ?? 0
+        pushDashPoint(rps, p95)
+        if (typeof p95 === 'number') {
+          const p95El = document.getElementById('dashKpiP95')
+          if (p95El) p95El.textContent = p95 + ' ms'
+        }
+        const infEl = document.getElementById('dashInFlight')
+        if (infEl) infEl.textContent = tick.inFlight ?? '0'
+      }
     } catch {}
   })
   es.addEventListener('request', (e) => {
@@ -1694,13 +2030,15 @@ if (csvBtn) {
 
 // ─── Boot ────────────────────────────────────────────────────
 const HASH_TO_TAB = {
+  '#dashboard': 'dashboard',
   '#metrics': 'metrics',
   '#setup': 'setup',
   '#compactor': 'compactor',
   '#guardrails': 'guardrails',
   '#logs': 'logs',
+  '#settings': 'settings',
 }
-const initialTab = HASH_TO_TAB[location.hash] ?? 'logs'
+const initialTab = HASH_TO_TAB[location.hash] ?? 'dashboard'
 activateTab(initialTab)
 
 // Hash navigation (deep links, back/forward, programmatic location.hash) must
