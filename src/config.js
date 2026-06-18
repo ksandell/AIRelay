@@ -18,7 +18,11 @@ export async function loadOverrides(filePath = DEFAULT_SETTINGS_PATH) {
 
 export async function applyOverrides(patch, filePath = DEFAULT_SETTINGS_PATH) {
   _overrides = { ..._overrides, ...patch }
-  await fs.writeFile(filePath, JSON.stringify(_overrides, null, 2))
+  try {
+    await fs.writeFile(filePath, JSON.stringify(_overrides, null, 2))
+  } catch (err) {
+    console.error('applyOverrides: failed to persist settings.json', err.message)
+  }
 }
 
 if (process.env.NODE_ENV !== 'production') {

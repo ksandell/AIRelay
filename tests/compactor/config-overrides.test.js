@@ -88,4 +88,14 @@ describe('config override layer', () => {
     expect(config.guardrailsSecretsMode).toBe('alert')
     delete process.env.GUARDRAILS_SECRETS_MODE
   })
+
+  it('applyOverrides: write failure — in-memory still applied, no throw', async () => {
+    const unwriteable = path.join(tmpDir, 'no', 'such', 'dir', 'settings.json')
+    const { loadOverrides, applyOverrides, _getOverrides } = await import('../../src/config.js')
+    await loadOverrides(path.join(tmpDir, 'missing.json'))
+    // Should not throw even though the path is invalid
+    await expect(applyOverrides({ compactorEnabled: true }, unwriteable)).resolves.toBeUndefined()
+    // In-memory override should still be applied
+    expect(_getOverrides().compactorEnabled).toBe(true)
+  })
 })
