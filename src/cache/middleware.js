@@ -5,6 +5,53 @@ import { exactGet, exactSet } from './exact.js'
 import { dedupGet, dedupSet, dedupDelete } from './dedup.js'
 import { checkSpendLimit } from './spend.js'
 import { recordCacheEvent } from './metrics.js'
+import { record } from '../metrics/collector.js'
+
+// Build a full metrics event for a response the cache served directly (HIT /
+// DEDUP / spend-reject). These short-circuit before the proxy handler, so we
+// emit the event here — same shape the proxy records — so cached traffic shows
+// up in Metrics, Logs, history, and the DB exactly like a proxied request.
+function buildCacheServedEvent(
+  req,
+  reqStart,
+  { cacheStatus, statusCode, keyPrefix, ageS, bodyLen },
+) {
+  const cached = cacheStatus === 'HIT' || cacheStatus === 'DEDUP'
+  return {
+    ts: new Date().toISOString(),
+    method: req.method,
+    path: req.originalUrl,
+    status: statusCode,
+    durationMs: Date.now() - reqStart,
+    bytesIn: req._cacheBodyBuffer?.length ?? 0,
+    bytesOut: bodyLen ?? 0,
+    upstream: null,
+    route: req.baseUrl || null,
+    error: cacheStatus === 'SPEND-REJECT' ? 'spend_limit' : null,
+    provider: null,
+    model: null,
+    inputTokens: null,
+    outputTokens: null,
+    cacheReadTokens: null,
+    cacheWriteTokens: null,
+    totalTokens: null,
+    costUsd: 0,
+    toolCalls: null,
+    toolBytesIn: null,
+    toolBytesOut: null,
+    compactorActive: null,
+    compactorBypass: null,
+    compactorSavedBytes: null,
+    compactorCompressors: null,
+    guardrailsAction: null,
+    guardrailsHits: null,
+    guardrailsDetectors: null,
+    cacheStatus,
+    cacheKeyPrefix: keyPrefix ?? null,
+    cacheAgeS: ageS ?? null,
+    bytesFromCache: cached ? (bodyLen ?? 0) : null,
+  }
+}
 
 function readBody(req, cap) {
   return new Promise((resolve, reject) => {
@@ -21,6 +68,7 @@ function readBody(req, cap) {
 
 export function createCacheMiddleware() {
   return async (req, res, next) => {
+    const reqStart = Date.now()
     if (!config.cacheEnabled || !isConnected()) return next()
     if (req.method !== 'POST') return next()
     if (!(req.headers['content-type'] ?? '').includes('application/json')) return next()
@@ -48,6 +96,9 @@ export function createCacheMiddleware() {
       if (exceeded) {
         res.set('X-Spend-Limit-Exceeded', exceeded)
         recordCacheEvent({ ts: new Date().toISOString(), type: 'SPEND-REJECT' })
+        record(
+          buildCacheServedEvent(req, reqStart, { cacheStatus: 'SPEND-REJECT', statusCode: 429 }),
+        )
         return res.status(429).json({ error: `Spend limit exceeded: ${exceeded}` })
       }
     }
@@ -67,6 +118,14 @@ export function createCacheMiddleware() {
             type: 'DEDUP',
             keyPrefix: sha256.slice(0, 8),
           })
+          record(
+            buildCacheServedEvent(req, reqStart, {
+              cacheStatus: 'DEDUP',
+              statusCode: cached.statusCode ?? 200,
+              keyPrefix: sha256.slice(0, 8),
+              bodyLen: (cached.body ?? '').length,
+            }),
+          )
           return res.status(cached.statusCode ?? 200).send(cached.body)
         }
       }
@@ -88,12 +147,25 @@ export function createCacheMiddleware() {
           keyAgeS: ageS,
           bytes: (hit.body ?? '').length,
         })
+        record(
+          buildCacheServedEvent(req, reqStart, {
+            cacheStatus: 'HIT',
+            statusCode: hit.statusCode ?? 200,
+            keyPrefix: sha256.slice(0, 8),
+            ageS,
+            bodyLen: (hit.body ?? '').length,
+          }),
+        )
         return res.status(hit.statusCode ?? 200).send(hit.body)
       }
     }
 
-    // 4. Cache miss — set up dedup promise + tee response into Redis
+    // 4. Cache miss — set up dedup promise + tee response into Redis.
+    // Tag the request so the proxy's finalize() stamps cacheStatus onto the
+    // single event it already records (no separate row for misses).
     res.set('X-Cache', 'MISS')
+    req._cacheStatus = 'MISS'
+    req._cacheKeyPrefix = sha256.slice(0, 8)
     recordCacheEvent({ ts: new Date().toISOString(), type: 'MISS', keyPrefix: sha256.slice(0, 8) })
 
     let resolveDedup
