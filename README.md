@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/logo.svg" alt="AIRelay" height="48" />
+  <img src="public/logo.png" alt="AIRelay" height="48" />
 </p>
 
 <p align="center">
