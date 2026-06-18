@@ -1,0 +1,13 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AIRelay">
+  <defs>
+    <linearGradient id="airelayTeal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2dd4bf"/>
+      <stop offset="1" stop-color="#0d9488"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke="url(#airelayTeal)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="14,14 29,32 14,50" opacity="0.25"/>
+    <polyline points="26,14 41,32 26,50" opacity="0.55"/>
+    <polyline points="38,14 53,32 38,50" opacity="1"/>
+  </g>
+</svg>
