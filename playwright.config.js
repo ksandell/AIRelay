@@ -23,7 +23,9 @@ export default defineConfig({
   workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list'], ['html', { open: 'never' }]],
+  reporter: process.env.CI
+    ? [['github'], ['html', { open: 'never' }]]
+    : [['list'], ['html', { open: 'never' }]],
   timeout: 30_000,
   expect: {
     timeout: 5000,
@@ -42,7 +44,10 @@ export default defineConfig({
     url: `${BASE_URL}/health`,
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,
-    env: { PORT: String(PORT) },
+    // Pin the cache OFF for E2E so the suite is deterministic regardless of the
+    // developer's local .env (the dev stack enables CACHE_ENABLED). dotenv does
+    // not override env vars already set here, so these win over .env.
+    env: { PORT: String(PORT), CACHE_ENABLED: 'false', CACHE_REDIS_URL: '' },
     stdout: 'pipe',
     stderr: 'pipe',
   },

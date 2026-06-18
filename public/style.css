@@ -45,7 +45,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
-  font-size: 13px;
+  font-size: 14.3px;
   display: flex;
   flex-direction: column;
 }
@@ -67,7 +67,7 @@ header {
   gap: 18px;
 }
 h1 {
-  font-size: 15px;
+  font-size: 16.5px;
   font-weight: 600;
   letter-spacing: 0.03em;
 }
@@ -83,7 +83,7 @@ h1 {
   border-radius: 6px;
   padding: 4px 12px;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13.2px;
   cursor: pointer;
 }
 .tab:hover {
@@ -112,7 +112,7 @@ button {
   border-radius: 6px;
   padding: 4px 10px;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13.2px;
   cursor: pointer;
 }
 
@@ -127,7 +127,7 @@ button.active {
 
 .status,
 .pill {
-  font-size: 11px;
+  font-size: 12.1px;
   padding: 3px 8px;
   border-radius: 12px;
   font-weight: 500;
@@ -219,7 +219,7 @@ button.active {
 .log-level {
   font-weight: 600;
   text-transform: uppercase;
-  font-size: 11px;
+  font-size: 12.1px;
   display: flex;
   align-items: center;
 }
@@ -253,7 +253,7 @@ button.active {
 .log-meta {
   color: var(--muted);
   margin-left: 4px;
-  font-size: 11px;
+  font-size: 12.1px;
 }
 
 /* ── Metrics panel ─────────────────────────────────────────── */
@@ -283,18 +283,18 @@ button.active {
 }
 .kpi-label {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12.1px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 .kpi-val {
-  font-size: 22px;
+  font-size: 24.2px;
   font-weight: 600;
   color: var(--text);
 }
 .kpi-unit {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12.1px;
 }
 .kpi-val-row {
   display: flex;
@@ -302,7 +302,7 @@ button.active {
   gap: 3px;
 }
 .kpi-val-sm {
-  font-size: 14px;
+  font-size: 15.4px;
   font-weight: 500;
   word-break: break-all;
 }
@@ -335,7 +335,7 @@ button.active {
     0 1px 8px rgba(0, 0, 0, 0.2);
 }
 .chart-title {
-  font-size: 11px;
+  font-size: 12.1px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--muted);
@@ -381,7 +381,7 @@ button.active {
 #recentTable {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 13.2px;
 }
 #recentTable th,
 #recentTable td {
@@ -393,7 +393,7 @@ button.active {
 #recentTable th {
   color: var(--muted);
   font-weight: 500;
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
 }
 #recentTable th.num {
@@ -424,7 +424,7 @@ button.active {
 #topCostTable {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 13.2px;
 }
 #modelsTable th,
 #modelsTable td,
@@ -439,7 +439,7 @@ button.active {
 #topCostTable th {
   color: var(--muted);
   font-weight: 500;
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
 }
 #modelsTable th.num,
@@ -469,7 +469,7 @@ button.active {
 }
 
 .setup-intro h2 {
-  font-size: 18px;
+  font-size: 19.8px;
   font-weight: 600;
   margin-bottom: 8px;
 }
@@ -480,13 +480,13 @@ button.active {
 }
 .setup-intro p.muted {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13.2px;
 }
 .setup-intro code {
   background: var(--surface);
   padding: 1px 5px;
   border-radius: 3px;
-  font-size: 12px;
+  font-size: 13.2px;
 }
 
 .setup-form,
@@ -506,7 +506,7 @@ button.active {
   gap: 4px;
 }
 .field label {
-  font-size: 12px;
+  font-size: 13.2px;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -518,7 +518,7 @@ button.active {
   text-transform: none;
   letter-spacing: normal;
   color: var(--text);
-  font-size: 13px;
+  font-size: 14.3px;
 }
 .field input[type='text'],
 .field input[type='number'],
@@ -529,7 +529,7 @@ button.active {
   border-radius: 6px;
   padding: 7px 10px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 14.3px;
 }
 .field input:focus,
 .field select:focus {
@@ -538,7 +538,7 @@ button.active {
 }
 .field .hint {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12.1px;
 }
 .field .hint code {
   background: var(--bg);
@@ -565,7 +565,7 @@ button.active {
 }
 
 .setup-output h3 {
-  font-size: 13px;
+  font-size: 14.3px;
   font-weight: 600;
   color: var(--text);
   margin-top: 4px;
@@ -574,10 +574,10 @@ button.active {
   background: var(--bg);
   padding: 1px 5px;
   border-radius: 3px;
-  font-size: 12px;
+  font-size: 13.2px;
 }
 .setup-output h4 {
-  font-size: 11px;
+  font-size: 12.1px;
   font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
@@ -590,7 +590,7 @@ button.active {
   border-radius: 6px;
   padding: 12px 14px;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13.2px;
   line-height: 1.6;
   white-space: pre;
   overflow-x: auto;
@@ -598,7 +598,7 @@ button.active {
 }
 .setup-output p.muted {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13.2px;
 }
 
 .output-head {
@@ -649,7 +649,7 @@ footer {
   background: var(--surface);
   border-top: 1px solid var(--border);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12.1px;
   flex-shrink: 0;
   position: sticky;
   bottom: 0;
@@ -691,7 +691,7 @@ footer {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  font-size: 0.78rem;
+  font-size: 0.858rem;
   color: #8b949e;
   cursor: pointer;
   user-select: none;
@@ -729,7 +729,7 @@ footer {
   border-radius: 50%;
   background: #21262d;
   color: #8b949e;
-  font-size: 0.65rem;
+  font-size: 0.715rem;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -747,7 +747,7 @@ footer {
   border: 1px solid #30363d;
   border-radius: 6px;
   padding: 0.4rem 0.6rem;
-  font-size: 0.72rem;
+  font-size: 0.792rem;
   color: #e6edf3;
   white-space: normal;
   z-index: 100;
@@ -784,7 +784,7 @@ footer {
 #guardrailsRecentTable {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 13.2px;
 }
 #compactorTable thead tr,
 #compactorRecentTable thead tr,
@@ -811,7 +811,7 @@ footer {
 #guardrailsRecentTable th {
   color: var(--muted);
   font-weight: 500;
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -820,10 +820,10 @@ footer {
   background: var(--bg);
   padding: 1px 6px;
   border-radius: 3px;
-  font-size: 11px;
+  font-size: 12.1px;
 }
 .table-card h3 {
-  font-size: 11px;
+  font-size: 12.1px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--muted);
@@ -858,13 +858,13 @@ footer {
 }
 .info-callout p {
   margin: 0;
-  font-size: 12px;
+  font-size: 13.2px;
 }
 .info-callout code {
   background: var(--bg);
   padding: 1px 5px;
   border-radius: 3px;
-  font-size: 11px;
+  font-size: 12.1px;
 }
 .info-callout a {
   color: var(--info);
@@ -884,7 +884,7 @@ footer {
 .status-pill {
   padding: 0.2rem 0.65rem;
   border-radius: 1rem;
-  font-size: 0.75rem;
+  font-size: 0.825rem;
   font-weight: 600;
   letter-spacing: 0.02em;
 }
@@ -937,14 +937,14 @@ footer {
 }
 
 .kpi-label {
-  font-size: 0.75rem;
+  font-size: 0.825rem;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .kpi-value {
-  font-size: 1.75rem;
+  font-size: 1.925rem;
   font-weight: 600;
   color: var(--text);
   font-variant-numeric: tabular-nums;
@@ -981,7 +981,7 @@ footer {
   align-items: baseline;
   justify-content: space-between;
   margin: 0 0 0.75rem;
-  font-size: 0.9rem;
+  font-size: 0.99rem;
   font-weight: 600;
 }
 
@@ -998,7 +998,7 @@ footer {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.9rem;
+  font-size: 0.99rem;
 }
 
 .health-dot {
@@ -1032,7 +1032,7 @@ footer {
 }
 
 #dashRecommendationsList li {
-  font-size: 0.85rem;
+  font-size: 0.935rem;
   padding: 0.5rem 0.75rem;
   border-radius: 4px;
   background: var(--surface);
@@ -1051,7 +1051,7 @@ footer {
 .quick-links a {
   color: var(--accent, #6366f1);
   text-decoration: none;
-  font-size: 0.9rem;
+  font-size: 0.99rem;
 }
 
 .quick-links a:hover {
@@ -1059,7 +1059,7 @@ footer {
 }
 
 .link-subtle {
-  font-size: 0.8rem;
+  font-size: 0.88rem;
   color: var(--accent, #6366f1);
   text-decoration: none;
   font-weight: 400;
@@ -1071,7 +1071,7 @@ footer {
 
 /* ─── Settings tab ───────────────────────────────────── */
 .settings-note {
-  font-size: 0.85rem;
+  font-size: 0.935rem;
   color: var(--text-muted);
   margin-bottom: 1.5rem;
 }
@@ -1093,7 +1093,7 @@ footer {
 
 .settings-section-header h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 600;
 }
 
@@ -1102,7 +1102,7 @@ footer {
 }
 
 .settings-subsection h4 {
-  font-size: 0.85rem;
+  font-size: 0.935rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-muted);
@@ -1120,7 +1120,7 @@ footer {
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.99rem;
   user-select: none;
 }
 
@@ -1158,25 +1158,25 @@ footer {
 
 .compressor-name {
   font-family: monospace;
-  font-size: 0.85rem;
+  font-size: 0.935rem;
   font-weight: 600;
   flex: 1;
 }
 
 .compressor-desc {
-  font-size: 0.78rem;
+  font-size: 0.858rem;
   color: var(--text-muted);
   margin: 0.35rem 0 0;
 }
 
 .badge-risky {
-  font-size: 0.75rem;
+  font-size: 0.825rem;
   color: #f59e0b;
   font-weight: 700;
 }
 
 .category-badge {
-  font-size: 0.65rem;
+  font-size: 0.715rem;
   padding: 2px 6px;
   border-radius: 9999px;
   font-weight: 600;
@@ -1231,11 +1231,11 @@ footer {
 
 .category-name {
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.99rem;
 }
 
 .category-desc {
-  font-size: 0.75rem;
+  font-size: 0.825rem;
   color: var(--text-muted);
   margin-top: 0.2rem;
 }
@@ -1253,7 +1253,7 @@ footer {
   border: 1px solid var(--border);
   background: transparent;
   cursor: pointer;
-  font-size: 0.78rem;
+  font-size: 0.858rem;
   color: var(--text-muted);
   transition:
     background 0.1s,
@@ -1290,7 +1290,7 @@ footer {
 }
 
 .settings-footer {
-  font-size: 0.78rem;
+  font-size: 0.858rem;
   color: var(--text-muted);
   text-align: center;
   margin-top: 0.5rem;
@@ -1302,7 +1302,7 @@ footer {
   color: #f59e0b;
   border-radius: 9999px;
   padding: 3px 10px;
-  font-size: 0.8rem;
+  font-size: 0.88rem;
   font-weight: 600;
 }
 
@@ -1320,7 +1320,7 @@ footer {
 }
 
 .cache-status-pill {
-  font-size: 0.8rem;
+  font-size: 0.88rem;
   padding: 2px 10px;
   border-radius: 9999px;
   background: var(--surface-2, var(--surface));
@@ -1341,13 +1341,13 @@ footer {
 
 #cacheDisabledNotice {
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: 0.99rem;
   text-align: center;
   padding: 2rem;
 }
 
 .cache-type-badge {
-  font-size: 0.75rem;
+  font-size: 0.825rem;
   padding: 1px 8px;
   border-radius: 9999px;
   border: 1px solid var(--border);
