@@ -7,6 +7,7 @@ services:
       - "${PORT:-3000}:3000"
     volumes:
       - log-data:/data/logs
+      - metrics-data:/data/metrics
     environment:
       NODE_ENV: production
       TZ: UTC
@@ -70,7 +71,7 @@ services:
       ROUTES_CONFIG_PATH: ${ROUTES_CONFIG_PATH:-}
       PROXY_ROUTES: ${PROXY_ROUTES:-}
       # Metric persistence (v0.4.0) — opt-in SQLite. See CONFIGURATION.md.
-      METRICS_DB_PATH: ${METRICS_DB_PATH:-}
+      METRICS_DB_PATH: ${METRICS_DB_PATH:-/data/metrics/metrics.db}
       METRICS_RETENTION_DAYS: ${METRICS_RETENTION_DAYS:-30}
       METRICS_WRITE_BATCH_SIZE: ${METRICS_WRITE_BATCH_SIZE:-100}
       METRICS_WRITE_BATCH_MS: ${METRICS_WRITE_BATCH_MS:-1000}
@@ -109,6 +110,8 @@ services:
 
 volumes:
   log-data:
+    driver: local
+  metrics-data:
     driver: local
   dragonfly-data:
     driver: local

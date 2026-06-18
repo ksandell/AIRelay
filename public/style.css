@@ -355,8 +355,8 @@ button.active {
    maintainAspectRatio:false) can't enter a resize feedback loop and grow the
    canvas every frame until the tab crashes. */
 #dashSparkline {
-  height: 80px !important;
-  max-height: 80px;
+  height: 200px !important;
+  max-height: 200px;
 }
 
 .table-card {
@@ -426,6 +426,10 @@ button.active {
   font-weight: 600;
 }
 
+#topCostTable-wrap {
+  max-height: 360px;
+  overflow-y: auto;
+}
 #modelsTable,
 #topCostTable {
   width: 100%;
@@ -784,6 +788,14 @@ footer {
   gap: 12px;
 }
 
+#cachePanel {
+  padding: 16px;
+}
+
+#settingsPanel {
+  padding: 16px 24px;
+}
+
 #compactorTable,
 #compactorRecentTable,
 #guardrailsTable,
@@ -821,6 +833,26 @@ footer {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+/* Numeric columns: Fires / Bytes saved / Avg µs / Hits / Key age / Bytes */
+#compactorTable td:nth-child(n+3),
+#compactorTable th:nth-child(n+3),
+#compactorRecentTable td:nth-child(4),
+#compactorRecentTable th:nth-child(4),
+#compactorRecentTable td:nth-child(5),
+#compactorRecentTable th:nth-child(5),
+#compactorRecentTable td:nth-child(6),
+#compactorRecentTable th:nth-child(6),
+#guardrailsTable td:nth-child(n+4),
+#guardrailsTable th:nth-child(n+4),
+#guardrailsRecentTable td:nth-child(4),
+#guardrailsRecentTable th:nth-child(4),
+#cacheRecentTable td:nth-child(4),
+#cacheRecentTable th:nth-child(4),
+#cacheRecentTable td:nth-child(5),
+#cacheRecentTable th:nth-child(5) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 #compactorTable td code,
 #guardrailsTable td code {
   background: var(--bg);
@@ -840,6 +872,34 @@ footer {
 #guardrailsRecent-wrap {
   max-height: 420px;
   overflow-y: auto;
+}
+
+/* ─── Cache recent-events table ──────────────────────────────── */
+#cacheRecent-wrap {
+  max-height: 420px;
+  overflow-y: auto;
+}
+#cacheRecentTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.2px;
+}
+#cacheRecentTable th,
+#cacheRecentTable td {
+  text-align: left;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+#cacheRecentTable th {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+#cacheRecentTable thead tr {
+  background: var(--surface-2);
 }
 
 /* ─── Info callout (Compactor instructions) ─────────────────── */
@@ -921,9 +981,13 @@ footer {
 }
 
 /* ─── Dashboard tab ──────────────────────────────────── */
+#dashboardPanel {
+  padding: 16px;
+}
+
 .kpi-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 1rem;
   margin-bottom: 1.5rem;
 }
@@ -944,7 +1008,7 @@ footer {
 
 .kpi-label {
   font-size: 0.825rem;
-  color: var(--text-muted);
+  color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -1000,7 +1064,7 @@ footer {
 }
 #dashRecentTable th,
 #dashRecentTable td {
-  padding: 5px 16px 5px 0;
+  padding: 5px 14px;
   text-align: left;
   white-space: nowrap;
 }
@@ -1039,7 +1103,7 @@ footer {
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: var(--text-muted);
+  background: var(--muted);
 }
 
 .health-dot.dot-ok {
@@ -1052,7 +1116,7 @@ footer {
   background: #ef4444;
 }
 .health-dot.dot-neutral {
-  background: var(--text-muted);
+  background: var(--muted);
 }
 
 #dashRecommendationsList {
@@ -1105,7 +1169,7 @@ footer {
 /* ─── Settings tab ───────────────────────────────────── */
 .settings-note {
   font-size: 0.935rem;
-  color: var(--text-muted);
+  color: var(--muted);
   margin-bottom: 1.5rem;
 }
 
@@ -1138,7 +1202,7 @@ footer {
   font-size: 0.935rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-muted);
+  color: var(--muted);
   margin: 1rem 0 0.5rem;
 }
 
@@ -1198,7 +1262,7 @@ footer {
 
 .compressor-desc {
   font-size: 0.858rem;
-  color: var(--text-muted);
+  color: var(--muted);
   margin: 0.35rem 0 0;
 }
 
@@ -1269,7 +1333,7 @@ footer {
 
 .category-desc {
   font-size: 0.825rem;
-  color: var(--text-muted);
+  color: var(--muted);
   margin-top: 0.2rem;
 }
 
@@ -1287,7 +1351,7 @@ footer {
   background: transparent;
   cursor: pointer;
   font-size: 0.858rem;
-  color: var(--text-muted);
+  color: var(--muted);
   transition:
     background 0.1s,
     color 0.1s,
@@ -1319,12 +1383,12 @@ footer {
 .mode-pill.active[data-mode='off'] {
   background: var(--surface);
   border-color: var(--border);
-  color: var(--text-muted);
+  color: var(--muted);
 }
 
 .settings-footer {
   font-size: 0.858rem;
-  color: var(--text-muted);
+  color: var(--muted);
   text-align: center;
   margin-top: 0.5rem;
 }
@@ -1358,7 +1422,7 @@ footer {
   border-radius: 9999px;
   background: var(--surface-2, var(--surface));
   border: 1px solid var(--border);
-  color: var(--text-muted);
+  color: var(--muted);
 }
 
 .cache-status-pill.pill-on {
@@ -1369,11 +1433,11 @@ footer {
 
 .cache-status-pill.pill-off {
   background: var(--surface-2, var(--surface));
-  color: var(--text-muted);
+  color: var(--muted);
 }
 
 #cacheDisabledNotice {
-  color: var(--text-muted);
+  color: var(--muted);
   font-size: 0.99rem;
   text-align: center;
   padding: 2rem;
@@ -1384,7 +1448,7 @@ footer {
   padding: 1px 8px;
   border-radius: 9999px;
   border: 1px solid var(--border);
-  color: var(--text-muted);
+  color: var(--muted);
 }
 
 .cache-type-badge.cache-hit {
