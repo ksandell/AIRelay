@@ -4,6 +4,7 @@ import { gunzipSync, inflateSync, brotliDecompressSync } from 'node:zlib'
 import { config } from '../config.js'
 import { pickAgent } from './agent.js'
 import { record, incInFlight, decInFlight } from '../metrics/collector.js'
+import { incrementSpend } from '../cache/spend.js'
 
 // Off the hot path: decode the (possibly compressed) teed response body
 // for token/tool extraction. Mistral & friends ship brotli-compressed JSON
@@ -194,6 +195,12 @@ function finalize(m, providerInstance) {
           } catch {
             event.costUsd = null
           }
+          // Per-key spend accounting (v0.6.0). Only when the spend gate is on
+          // and we have both a request reference and a non-zero cost. Fire and
+          // forget — Redis errors must never affect the recorded event.
+          if (config.cacheSpendEnabled && m.spendReq && event.costUsd) {
+            incrementSpend(m.spendReq, event.costUsd).catch(() => {})
+          }
         } else {
           event.provider = providerInstance.name
         }
@@ -329,7 +336,7 @@ export function createProxyHandler(route) {
     // middleware, feed it to http-proxy via the `buffer` option so the
     // (possibly mutated) bytes go upstream instead of the already-consumed
     // request stream. Guardrails runs after Compactor and its body supersedes.
-    const substituteBody = req._guardrailsBody ?? req._compactorBody
+    const substituteBody = req._guardrailsBody ?? req._compactorBody ?? req._cacheBodyBuffer
     const proxyOpts = {
       target: route.upstream,
       agent,
@@ -338,7 +345,21 @@ export function createProxyHandler(route) {
     if (substituteBody) {
       proxyOpts.buffer = Readable.from([substituteBody])
       m.bytesIn = substituteBody.length
+      // The request stream was already consumed by a middleware (cache /
+      // compactor / guardrails), so the proxy's own req.on('data') tee never
+      // fires. Seed the tee from the substitute body (capped) so tool-call
+      // extraction still works on cached-eligible / mutated traffic.
+      if (
+        route.providerInstance &&
+        !m.reqChunks &&
+        substituteBody.length <= config.proxyTokenTeeMaxBytes
+      ) {
+        m.reqChunks = [substituteBody]
+        m.reqTeeBytes = substituteBody.length
+      }
     }
+    // Capture the request for per-key spend accounting in finalize().
+    if (config.cacheSpendEnabled) m.spendReq = req
 
     proxy.web(req, res, proxyOpts, (err) => {
       if (err && !m.recorded) {

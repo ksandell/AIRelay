@@ -36,31 +36,70 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.4.2 | ✅ Done | **Dependency refresh + CI/security housekeeping** — Node 24 LTS, express 5, http-proxy-3, vitest/eslint/dotenv/fast-check/node-cron/playwright majors; Dependabot + CodeQL + Bless workflows; brotli/gzip token-extraction fix |
 | v0.4.3 | ✅ Done | **CI: Linux Playwright baselines** — committed the 5 missing `*-visual-linux.png` baselines so the `ubuntu-22.04` visual e2e job is green; documented the OS-pinning gotcha in [docs/e2e-test-plan.md](docs/e2e-test-plan.md) |
 | v0.5.0 | ✅ Done | **Zero-config provider routing** — single-upstream deployments auto-mount a `/proxy/<provider>` alias so SDKs pointed at the provider-named path work without writing `PROXY_ROUTES`; folds in the prior v0.4.next housekeeping (per-IP rate limiting on `/health` + `/api/*`, cleared CodeQL alerts, log-rotation TOCTOU fix, CodeQL Action `v3` → `v4`) |
-| Future | ⚪ Deferred | Persistence + multi-upstream, Compactor v2, caching, retries, routing intelligence (no committed target release) |
+| v0.6.0 | ✅ Done | **Dashboard + Settings + Dragonfly Cache** — landing dashboard tab (health, KPIs, cache hit rate, recommendations), Settings tab with live-toggle Compactors, Guardrails, and Cache; optional Dragonfly sidecar for exact-match response cache, request dedup, per-key spend limits, multi-instance SSE fan-out |
+| v0.7.0 | ⚪ Queued | **Semantic Cache** — embedding-provider abstraction (OpenAI / Ollama), Dragonfly vector index bootstrap, KNN search, configurable cosine threshold; builds on v0.6.0 cache infrastructure |
 
 Per-release detail in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
-## v0.4.next — CodeQL & security housekeeping  🚧
+## v0.6.0 — Dashboard + Settings + Dragonfly Cache  ✅
 
-**In progress** (GitHub milestone `v0.4.next` — gathers all next-version work).
+**Done.** Full spec: [docs/superpowers/specs/2026-06-18-dashboard-settings-design.md](docs/superpowers/specs/2026-06-18-dashboard-settings-design.md).
 
-No new product features. A code-scanning-driven hardening pass plus a CI
-action bump:
+### Navigation changes
+- **Dashboard** tab — new first tab (default landing page).
+- **Cache** tab — follows Guardrails; always visible, disabled state when `CACHE_ENABLED=false`.
+- **Settings** tab — new last tab (always visible); replaces hidden-until-unconfigured Setup for config tasks.
 
-- **CodeQL code-scanning alerts cleared** — every open alert resolved.
-  Insecure temp-file paths in `tests/` swapped to `fs.mkdtempSync` private
-  dirs; the `rotation.js` `existsSync` check-then-use replaced with direct
-  ops + `ENOENT` handling (closes the cron-vs-sizeGuard file-system race);
-  dead `makeDualLineChart` and an always-true guard removed from `app.js`.
-- **API rate limiting** — `express-rate-limit` on `/health` + `/api/*`
-  (`API_RATE_LIMIT_*`, default 600 req/min). The proxy hot path is never
-  rate-limited.
-- **CI: CodeQL Action `v3` → `v4`** ([#150](https://github.com/ksandell/AIRelay/issues/150)) —
-  ahead of GitHub's December 2026 v3 deprecation.
+### Dashboard tab
+Two-column layout: metrics + activity left (2/3), health + recommendations right (1/3).
 
-Release notes: [CHANGELOG.md](CHANGELOG.md) `[Unreleased]` section.
+- **KPI row** — requests today, cost today, p95 latency, bytes saved (Compactor, conditional), cache hit rate (conditional).
+- **Activity chart** — RPS + p95 latency sparklines, last 30 min (live via SSE).
+- **Recent requests table** — last 5 proxied requests with model, tokens, cost, latency.
+- **System health sidebar** — Proxy, Compactors (on/off + count), Guardrails (on/off + count), Cache (connected/off/disconnected), in-flight.
+- **Recommendations panel** — computed client-side. Includes cache-disconnected warning.
+- **Quick links** — Metrics, Compressors, Guardrails, Cache, Logs.
+
+### Settings tab
+Runtime overrides for Compactors, Guardrails, and Cache. Proxy connection config remains `.env`-only.
+
+- **Persistence** — `data/settings.json` (gitignored). No restart required.
+- **Apply model** — staged locally; "Unsaved changes" banner + Save / Discard.
+- **Compactors section** — master toggle + scope toggles + 10 compressor cards.
+- **Guardrails section** — master toggle + 3 category mode cards + 11 detector cards.
+- **Cache section** — master toggle + exact match on/off + TTL input + dedup on/off + spend limits on/off + daily/monthly $ inputs + SSE fan-out on/off.
+
+### Cache (Dragonfly)
+Optional Redis-compatible sidecar via Docker Compose profile `cache`. Default off; zero overhead when disabled.
+
+- **Exact-match response cache** — normalize + SHA-256 request body → Redis key → stored response. On hit: return cached, skip upstream. TTL configurable. Bypass: `X-Cache: no-store`.
+- **Request deduplication** — identical concurrent in-flight requests coalesce in-process to one upstream call; waiters get the same response.
+- **Per-key spend tracking** — per-API-key-hash daily/monthly `INCR` counter; reject at 429 when budget exceeded.
+- **Multi-instance SSE fan-out** — Redis pub/sub syncs metric `tick` events across replicas so all dashboard connections see the full picture.
+- **Response headers** — `X-Cache: HIT|MISS|DEDUP|BYPASS|SPEND-REJECT`, `X-Cache-Age`, `X-Cache-Key`.
+- **Graceful degrade** — Dragonfly absent or disconnected → all requests pass through unchanged; dashboard shows ✕ Disconnected.
+
+### Backend changes
+1. **`src/cache/`** — new module: `client.js`, `normalize.js`, `exact.js`, `dedup.js`, `spend.js`, `fanout.js`, `metrics.js`, `middleware.js`, `api.js`.
+2. **`src/config.js`** — cache getters (9 new) checking `_overrides` first; Compactor/Guardrail getters already converted to this pattern.
+3. **`src/api/settings.js`** — SCHEMA extended with 8 cache keys.
+4. **`src/server.js`** — mount `cacheMiddleware` before proxy; register `cacheRouter`.
+5. **`docker-compose.yml`** — Dragonfly sidecar (profile `cache`) + `CACHE_*` env vars.
+
+---
+
+## v0.7.0 — Semantic Cache  ⚪
+
+**Queued.** Builds on the v0.6.0 cache infrastructure (Dragonfly connected, exact-match + dedup already in place).
+
+- **Embedding provider abstraction** — `src/cache/embed.js` with `openai` and `ollama` backends. Configured via `CACHE_EMBED_PROVIDER`, `CACHE_EMBED_MODEL`, `CACHE_EMBED_API_KEY`.
+- **Dragonfly vector index** — `FT.CREATE` bootstrap on first start; index dimension matches model output (`CACHE_EMBED_DIM`).
+- **KNN search** — `FT.SEARCH ... KNN 1` on cache miss after exact-match lookup; cosine ≥ `CACHE_SEMANTIC_THRESHOLD` (default 0.97) returns cached response.
+- **`X-Semantic-Cache: off`** bypass header.
+- **Semantic hit rate** surfaced as additional KPI on the Cache tab.
+- **Settings** — semantic on/off toggle + threshold slider added to Cache section.
 
 ---
 
@@ -210,14 +249,14 @@ section above for details.
 
 > Prioritization is loose. Items move up based on actual usage friction.
 
-- **Response cache** — exact-match cache for deterministic prompts (`temperature=0`), opt-in per route.
 - **Smart retries** — automatic retry on `429` / transient `5xx` with exponential backoff. Honors `Retry-After`.
 - **Model fallback chains** — primary `claude-sonnet-4-6` → fallback `claude-haiku-4-5` on overload.
-- **Per-API-key budgets** — daily $ limit per inbound key with a 429 when exceeded.
 - **WebSocket / Realtime API support** — `server.on('upgrade')` passthrough.
 - **Auth on the dashboard** — basic auth or OIDC, only if leaving the homelab.
-- **Rate limiting** — per-IP / per-key / global throttling for the **proxy prefix**. (Considered with Guardrails v0.4.0, deferred. Note: per-IP limiting for the `/health` + `/api/*` dashboard routes shipped in v0.4.next; the proxy hot path remains deliberately unthrottled.)
 - **Guardrails v2** — response-side detectors (model-output PII / secret leakage), streaming-aware partial scans, per-category metrics splits by detector.
+- **Compactor v2** — real tokenizer for accurate token-savings reporting, streaming-request compression via incremental SSE rewriting.
+
+> Items promoted to committed versions: response cache + per-key budgets → **v0.7.0** (Redis / Semantic Caching).
 
 > ✅ Shipped in v0.4.0: **prompt redaction in stored logs** (always-on log
 > sanitizer in `src/guardrails/sanitizer.js`) and **opt-in body-level

@@ -74,6 +74,17 @@ services:
       METRICS_RETENTION_DAYS: ${METRICS_RETENTION_DAYS:-30}
       METRICS_WRITE_BATCH_SIZE: ${METRICS_WRITE_BATCH_SIZE:-100}
       METRICS_WRITE_BATCH_MS: ${METRICS_WRITE_BATCH_MS:-1000}
+      # Cache (v0.6.0) — opt-in Dragonfly response cache.
+      # Enable Dragonfly via: docker compose --profile cache up
+      CACHE_ENABLED: ${CACHE_ENABLED:-false}
+      CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://dragonfly:6379}
+      CACHE_EXACT_MATCH_ENABLED: ${CACHE_EXACT_MATCH_ENABLED:-true}
+      CACHE_EXACT_TTL_SECONDS: ${CACHE_EXACT_TTL_SECONDS:-3600}
+      CACHE_DEDUP_ENABLED: ${CACHE_DEDUP_ENABLED:-true}
+      CACHE_SPEND_ENABLED: ${CACHE_SPEND_ENABLED:-false}
+      CACHE_SPEND_DAILY_LIMIT_USD: ${CACHE_SPEND_DAILY_LIMIT_USD:-}
+      CACHE_SPEND_MONTHLY_LIMIT_USD: ${CACHE_SPEND_MONTHLY_LIMIT_USD:-}
+      CACHE_SSE_FANOUT_ENABLED: ${CACHE_SSE_FANOUT_ENABLED:-false}
     ulimits:
       nofile:
         soft: 65536
@@ -85,6 +96,19 @@ services:
         max-file: "5"
     restart: always
 
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.26.2
+    profiles: ["cache"]
+    ports:
+      - "${DRAGONFLY_PORT:-6379}:6379"
+    volumes:
+      - dragonfly-data:/data
+    ulimits:
+      memlock: -1
+    restart: unless-stopped
+
 volumes:
   log-data:
+    driver: local
+  dragonfly-data:
     driver: local

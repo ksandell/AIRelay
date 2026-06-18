@@ -59,6 +59,27 @@ flowchart LR
         rotation[logs/rotation.js]
         reader[logs/reader.js]
     end
+    subgraph cache[Cache layer - Dragonfly / Redis]
+        cmw[cache/middleware.js]
+        cexact[cache/exact.js<br/>GET / SET]
+        cdedup[cache/dedup.js<br/>in-process Map]
+        cnorm[cache/normalize.js]
+        cspend[cache/spend.js]
+        cfanout[cache/fanout.js]
+        cmetrics[cache/metrics.js]
+        capi[cache/api.js]
+        cclient[cache/client.js<br/>ioredis]
+    end
+
+    cmw --> cexact
+    cmw --> cdedup
+    cexact --> cclient
+    cmw --> cnorm
+    cfanout --> cclient
+    cspend --> cclient
+    capi --> cclient
+    capi --> cmetrics
+    cmw --> proxy
 
     proxy --> agent
     proxy --> collector
@@ -82,10 +103,38 @@ The logger is **never** invoked per proxied request — it exists for app events
 (startup, cron, errors). The metric event path is the only per-request
 observability mechanism.
 
+## Cache (v0.6.0, opt-in)
+
+A caching layer mounted **before Compactor** on every proxy route prefix.
+Inert when `CACHE_ENABLED=false` (default — single boolean check, zero overhead).
+
+```
+src/cache/
+├── middleware.js    Hit: short-circuits with cached response (no upstream call).
+│                   Miss: buffers request body in req._cacheBodyBuffer (body-buffer
+│                   contract — Compactor/Guardrails read this instead of re-consuming
+│                   the stream), then tees the upstream response into Redis via
+│                   queueMicrotask after response end.
+├── exact.js        GET/SET for exact-match cache entries (Dragonfly/Redis)
+├── dedup.js        In-flight deduplication via in-process Map (coalesces concurrent
+│                   identical requests onto a single upstream call)
+├── normalize.js    Request key normalisation (strips non-deterministic fields)
+├── spend.js        Per-key spend tracking written back to Redis
+├── fanout.js       Broadcasts cache hit/miss events into the metrics pipeline
+├── metrics.js      Parallel ring buffer + lifetime counters for cache events
+├── api.js          /api/cache/summary and /api/cache/recent endpoints
+└── client.js       ioredis connection factory (singleton); used by all sub-modules
+```
+
+On a cache hit the response is returned immediately — no Compactor, Guardrails,
+or upstream call runs. On a miss the upstream response is teed into Redis in a
+`queueMicrotask` after `res.finish`, preserving the hot-path zero-sync-I/O invariant.
+
 ## Compactor (v0.3.0, opt-in)
 
 A second per-request pipeline, mounted under the same proxy prefix but
-**before** `proxy.js`. Inert when `COMPACTOR_ENABLED=false` (default).
+**after** the cache middleware and **before** `proxy.js`.
+Inert when `COMPACTOR_ENABLED=false` (default).
 
 ```
 src/compactor/
@@ -117,7 +166,7 @@ src/routes/
                   Attaches a per-route provider instance for token tracking.
 ```
 
-`server.js` iterates `getRoutes()` at startup and mounts the Compactor +
+`server.js` iterates `getRoutes()` at startup and mounts the Cache + Compactor +
 Guardrails + proxy handler under each route's prefix. The proxy handler is a
 closure over the route so the upstream URL, agent, and provider are pre-
 resolved (no per-request lookup on the hot path). Full reference in
@@ -248,6 +297,10 @@ GET  /api/metrics/routes              active routes (v0.4.0 multi-upstream)
 GET  /api/metrics/history             time-range events from SQLite (when METRICS_DB_PATH set)
 GET  /api/metrics/rollups             bucketed aggregates (hour/day/week) — requires SQLite
 GET  /api/metrics/export.csv          CSV download; falls back to ring buffer when SQLite off
+
+# Cache (v0.6.0, when CACHE_ENABLED=true)
+GET  /api/cache/summary               enabled, connected, keyCount, lifetime hit/miss counters
+GET  /api/cache/recent                last N per-request cache events
 ```
 
 ## Key design decisions
@@ -279,7 +332,7 @@ For release process see [RELEASING.md](RELEASING.md).
 | Invariant | Why |
 |---|---|
 | Zero sync I/O on proxy path | `appendFileSync`/`readFileSync` stall the event loop — banned from `proxy.js`, `middleware/`, hot-path code |
-| Zero body buffering **(for non-opted-in traffic)** | `http-proxy` streams bytes unchanged; tee is a passive `data` listener. **Opted-in Compactor traffic** (v0.3.0, `COMPACTOR_ENABLED=true` + no `X-Compactor: off`) deliberately buffers the JSON body in order to mutate it — see [COMPACTOR.md](../docs/COMPACTOR.md). Default-off behavior preserves the byte-identical passthrough invariant. |
+| Zero body buffering **(for non-opted-in traffic)** | `http-proxy` streams bytes unchanged; tee is a passive `data` listener. **Opted-in Cache traffic** (v0.6.0, `CACHE_ENABLED=true`) buffers the request body in `req._cacheBodyBuffer` on a miss; Compactor and Guardrails read from this buffer (body-buffer contract) instead of re-consuming the stream. **Opted-in Compactor traffic** (v0.3.0, `COMPACTOR_ENABLED=true` + no `X-Compactor: off`) also buffers the JSON body to mutate it — see [COMPACTOR.md](../docs/COMPACTOR.md). Default-off behavior preserves the byte-identical passthrough invariant. |
 | Token extraction in `queueMicrotask` | Deferred until after `res.finish` — never inline |
 | O(1) metric record | Ring buffer pre-allocated; `record()` is a single array slot write |
 | Aggregator single-pass | `summary()` scans the ring once for all three windows; result memoized 1 s |

@@ -1,7 +1,6 @@
 import express from 'express'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { config } from './config.js'
 import { requestLogger } from './middleware/requestLogger.js'
 import { apiRateLimiter } from './middleware/rateLimiter.js'
 import { errorHandler } from './middleware/errorHandler.js'
@@ -10,7 +9,10 @@ import logsRouter from './api/logs.js'
 import metricsRouter from './api/metrics.js'
 import compactorRouter from './api/compactor.js'
 import guardrailsRouter from './api/guardrails.js'
+import settingsRouter from './api/settings.js'
+import cacheRouter from './cache/api.js'
 import { createProxyHandler } from './proxy/proxy.js'
+import { createCacheMiddleware } from './cache/middleware.js'
 import { createCompactorMiddleware } from './compactor/middleware.js'
 import { createGuardrailsMiddleware } from './guardrails/middleware.js'
 import { getRoutes } from './routes/registry.js'
@@ -33,12 +35,13 @@ export function createApp() {
   // length so Express's longest-prefix-wins matching does the right thing.
   const routes = getRoutes()
   for (const route of routes) {
-    if (config.compactorEnabled) {
-      app.use(route.prefix, createCompactorMiddleware())
-    }
-    if (config.guardrailsEnabled) {
-      app.use(route.prefix, createGuardrailsMiddleware())
-    }
+    // ALWAYS register — the middleware itself checks config.*Enabled per-request,
+    // so runtime enable/disable (via POST /api/settings) takes effect immediately.
+    // Cache MUST be first — it buffers the body in req._cacheBodyBuffer so
+    // Compactor/Guardrails can still read it (body-buffer contract).
+    app.use(route.prefix, createCacheMiddleware())
+    app.use(route.prefix, createCompactorMiddleware())
+    app.use(route.prefix, createGuardrailsMiddleware())
     app.use(route.prefix, createProxyHandler(route))
   }
 
@@ -52,6 +55,8 @@ export function createApp() {
   app.use(metricsRouter)
   app.use(compactorRouter)
   app.use(guardrailsRouter)
+  app.use(settingsRouter)
+  app.use(cacheRouter)
 
   app.use(errorHandler)
 

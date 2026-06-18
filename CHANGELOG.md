@@ -5,7 +5,34 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.6.0] — 2026-06-18 — Dashboard + Settings + Dragonfly Cache
+
+### Added
+
+- **Dashboard tab** — new first tab (default landing page). KPI row (requests today, cost today, p95 latency, bytes saved, cache hit rate), activity sparkline (RPS + p95, last 30 min), recent requests table, system health sidebar (Proxy / Compactors / Guardrails / Cache / in-flight), recommendations panel (computed client-side), quick links.
+- **Settings tab** — runtime toggles for all Compactor, Guardrail, and Cache settings. Changes staged locally (dirty banner + Save / Discard); persisted to `data/settings.json` (gitignored). No restart required; `.env` is never modified.
+- **Cache (Dragonfly)** — optional Redis-compatible sidecar via Docker Compose profile `cache` (`docker compose --profile cache up`). Default off; zero overhead when disabled.
+  - **Exact-match response cache** — normalize + SHA-256 request body → Redis key → stored response. On hit: skip upstream, return cached. TTL configurable (`CACHE_EXACT_TTL_SECONDS`, default 3600 s). Response headers: `X-Cache: HIT`, `X-Cache-Age`, `X-Cache-Key`. Bypass via `X-Cache: no-store`.
+  - **Request deduplication** — identical concurrent in-flight requests coalesce in-process. Waiters receive the same response without an extra upstream call. `X-Cache: DEDUP`.
+  - **Per-key spend limits** — per-API-key-hash daily/monthly `INCRBYFLOAT` counter in Redis. Requests 429 when budget exceeded. `X-Spend-Limit-Exceeded: daily|monthly`. Fails open on Redis error.
+  - **Multi-instance SSE fan-out** — Redis pub/sub syncs metric `tick` events across replicas so all dashboard connections see the full picture.
+  - **Cache tab** — KPI cards (1m / lifetime hits, hit rate, bytes from cache, dedup coalesced, spend rejects), status row (connected/off/disconnected + per-feature pills), recent events feed.
+  - **Graceful degrade** — Dragonfly absent or disconnected → every request passes through unchanged; dashboard shows ✕ Disconnected.
+- **`GET /api/cache/summary`** — cache status + connection state + per-window and lifetime counters.
+- **`GET /api/cache/recent`** — last cache events ring buffer.
+- **`GET /api/settings`** / **`POST /api/settings`** — runtime settings endpoint (Compactor + Guardrail + Cache keys). Changes applied in-memory immediately; persisted to `data/settings.json`.
+- **`src/config.js` override layer** — `_overrides` loaded from `data/settings.json` at startup; all Compactor, Guardrail, and Cache `config.*` getters check overrides first.
+- **9 new `CACHE_*` env vars** — documented in `CONFIGURATION.md` and `.env.example`.
+- **Dragonfly Docker Compose sidecar** — pinned image `v1.26.2`; Compose profile `cache`; named volume `dragonfly-data`.
+- **`docs/OPERATIONS.md`** — Dragonfly health check, flush, and restart commands.
+
+### Changed
+
+- **Navigation** — tab order is now: Dashboard · Logs · Metrics · Compressors · Guardrails · Cache · Settings.
+- **`src/compactor/middleware.js`** / **`src/guardrails/middleware.js`** — `readBody()` checks `req._cacheBodyBuffer` before attaching stream listeners (body-buffer contract).
+- **`src/proxy/proxy.js`** — `substituteBody` falls back to `req._cacheBodyBuffer` when no Compactor or Guardrails body is set.
+- **`src/metrics/broadcaster.js`** — tick data published to Redis pub/sub when `CACHE_SSE_FANOUT_ENABLED=true`.
+- **`ROADMAP.md`** — v0.6.0 expanded to include cache; v0.7.0 renamed to "Semantic Cache" (vector search only, builds on v0.6.0 cache infrastructure).
 
 ## [0.5.0] — 2026-06-04 — Zero-config provider routing
 

@@ -16,7 +16,10 @@
           <button class="tab" data-tab="setup" id="setupTab" hidden>
             <i aria-hidden="true" data-lucide="settings"></i>Setup
           </button>
-          <button class="tab active" data-tab="logs">
+          <button class="tab active" data-tab="dashboard">
+            <i aria-hidden="true" data-lucide="layout-dashboard"></i>Dashboard
+          </button>
+          <button class="tab" data-tab="logs">
             <i aria-hidden="true" data-lucide="scroll-text"></i>Logs
           </button>
           <button class="tab" data-tab="metrics">
@@ -27,6 +30,12 @@
           </button>
           <button class="tab" data-tab="guardrails">
             <i aria-hidden="true" data-lucide="shield"></i>Guardrails
+          </button>
+          <button class="tab" data-tab="cache">
+            <i aria-hidden="true" data-lucide="database"></i>Cache
+          </button>
+          <button class="tab" data-tab="settings">
+            <i aria-hidden="true" data-lucide="sliders-horizontal"></i>Settings
           </button>
         </nav>
       </div>
@@ -119,7 +128,123 @@
         </select>
         <button id="guardrailsRefreshBtn">Refresh</button>
       </div>
+
+      <div class="controls hidden" id="dashboardControls">
+        <span id="dashboardStatus" class="status disconnected" role="status" aria-live="polite"
+          >Loading…</span
+        >
+      </div>
+
+      <div class="controls hidden" id="cacheControls">
+        <span id="cacheStatus" class="status disconnected" role="status" aria-live="polite"
+          >Disabled</span
+        >
+      </div>
+
+      <div class="controls hidden" id="settingsControls">
+        <span class="pill" id="settingsDirtyPill" hidden>⚠ Unsaved changes</span>
+        <button id="settingsSaveBtn" hidden>Save</button>
+        <button id="settingsDiscardBtn" hidden>Discard</button>
+      </div>
     </header>
+
+    <main id="dashboardPanel" class="panel">
+      <!-- KPI row -->
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <span class="kpi-label">Requests today</span>
+          <span class="kpi-value" id="dashKpiRequests">—</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Cost today</span>
+          <span class="kpi-value" id="dashKpiCost">—</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">p95 latency</span>
+          <span class="kpi-value" id="dashKpiP95">—</span>
+        </div>
+        <div class="kpi-card" id="dashKpiBytesSavedCard">
+          <span class="kpi-label">Bytes saved</span>
+          <span class="kpi-value" id="dashKpiBytesSaved">—</span>
+        </div>
+        <div class="kpi-card" id="dashKpiCacheCard" hidden>
+          <span class="kpi-label">Cache hit rate</span>
+          <span class="kpi-value" id="dashKpiCacheHitRate">—</span>
+        </div>
+      </div>
+
+      <!-- Two-column body -->
+      <div class="dash-body">
+        <!-- Left 2/3 -->
+        <div class="dash-main">
+          <div class="card">
+            <h3>Activity (last 30 min)</h3>
+            <canvas id="dashSparkline" height="80"></canvas>
+          </div>
+          <div class="card">
+            <h3>
+              Recent requests
+              <a id="dashLogsLink" href="#logs" class="link-subtle">View all in Logs →</a>
+            </h3>
+            <table id="dashRecentTable">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Model</th>
+                  <th>Tokens</th>
+                  <th>Cost</th>
+                  <th>Latency</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Right 1/3 -->
+        <div class="dash-sidebar">
+          <div class="card">
+            <h3>System health</h3>
+            <ul class="health-list" id="dashHealthList">
+              <li>
+                <span class="health-dot" id="dashHealthProxy"></span> Proxy
+                <span id="dashHealthProxyLabel">—</span>
+              </li>
+              <li>
+                <span class="health-dot" id="dashHealthCompactor"></span> Compactors
+                <span id="dashHealthCompactorLabel">—</span>
+              </li>
+              <li>
+                <span class="health-dot" id="dashHealthGuardrails"></span> Guardrails
+                <span id="dashHealthGuardrailsLabel">—</span>
+              </li>
+              <li>
+                <span class="health-dot" id="dashHealthCache"></span> Cache
+                <span id="dashHealthCacheLabel">—</span>
+              </li>
+              <li>
+                <span class="health-dot dot-neutral"></span> In-flight
+                <span id="dashInFlight">0</span>
+              </li>
+            </ul>
+          </div>
+          <div class="card" id="dashRecommendationsCard" hidden>
+            <h3>Recommendations</h3>
+            <ul id="dashRecommendationsList"></ul>
+          </div>
+          <div class="card">
+            <h3>Jump to</h3>
+            <ul class="quick-links">
+              <li><a href="#metrics" class="tab-link" data-tab="metrics">Metrics</a></li>
+              <li><a href="#compactor" class="tab-link" data-tab="compactor">Compressors</a></li>
+              <li><a href="#guardrails" class="tab-link" data-tab="guardrails">Guardrails</a></li>
+              <li><a href="#cache" class="tab-link" data-tab="cache">Cache</a></li>
+              <li><a href="#logs" class="tab-link" data-tab="logs">Logs</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </main>
 
     <main id="setupPanel" class="panel hidden">
       <div class="setup-wrap">
@@ -244,7 +369,7 @@ npm run dev</pre
       </div>
     </main>
 
-    <main id="logsPanel" class="panel">
+    <main id="logsPanel" class="panel hidden">
       <div class="log-filter-bar">
         <label class="log-filter-check">
           <input type="checkbox" id="filterProxy" checked />
@@ -713,6 +838,455 @@ npm run dev</pre
           for the detector catalog, safety model, and deployment presets.
         </p>
       </section>
+    </main>
+
+    <main id="cachePanel" class="panel hidden">
+      <!-- Status row -->
+      <div class="cache-status-row" id="cacheStatusRow">
+        <span class="health-dot" id="cacheConnDot"></span>
+        <span id="cacheConnLabel">Cache disabled</span>
+        <span class="cache-status-pill" id="cacheExactPill">Exact match —</span>
+        <span class="cache-status-pill" id="cacheDedupPill">Dedup —</span>
+        <span class="cache-status-pill" id="cacheSpendPill">Spend limits —</span>
+      </div>
+
+      <!-- KPI row (1m window) -->
+      <div class="kpi-row" id="cacheKpiRow">
+        <div class="kpi-card">
+          <span class="kpi-label">Cache hits (1m)</span>
+          <span class="kpi-value" id="cacheKpiHits1m">—</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Hit rate</span>
+          <span class="kpi-value" id="cacheKpiHitRate">—</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Bytes from cache</span>
+          <span class="kpi-value" id="cacheKpiBytesFromCache">—</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Dedup coalesced</span>
+          <span class="kpi-value" id="cacheKpiDedup">—</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Spend rejects</span>
+          <span class="kpi-value" id="cacheKpiSpendRejects">—</span>
+        </div>
+      </div>
+
+      <!-- Lifetime KPIs -->
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <span class="kpi-label">Cache hits (lifetime)</span>
+          <span class="kpi-value" id="cacheKpiHitsLifetime">—</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Hit rate (lifetime)</span>
+          <span class="kpi-value" id="cacheKpiHitRateLifetime">—</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Keys cached</span>
+          <span class="kpi-value" id="cacheKpiKeyCount">—</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">In-flight dedup</span>
+          <span class="kpi-value" id="cacheKpiInflight">—</span>
+        </div>
+      </div>
+
+      <!-- Disabled notice -->
+      <div class="card" id="cacheDisabledNotice">
+        <p>
+          Cache is disabled. Set <code>CACHE_ENABLED=true</code> and configure
+          <code>CACHE_REDIS_URL</code>, then enable via Settings.
+        </p>
+      </div>
+
+      <!-- Recent events -->
+      <div class="card" id="cacheRecentCard" hidden>
+        <h3>Recent cache events</h3>
+        <table id="cacheRecentTable">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Type</th>
+              <th>Key prefix</th>
+              <th>Key age (s)</th>
+              <th>Bytes</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </main>
+
+    <main id="settingsPanel" class="panel hidden">
+      <h2>Runtime Settings</h2>
+      <p class="settings-note">
+        Saved to <code>data/settings.json</code> · Base <code>.env</code> never modified · No
+        restart required
+      </p>
+
+      <!-- Compactors section -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <h3>Compactors</h3>
+          <label class="toggle-label">
+            <input type="checkbox" id="settingCompactorEnabled" data-key="compactorEnabled" />
+            <span>Enable</span>
+          </label>
+        </div>
+
+        <div class="settings-subsection" id="compactorSubsection">
+          <h4>Scope</h4>
+          <div class="toggle-grid">
+            <label class="toggle-label"
+              ><input type="checkbox" data-key="compactorRequestBody" /><span
+                >Request body</span
+              ></label
+            >
+            <label class="toggle-label"
+              ><input type="checkbox" data-key="compactorResponseBody" /><span
+                >Response body</span
+              ></label
+            >
+            <label class="toggle-label"
+              ><input type="checkbox" data-key="compactorToolResultOnly" /><span
+                >Tool results only</span
+              ></label
+            >
+            <label class="toggle-label"
+              ><input type="checkbox" data-key="compactorAllowRisky" /><span
+                >Allow risky <span class="badge-risky">⚠</span></span
+              ></label
+            >
+          </div>
+
+          <h4>Compressors</h4>
+          <div class="compressor-grid" id="compressorGrid">
+            <div class="compressor-card" data-key="compactorAnsiStripEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">ansi-strip</span>
+                <label class="toggle-label"
+                  ><input type="checkbox" data-key="compactorAnsiStripEnabled"
+                /></label>
+              </div>
+              <p class="compressor-desc">Strip ANSI escape codes from terminal output</p>
+            </div>
+            <div class="compressor-card" data-key="compactorBlanklineCollapseEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">blankline-collapse</span>
+                <label class="toggle-label"
+                  ><input type="checkbox" data-key="compactorBlanklineCollapseEnabled"
+                /></label>
+              </div>
+              <p class="compressor-desc">Collapse consecutive blank lines to one</p>
+            </div>
+            <div class="compressor-card" data-key="compactorDiffCollapseEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">diff-collapse</span>
+                <label class="toggle-label"
+                  ><input type="checkbox" data-key="compactorDiffCollapseEnabled"
+                /></label>
+              </div>
+              <p class="compressor-desc">Collapse unchanged diff hunks to a summary line</p>
+            </div>
+            <div class="compressor-card" data-key="compactorLockfileDropEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">lockfile-drop</span>
+                <label class="toggle-label"
+                  ><input type="checkbox" data-key="compactorLockfileDropEnabled"
+                /></label>
+              </div>
+              <p class="compressor-desc">Replace lockfile content with a size summary</p>
+            </div>
+            <div class="compressor-card" data-key="compactorLsLongShrinkEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">ls-long-shrink</span>
+                <label class="toggle-label"
+                  ><input type="checkbox" data-key="compactorLsLongShrinkEnabled"
+                /></label>
+              </div>
+              <p class="compressor-desc">Shrink verbose ls -l permission / owner columns</p>
+            </div>
+            <div class="compressor-card" data-key="compactorNpmNoiseStripEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">npm-noise-strip</span>
+                <label class="toggle-label"
+                  ><input type="checkbox" data-key="compactorNpmNoiseStripEnabled"
+                /></label>
+              </div>
+              <p class="compressor-desc">Remove npm WARN deprecated lines from install output</p>
+            </div>
+            <div class="compressor-card" data-key="compactorRepeatLineDedupeEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">repeat-line-dedupe</span>
+                <label class="toggle-label"
+                  ><input type="checkbox" data-key="compactorRepeatLineDedupeEnabled"
+                /></label>
+              </div>
+              <p class="compressor-desc">Deduplicate repeated identical lines</p>
+            </div>
+            <div class="compressor-card" data-key="compactorStacktraceDedupeEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">stacktrace-dedupe</span>
+                <label class="toggle-label"
+                  ><input type="checkbox" data-key="compactorStacktraceDedupeEnabled"
+                /></label>
+              </div>
+              <p class="compressor-desc">Collapse duplicate stack frames in exception traces</p>
+            </div>
+            <div class="compressor-card" data-key="compactorLongFileElideEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name"
+                  >long-file-elide <span class="badge-risky">⚠</span></span
+                >
+                <label class="toggle-label"
+                  ><input type="checkbox" data-key="compactorLongFileElideEnabled"
+                /></label>
+              </div>
+              <p class="compressor-desc">Elide middle of very long files, keep head + tail</p>
+            </div>
+            <div class="compressor-card" data-key="compactorBase64TruncateEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">base64-truncate</span>
+                <label class="toggle-label"
+                  ><input type="checkbox" data-key="compactorBase64TruncateEnabled"
+                /></label>
+              </div>
+              <p class="compressor-desc">Truncate long base64 blobs and note their original size</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Guardrails section -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <h3>Guardrails</h3>
+          <label class="toggle-label">
+            <input type="checkbox" id="settingGuardrailsEnabled" data-key="guardrailsEnabled" />
+            <span>Enable</span>
+          </label>
+        </div>
+
+        <div class="settings-subsection" id="guardrailsSubsection">
+          <h4>Category modes</h4>
+          <div class="category-cards">
+            <div class="category-card" data-category="secrets">
+              <div class="category-card-header">
+                <span class="category-name">Secrets</span>
+                <p class="category-desc">AWS keys, GitHub PATs, API keys, JWTs, private keys</p>
+              </div>
+              <div class="mode-pills" data-key="guardrailsSecretsMode">
+                <button class="mode-pill" data-mode="off">off</button>
+                <button class="mode-pill" data-mode="alert">alert</button>
+                <button class="mode-pill" data-mode="block">block</button>
+                <button class="mode-pill" data-mode="redact">redact</button>
+              </div>
+            </div>
+            <div class="category-card" data-category="pii">
+              <div class="category-card-header">
+                <span class="category-name">PII</span>
+                <p class="category-desc">Email, phone, credit card, SSN, IP addresses</p>
+              </div>
+              <div class="mode-pills" data-key="guardrailsPiiMode">
+                <button class="mode-pill" data-mode="off">off</button>
+                <button class="mode-pill" data-mode="alert">alert</button>
+                <button class="mode-pill" data-mode="block">block</button>
+                <button class="mode-pill" data-mode="redact">redact</button>
+              </div>
+            </div>
+            <div class="category-card" data-category="injection">
+              <div class="category-card-header">
+                <span class="category-name">Prompt Injection</span>
+                <p class="category-desc">Role override, system prompt extraction, tool hijacking</p>
+              </div>
+              <div class="mode-pills" data-key="guardrailsInjectionMode">
+                <button class="mode-pill" data-mode="off">off</button>
+                <button class="mode-pill" data-mode="alert">alert</button>
+                <button class="mode-pill" data-mode="block">block</button>
+                <button class="mode-pill" data-mode="redact">redact</button>
+              </div>
+            </div>
+          </div>
+
+          <h4>Detectors</h4>
+          <div class="compressor-grid" id="detectorGrid">
+            <div class="compressor-card" data-key="guardrailsAwsAccessKeyEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">aws-access-key</span
+                ><span class="category-badge secrets">secrets</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsAwsAccessKeyEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsGithubPatEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">github-pat</span
+                ><span class="category-badge secrets">secrets</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsGithubPatEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsAnthropicKeyEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">anthropic-key</span
+                ><span class="category-badge secrets">secrets</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsAnthropicKeyEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsOpenaiKeyEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">openai-key</span
+                ><span class="category-badge secrets">secrets</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsOpenaiKeyEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsPrivateKeyEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">private-key</span
+                ><span class="category-badge secrets">secrets</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsPrivateKeyEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsJwtEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">jwt</span
+                ><span class="category-badge secrets">secrets</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsJwtEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsGenericHighEntropyEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">generic-high-entropy</span
+                ><span class="category-badge secrets">secrets</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsGenericHighEntropyEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsEmailEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">email</span><span class="category-badge pii">pii</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsEmailEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsPhoneEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">phone-e164</span
+                ><span class="category-badge pii">pii</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsPhoneEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsSsnUsEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">ssn-us</span
+                ><span class="category-badge pii">pii</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsSsnUsEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsCreditCardEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">credit-card</span
+                ><span class="category-badge pii">pii</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsCreditCardEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsRoleOverrideEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">role-override</span
+                ><span class="category-badge injection">injection</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsRoleOverrideEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsSystemPromptLeakEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">system-prompt-leak</span
+                ><span class="category-badge injection">injection</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsSystemPromptLeakEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsToolOverrideEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">tool-override</span
+                ><span class="category-badge injection">injection</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsToolOverrideEnabled"
+                /></label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cache section -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <h3>Cache</h3>
+          <label class="toggle-label">
+            <input type="checkbox" id="settingCacheEnabled" data-key="cacheEnabled" />
+            <span>Enable</span>
+          </label>
+        </div>
+
+        <div class="settings-subsection" id="cacheSubsection">
+          <h4>Features</h4>
+          <div class="toggle-grid">
+            <label class="toggle-label"
+              ><input type="checkbox" data-key="cacheExactMatchEnabled" /><span
+                >Exact-match cache</span
+              ></label
+            >
+            <label class="toggle-label"
+              ><input type="checkbox" data-key="cacheDedupEnabled" /><span
+                >Request deduplication</span
+              ></label
+            >
+            <label class="toggle-label"
+              ><input type="checkbox" data-key="cacheSpendEnabled" /><span
+                >Per-key spend limits</span
+              ></label
+            >
+            <label class="toggle-label"
+              ><input type="checkbox" data-key="cacheSseFanoutEnabled" /><span
+                >Multi-instance SSE fan-out</span
+              ></label
+            >
+          </div>
+          <p class="settings-note">
+            TTL and spend thresholds are set via <code>CACHE_*</code> env vars or
+            <code>POST /api/settings</code>. Requires <code>CACHE_REDIS_URL</code> + Dragonfly.
+          </p>
+        </div>
+      </div>
+
+      <p class="settings-footer">
+        Saved to <code>data/settings.json</code> · Base <code>.env</code> never modified · No
+        restart required
+      </p>
     </main>
 
     <footer id="statusBar">

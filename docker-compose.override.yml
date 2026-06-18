@@ -11,5 +11,6 @@ services:
       TZ: UTC
       LOG_DIR: /data/logs
       LOG_LEVEL: debug
+      CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://localhost:6379}
     command: ["node", "--watch", "src/index.js"]
     restart: unless-stopped

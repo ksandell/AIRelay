@@ -38,6 +38,38 @@ curl -s http://airelay.local:3000/api/metrics/summary | jq .
 curl -s http://airelay.local:3000/api/metrics/models  | jq .
 ```
 
+## Cache (Dragonfly)
+
+Start with cache enabled:
+```bash
+CACHE_ENABLED=true docker compose --profile cache up -d
+```
+
+Check Dragonfly connection:
+```bash
+curl -s http://airelay.local:3000/api/cache/summary | jq .connected
+```
+
+Cache stats:
+```bash
+curl -s http://airelay.local:3000/api/cache/summary | jq '{enabled, connected, keyCount, lifetime}'
+```
+
+Flush all cached responses (clears Dragonfly entirely):
+```bash
+docker compose exec dragonfly redis-cli FLUSHALL
+```
+
+Or target only AIRelay cache keys:
+```bash
+docker compose exec dragonfly redis-cli --scan --pattern 'airelay:exact:*' | xargs docker compose exec dragonfly redis-cli DEL
+```
+
+Restart just Dragonfly (data persisted to volume):
+```bash
+docker compose restart dragonfly
+```
+
 ## Log Rotation
 
 Rotation is automatic (nightly, configurable via `LOG_RETENTION_DAYS`).
