@@ -39,19 +39,20 @@ export function startMetricsBroadcaster() {
   })
 
   tickHandle = setInterval(() => {
-    hubBroadcast(
-      CHANNEL,
-      {
-        ts: new Date().toISOString(),
-        windows: {
-          '1m': aggregate(60),
-          '5m': aggregate(300),
-        },
-        inFlight: getInFlight(),
-        sseClients: hubClientCount(),
+    const tickData = {
+      ts: new Date().toISOString(),
+      windows: {
+        '1m': aggregate(60),
+        '5m': aggregate(300),
       },
-      'tick',
-    )
+      inFlight: getInFlight(),
+      sseClients: hubClientCount(),
+    }
+    hubBroadcast(CHANNEL, tickData, 'tick')
+    // Fan-out to other instances via Redis pub/sub (no-op when fanout disabled)
+    import('../cache/fanout.js')
+      .then(({ publishTick }) => publishTick(tickData))
+      .catch(() => {})
   }, config.metricsTickMs)
 
   return stopMetricsBroadcaster
