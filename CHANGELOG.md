@@ -5,6 +5,17 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] — 2026-06-18 — Window-aware KPIs, log UX polish, table fixes
+
+### Fixed
+
+- **All KPI tiles now respect the time-window selector** — every KPI on every page (Dashboard, Metrics, Compactor, Guardrails, Cache) previously showed the in-memory 1-minute rolling window regardless of the selector. In history mode all tiles are now computed client-side from the fetched events array for the selected window (5m–7d). A new `computeWindowKpis(events, windowSec)` utility drives all five `renderXHistoryKpis` helpers. SSE `pushTick` skips KPI tile updates while a history window is active; only the instantaneous in-flight counter stays live.
+- **Logs no longer blink on tab switch** — `loadLive()` was called every time the Logs tab was activated, wiping and rebuilding the full DOM. It now runs only on first visit when the buffer is empty; SSE delivers new entries incrementally.
+- **Log line cap reduced 500 → 100** — `LOG_BUFFER_MAX` and fetch limits both reduced; users no longer scroll through hundreds of entries on load.
+- **Log status column widened 52 → 74 px** — the grid column was too narrow for error labels "TIMEOUT" / "REFUSED", causing them to overflow into the message column.
+- **Horizontal scroll on all table wrappers** — `overflow-x: auto` added to `#recentTable-wrap`, `#topCostTable-wrap`, `#compactorRecent-wrap`, `#guardrailsRecent-wrap`, `#cacheRecent-wrap`. Tables with more columns than the viewport now scroll instead of clipping.
+- **Compactor / Guardrails / Cache history KPIs now accurate** — history refresh functions now fetch `/api/metrics/history` (limit 5000) in parallel with the page-specific history endpoint and derive KPI aggregates from actual event data instead of stale in-memory summary windows.
+
 ## [0.6.1] — 2026-06-18 — Cache metrics, dashboard polish, security hardening
 
 ### Added
