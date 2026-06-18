@@ -340,6 +340,9 @@ export const config = {
   get cacheExactTtlSeconds() {
     return _overrides.cacheExactTtlSeconds ?? int('CACHE_EXACT_TTL_SECONDS', 3600)
   },
+  // Hard cap on how many response bytes the cache will buffer per request.
+  // Beyond this the response is streamed through uncached — bounds heap use.
+  cacheMaxResponseBytes: int('CACHE_MAX_RESPONSE_BYTES', 5_242_880),
   get cacheDedupEnabled() {
     return _overrides.cacheDedupEnabled ?? process.env.CACHE_DEDUP_ENABLED !== 'false'
   },

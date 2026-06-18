@@ -97,35 +97,75 @@ export function createCacheMiddleware() {
     recordCacheEvent({ ts: new Date().toISOString(), type: 'MISS', keyPrefix: sha256.slice(0, 8) })
 
     let resolveDedup
+    let settled = false
     const dedupPromise = new Promise((resolve) => {
       resolveDedup = resolve
     })
     if (config.cacheDedupEnabled) dedupSet(sha256, dedupPromise)
 
-    // Intercept res.write + res.end to capture upstream response
+    // Guard against a dedup leak: if the connection is destroyed (idle
+    // watchdog, client abort) the wrapped res.end never runs, so the in-flight
+    // promise would stay pending and the Map entry would leak. Resolve null +
+    // delete on close if nothing settled it first.
+    res.on('close', () => {
+      if (settled) return
+      settled = true
+      resolveDedup?.(null)
+      dedupDelete(sha256)
+    })
+
+    // Intercept res.write + res.end to capture upstream response.
+    // Buffering is bounded: we stop accumulating once the response is known to
+    // be uncacheable (event-stream) or exceeds the tee cap, so a large or
+    // streaming response can never grow the heap unbounded.
     const origWrite = res.write.bind(res)
     const origEnd = res.end.bind(res)
     const origWriteHead = res.writeHead.bind(res)
-    const chunks = []
+    const TEE_CAP = config.cacheMaxResponseBytes
+    let chunks = []
+    let bufBytes = 0
+    let teeDisabled = false
     let statusCode = 200
     let contentType = 'application/json'
+
+    const isCacheableContentType = () =>
+      !String(res.getHeader('content-type') ?? '').includes('text/event-stream')
+
+    const accumulate = (chunk) => {
+      if (teeDisabled || !chunk) return
+      // Decide once we have headers: never buffer a streaming response.
+      if (!isCacheableContentType()) {
+        teeDisabled = true
+        chunks = []
+        return
+      }
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+      bufBytes += buf.length
+      if (bufBytes > TEE_CAP) {
+        teeDisabled = true
+        chunks = []
+        return
+      }
+      chunks.push(buf)
+    }
 
     res.writeHead = function (code, ...args) {
       statusCode = code
       return origWriteHead(code, ...args)
     }
     res.write = function (chunk, ...args) {
-      if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+      accumulate(chunk)
       return origWrite(chunk, ...args)
     }
     res.end = function (chunk, ...args) {
-      if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+      accumulate(chunk)
       contentType = res.getHeader('content-type') ?? 'application/json'
 
       const isSuccess = statusCode >= 200 && statusCode < 300
-      const isStream = String(contentType).includes('text/event-stream')
+      const alreadySettled = settled
+      settled = true
 
-      if (isSuccess && !isStream && chunks.length > 0) {
+      if (!alreadySettled && isSuccess && !teeDisabled && chunks.length > 0) {
         const body = Buffer.concat(chunks).toString('utf8')
         const entry = { body, statusCode, contentType }
         queueMicrotask(async () => {
@@ -133,7 +173,7 @@ export function createCacheMiddleware() {
           resolveDedup?.(entry)
           dedupDelete(sha256)
         })
-      } else {
+      } else if (!alreadySettled) {
         resolveDedup?.(null)
         dedupDelete(sha256)
       }
