@@ -67,8 +67,8 @@ header {
   gap: 18px;
 }
 .brand-mark {
-  width: 28px;
-  height: 28px;
+  height: 36px;
+  width: auto;
   flex-shrink: 0;
   display: block;
 }

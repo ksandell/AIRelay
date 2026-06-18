@@ -1946,8 +1946,8 @@ function connectMetricsSSE() {
       pushTick(tick)
       const dashPanel = document.getElementById('dashboardPanel')
       if (!dashPanel?.classList.contains('hidden')) {
-        const p95 = tick.p95 ?? tick.window_1m?.p95 ?? 0
-        const rps = tick.rps ?? tick.window_1m?.rps ?? 0
+        const p95 = tick.windows?.['1m']?.p95 ?? tick.p95 ?? tick.window_1m?.p95 ?? 0
+        const rps = tick.windows?.['1m']?.rps ?? tick.rps ?? tick.window_1m?.rps ?? 0
         pushDashPoint(rps, p95)
         if (typeof p95 === 'number') {
           const p95El = document.getElementById('dashKpiP95')
@@ -2146,6 +2146,10 @@ function rebuildChartsFromHistory(events, windowKey) {
   const outTok = new Array(numBuckets).fill(0)
   const toolIn = new Array(numBuckets).fill(0)
   const toolOut = new Array(numBuckets).fill(0)
+  const costs = new Array(numBuckets).fill(0)
+  const errCounts = new Array(numBuckets).fill(0)
+  const bytesInBucket = new Array(numBuckets).fill(0)
+  const bytesOutBucket = new Array(numBuckets).fill(0)
 
   for (const ev of events) {
     const t = new Date(ev.ts).getTime()
@@ -2156,8 +2160,10 @@ function rebuildChartsFromHistory(events, windowKey) {
     if (typeof ev.durationMs === 'number') durations[idx].push(ev.durationMs)
     inTok[idx] += ev.inputTokens ?? 0
     outTok[idx] += ev.outputTokens ?? 0
-    toolIn[idx] += ev.toolBytesIn ? 0 : 0 // no per-event tool-token field; leave at 0
-    toolOut[idx] += 0
+    costs[idx] += ev.costUsd ?? 0
+    if (ev.error || (ev.status != null && ev.status >= 400)) errCounts[idx]++
+    bytesInBucket[idx] += ev.bytesIn ?? 0
+    bytesOutBucket[idx] += ev.bytesOut ?? 0
   }
 
   const labels = []
@@ -2181,9 +2187,9 @@ function rebuildChartsFromHistory(events, windowKey) {
       p95.push(0)
     }
     tokInRate.push(inTok[i] / bucketSec)
-    tokToolInRate.push(toolIn[i] / bucketSec)
+    tokToolInRate.push(0) // no per-event tool-token field
     tokOutRate.push(-(outTok[i] / bucketSec))
-    tokToolOutRate.push(-(toolOut[i] / bucketSec))
+    tokToolOutRate.push(0)
   }
 
   // Mutate the shared label array in place so all three charts pick up the
@@ -2220,6 +2226,25 @@ function rebuildChartsFromHistory(events, windowKey) {
   chartTokens.options.scales.y.suggestedMin = -peak
   chartTokens.options.scales.y.suggestedMax = peak
   chartTokens.update('none')
+
+  // Push bucketed history data into KPI sparklines so they match the charts.
+  const overwriteSpark = (key, data) => {
+    const slice = data.slice(-SPARK_TICKS)
+    sparkSeries[key] = slice.slice()
+    const ch = sparkCharts[key]
+    if (!ch) return
+    ch.data.labels = slice.map((_, i) => i)
+    ch.data.datasets[0].data = slice
+    ch.update('none')
+  }
+  overwriteSpark('rps', rps)
+  overwriteSpark('p95', p95)
+  overwriteSpark('tokIn', tokInRate)
+  overwriteSpark('tokOut', tokOutRate.map(Math.abs))
+  overwriteSpark('costPerMin', costs.map((c) => (c / bucketSec) * 60))
+  overwriteSpark('bytesIn', bytesInBucket)
+  overwriteSpark('bytesOut', bytesOutBucket)
+  overwriteSpark('err', counts.map((n, i) => (n > 0 ? (errCounts[i] / n) * 100 : 0)))
 }
 
 async function refreshChartsForWindow() {
@@ -2257,9 +2282,27 @@ function applyHistoryWindowToAll(value) {
   }
 }
 
+function updateKpiWindowLabels(win) {
+  const disp = win === 'live' ? null : win
+  for (const el of document.querySelectorAll('#metricsPanel .kpi-label')) {
+    const orig = (el.dataset.origLabel ||= el.textContent)
+    el.textContent = disp ? orig.replace(/\(\d+ min\)/g, `(${disp})`) : orig
+  }
+}
+
+function updateChartWindowLabels(win) {
+  const disp = win === 'live' ? null : win
+  for (const el of document.querySelectorAll('#metricsPanel .chart-title')) {
+    const orig = (el.dataset.origTitle ||= el.textContent)
+    el.textContent = disp ? orig.replace(/last \d+ min/g, `last ${disp}`) : orig
+  }
+}
+
 function syncHistoryWindow(value) {
   localStorage.setItem(HW_STORAGE_KEY, value)
   applyHistoryWindowToAll(value)
+  updateKpiWindowLabels(value)
+  updateChartWindowLabels(value)
   const tab = (location.hash.replace('#', '') || 'dashboard')
   if (tab === 'metrics') {
     refreshChartsForWindow().then(() => refreshRecentForWindow()).catch(() => {})

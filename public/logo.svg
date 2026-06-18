@@ -1,13 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="28" height="28" aria-hidden="true">
+<svg width="250" height="64" viewBox="0 0 250 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AIRelay">
   <defs>
-    <linearGradient id="brandTeal" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#2dd4bf" />
-      <stop offset="1" stop-color="#0d9488" />
+    <linearGradient id="airelayTeal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2dd4bf"/>
+      <stop offset="1" stop-color="#0d9488"/>
     </linearGradient>
   </defs>
-  <g fill="none" stroke="url(#brandTeal)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="14,14 29,32 14,50" opacity="0.25" />
-    <polyline points="26,14 41,32 26,50" opacity="0.55" />
-    <polyline points="38,14 53,32 38,50" opacity="1" />
+  <g fill="none" stroke="url(#airelayTeal)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="8,18 21,32 8,46" opacity="0.25"/>
+    <polyline points="19,18 32,32 19,46" opacity="0.55"/>
+    <polyline points="30,18 43,32 30,46" opacity="1"/>
   </g>
+  <text x="58" y="44" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="36" font-weight="600" letter-spacing="0.2">
+    <tspan fill="#64748b">AI</tspan><tspan fill="#0d9488">Relay</tspan>
+  </text>
 </svg>
