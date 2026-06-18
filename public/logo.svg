@@ -11,6 +11,6 @@
     <polyline points="30,18 43,32 30,46" opacity="1"/>
   </g>
   <text x="58" y="44" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="36" font-weight="600" letter-spacing="0.2">
-    <tspan fill="#64748b">AI</tspan><tspan fill="#0d9488">Relay</tspan>
+    <tspan fill="#ffffff">AI</tspan><tspan fill="#0d9488">Relay</tspan>
   </text>
 </svg>
