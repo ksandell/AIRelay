@@ -1,9 +1,13 @@
 import fs from 'node:fs'
 import http from 'node:http'
 import https from 'node:https'
+import { createRequire } from 'node:module'
 import { monitorEventLoopDelay } from 'node:perf_hooks'
 import { Router } from 'express'
 import { config } from '../config.js'
+
+const require = createRequire(import.meta.url)
+const { version } = require('../../package.json')
 import { nextRotationISO } from '../logs/rotation.js'
 import { getInFlight } from '../metrics/collector.js'
 import { metricsClientCount } from '../metrics/broadcaster.js'
@@ -76,6 +80,7 @@ router.get('/health', async (req, res) => {
 
   res.json({
     status: 'ok',
+    version,
     uptime: Math.floor(process.uptime()),
     publicBaseUrl: config.publicBaseUrl,
     bindHost: config.bindHost,

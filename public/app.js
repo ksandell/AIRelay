@@ -489,7 +489,7 @@ function initDashSparkline() {
           backgroundColor: 'rgba(245,158,11,0.6)',
           borderColor: 'rgba(245,158,11,0.85)',
           borderWidth: 0,
-
+          stack: 'counts',
           yAxisID: 'y',
           order: 2,
         },
@@ -500,7 +500,7 @@ function initDashSparkline() {
           backgroundColor: 'rgba(239,68,68,0.65)',
           borderColor: 'rgba(239,68,68,0.9)',
           borderWidth: 0,
-
+          stack: 'counts',
           yAxisID: 'y',
           order: 1,
         },
@@ -524,7 +524,7 @@ function initDashSparkline() {
       plugins: { legend: { display: true, position: 'bottom' } },
       scales: {
         x: { display: false },
-        y: { beginAtZero: true, position: 'left', title: { display: true, text: 'req/s' } },
+        y: { beginAtZero: true, stacked: true, position: 'left', title: { display: true, text: 'req/s' } },
         y1: {
           beginAtZero: true,
           position: 'right',
@@ -705,6 +705,11 @@ async function refreshDashboard() {
       ])
     if (!healthRes.ok) throw new Error('health fetch failed')
     const health = await healthRes.json()
+    const versionEl = document.getElementById('appVersion')
+    if (versionEl && health.version && !versionEl.dataset.set) {
+      versionEl.textContent = `v${health.version}`
+      versionEl.dataset.set = '1'
+    }
     if (!summaryRes.ok) console.warn('refreshDashboard: summary fetch failed', summaryRes.status)
     if (!recentRes.ok) console.warn('refreshDashboard: recent fetch failed', recentRes.status)
     if (!compactorRes.ok)
