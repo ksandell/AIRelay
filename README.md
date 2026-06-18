@@ -1,21 +1,23 @@
-# AIRelay
+<p align="center">
+  <img src="public/logo.svg" alt="AIRelay" height="48" />
+</p>
 
-[![Releases](https://img.shields.io/github/v/release/ksandell/AIRelay?include_prereleases&sort=semver)](CHANGELOG.md)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/node-%E2%89%A524.0-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org)
-[![Docker](https://img.shields.io/badge/docker-ready-2496ED.svg?logo=docker&logoColor=white)](docker-compose.yml)
-[![Tests: Vitest](https://img.shields.io/badge/tests-vitest-6E9F18.svg?logo=vitest&logoColor=white)](https://vitest.dev)
-[![Status](https://img.shields.io/badge/status-alpha-orange.svg)]()
+<p align="center">
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/github/v/release/ksandell/AIRelay?include_prereleases&sort=semver" alt="Releases"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%E2%89%A524.0-339933.svg?logo=node.js&logoColor=white" alt="Node.js"></a>
+  <a href="docker-compose.yml"><img src="https://img.shields.io/badge/docker-ready-2496ED.svg?logo=docker&logoColor=white" alt="Docker"></a>
+  <a href="https://vitest.dev"><img src="https://img.shields.io/badge/tests-vitest-6E9F18.svg?logo=vitest&logoColor=white" alt="Tests: Vitest"></a>
+  <img src="https://img.shields.io/badge/status-alpha-orange.svg" alt="Status">
+</p>
 
 **An API proxy for AI** — with an **opt-in prompt compressor** that shaves bloated tool output before it hits your LLM. Sits between your codebase and any AI/LLM HTTP API (Anthropic, OpenAI, Gemini, OpenRouter, self-hosted). Forwards bytes unchanged by default; transparently shrinks them when you flip the switch. Live logs + per-request metrics in a browser dashboard.
 
 > **What this is not:** a desktop chat client, a CLI assistant, or a browser extension. The target traffic is server-to-API SDK calls from a codebase.
 
-![AIRelay Compressors dashboard](docs/screenshots/compressors.png)
-*The Compressors dashboard — live view of byte savings per compressor, recent events stream, and cumulative ratios.*
+![AIRelay Dashboard](docs/screenshots/dashboard.png)
 
-![AIRelay metrics dashboard](docs/screenshots/metrics.png)
-*The Metrics dashboard — RPS, latency, token throughput, per-model breakdown, and most-expensive requests.*
+→ **[All dashboard screenshots](docs/screenshots.md)** — Dashboard · Logs · Metrics · Compressors · Guardrails · Cache · Settings
 
 ---
 
