@@ -327,22 +327,36 @@ export const config = {
     }
   },
 
-  // Cache (v0.6.0) — optional Redis-backed exact-match & normalized caching
-  // See docs/CACHE.md.
+  // Cache (v0.6.0) — opt-in Dragonfly response cache.
+  // CACHE_REDIS_URL is env-only (changing it requires restart).
+  // All other keys are runtime-settable via POST /api/settings.
   cacheRedisUrl: process.env.CACHE_REDIS_URL ?? null,
+  get cacheEnabled() {
+    return _overrides.cacheEnabled ?? process.env.CACHE_ENABLED === 'true'
+  },
   get cacheExactMatchEnabled() {
-    return _overrides.cacheExactMatchEnabled ?? process.env.CACHE_EXACT_MATCH_ENABLED === 'true'
+    return _overrides.cacheExactMatchEnabled ?? process.env.CACHE_EXACT_MATCH_ENABLED !== 'false'
   },
-  cacheExactTtlSeconds: int('CACHE_EXACT_TTL_SECONDS', 3600),
-  get cacheNormalizedEnabled() {
-    return _overrides.cacheNormalizedEnabled ?? process.env.CACHE_NORMALIZED_ENABLED === 'true'
+  get cacheExactTtlSeconds() {
+    return _overrides.cacheExactTtlSeconds ?? int('CACHE_EXACT_TTL_SECONDS', 3600)
   },
-  cacheNormalizedTtlSeconds: int('CACHE_NORMALIZED_TTL_SECONDS', 86400),
+  get cacheDedupEnabled() {
+    return _overrides.cacheDedupEnabled ?? process.env.CACHE_DEDUP_ENABLED !== 'false'
+  },
   get cacheSpendEnabled() {
     return _overrides.cacheSpendEnabled ?? process.env.CACHE_SPEND_ENABLED === 'true'
   },
-  cacheSpendDailyLimitUsd: +((process.env.CACHE_SPEND_DAILY_LIMIT_USD ?? _overrides.cacheSpendDailyLimitUsd) ?? null),
-  cacheSpendMonthlyLimitUsd: +((process.env.CACHE_SPEND_MONTHLY_LIMIT_USD ?? _overrides.cacheSpendMonthlyLimitUsd) ?? null),
+  get cacheSpendDailyLimitUsd() {
+    const v = _overrides.cacheSpendDailyLimitUsd ?? process.env.CACHE_SPEND_DAILY_LIMIT_USD
+    return v != null && v !== '' ? parseFloat(v) : null
+  },
+  get cacheSpendMonthlyLimitUsd() {
+    const v = _overrides.cacheSpendMonthlyLimitUsd ?? process.env.CACHE_SPEND_MONTHLY_LIMIT_USD
+    return v != null && v !== '' ? parseFloat(v) : null
+  },
+  get cacheSseFanoutEnabled() {
+    return _overrides.cacheSseFanoutEnabled ?? process.env.CACHE_SSE_FANOUT_ENABLED === 'true'
+  },
 
   // Shutdown
   shutdownTimeoutMs: int('SHUTDOWN_TIMEOUT_MS', 30_000),
