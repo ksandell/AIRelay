@@ -58,7 +58,12 @@ function activateTab(name) {
   // Re-pull ring-buffer data when the user lands on Logs/Metrics so tables
   // populate even if the tab was hidden when the proxy traffic arrived.
   // Only reload on first visit; SSE stream handles incremental updates after that.
-  if (name === 'logs' && typeof loadLive === 'function' && !dateSelect?.value && logBuffer.length === 0) {
+  if (
+    name === 'logs' &&
+    typeof loadLive === 'function' &&
+    !dateSelect?.value &&
+    logBuffer.length === 0
+  ) {
     loadLive().catch(() => {})
   }
   if (name === 'metrics' && typeof loadRecent === 'function') {
@@ -96,23 +101,27 @@ async function refreshCompactor() {
       enabledPill.textContent = s.enabled ? 'enabled' : 'disabled'
       enabledPill.className = s.enabled ? 'pill ok' : 'pill warn'
     }
-    document.getElementById('compactorBytes1m').textContent = fmtBytes(s.windows['1m'].bytesSaved)
-    document.getElementById('compactorBytes5m').textContent = fmtBytes(s.windows['5m'].bytesSaved)
-    document.getElementById('compactorBytesLifetime').textContent = fmtBytes(s.lifetime.bytesSaved)
-    document.getElementById('compactorTokensLifetime').textContent = Math.floor(
-      s.lifetime.bytesSaved / 4,
-    ).toLocaleString()
-    const r = s.windows['5m'].ratio
-    document.getElementById('compactorRatio5m').textContent =
-      r == null ? '—' : `${Math.round((1 - r) * 100)}%`
-    document.getElementById('compactorBypasses').textContent = s.lifetime.requestsBypassed
+    if ((compactorHistoryWindowEl?.value || 'live') === 'live') {
+      document.getElementById('compactorBytes1m').textContent = fmtBytes(s.windows['1m'].bytesSaved)
+      document.getElementById('compactorBytes5m').textContent = fmtBytes(s.windows['5m'].bytesSaved)
+      document.getElementById('compactorBytesLifetime').textContent = fmtBytes(
+        s.lifetime.bytesSaved,
+      )
+      document.getElementById('compactorTokensLifetime').textContent = Math.floor(
+        s.lifetime.bytesSaved / 4,
+      ).toLocaleString()
+      const r = s.windows['5m'].ratio
+      document.getElementById('compactorRatio5m').textContent =
+        r == null ? '—' : `${Math.round((1 - r) * 100)}%`
+      document.getElementById('compactorBypasses').textContent = s.lifetime.requestsBypassed
 
-    pushSpark('compactorBytes1m', s.windows['1m'].bytesSaved)
-    pushSpark('compactorBytes5m', s.windows['5m'].bytesSaved)
-    pushSpark('compactorBytesLifetime', s.lifetime.bytesSaved)
-    pushSpark('compactorTokensLifetime', Math.floor(s.lifetime.bytesSaved / 4))
-    pushSpark('compactorRatio5m', r == null ? 0 : Math.round((1 - r) * 100))
-    pushSpark('compactorBypasses', s.lifetime.requestsBypassed)
+      pushSpark('compactorBytes1m', s.windows['1m'].bytesSaved)
+      pushSpark('compactorBytes5m', s.windows['5m'].bytesSaved)
+      pushSpark('compactorBytesLifetime', s.lifetime.bytesSaved)
+      pushSpark('compactorTokensLifetime', Math.floor(s.lifetime.bytesSaved / 4))
+      pushSpark('compactorRatio5m', r == null ? 0 : Math.round((1 - r) * 100))
+      pushSpark('compactorBypasses', s.lifetime.requestsBypassed)
+    }
 
     const tbody = document.querySelector('#compactorTable tbody')
     if (tableNeedsRebuild(tbody, s.compressors.all[0])) {
@@ -196,9 +205,13 @@ async function refreshCompactorAuto() {
     if (compHistRes.ok) {
       const body = await compHistRes.json()
       const rbody = document.querySelector('#compactorRecentTable tbody')
-      if (rbody) {
+      const compHistEvents = body.events ?? []
+      if (
+        rbody &&
+        tableNeedsRebuild(rbody, compHistEvents[0]?.ts ? fmtTime(compHistEvents[0].ts) : '')
+      ) {
         rbody.innerHTML = ''
-        for (const ev of body.events ?? []) {
+        for (const ev of compHistEvents) {
           const tr = document.createElement('tr')
           const filters = ev.compactorCompressors || '—'
           tr.innerHTML = `<td>${fmtTimeShort(ev.ts)}</td>
@@ -242,21 +255,25 @@ async function refreshGuardrails() {
       enabledPill.className = s.enabled ? 'pill ok' : 'pill warn'
     }
 
-    const scanned1m = s.windows['1m'].requestsScanned
-    const hits1m = s.windows['1m'].hits
-    document.getElementById('guardrailsScanned1m').textContent = scanned1m
-    document.getElementById('guardrailsHits1m').textContent = hits1m
-    document.getElementById('guardrailsBlockedLifetime').textContent = s.lifetime.requestsBlocked
-    document.getElementById('guardrailsRedactedLifetime').textContent = s.lifetime.requestsRedacted
-    document.getElementById('guardrailsAlertedLifetime').textContent = s.lifetime.requestsAlerted
-    document.getElementById('guardrailsBypassesLifetime').textContent = s.lifetime.requestsBypassed
+    if ((guardrailsHistoryWindowEl?.value || 'live') === 'live') {
+      const scanned1m = s.windows['1m'].requestsScanned
+      const hits1m = s.windows['1m'].hits
+      document.getElementById('guardrailsScanned1m').textContent = scanned1m
+      document.getElementById('guardrailsHits1m').textContent = hits1m
+      document.getElementById('guardrailsBlockedLifetime').textContent = s.lifetime.requestsBlocked
+      document.getElementById('guardrailsRedactedLifetime').textContent =
+        s.lifetime.requestsRedacted
+      document.getElementById('guardrailsAlertedLifetime').textContent = s.lifetime.requestsAlerted
+      document.getElementById('guardrailsBypassesLifetime').textContent =
+        s.lifetime.requestsBypassed
 
-    pushSpark('guardrailsScanned1m', scanned1m)
-    pushSpark('guardrailsHits1m', hits1m)
-    pushSpark('guardrailsBlockedLifetime', s.lifetime.requestsBlocked)
-    pushSpark('guardrailsRedactedLifetime', s.lifetime.requestsRedacted)
-    pushSpark('guardrailsAlertedLifetime', s.lifetime.requestsAlerted)
-    pushSpark('guardrailsBypassesLifetime', s.lifetime.requestsBypassed)
+      pushSpark('guardrailsScanned1m', scanned1m)
+      pushSpark('guardrailsHits1m', hits1m)
+      pushSpark('guardrailsBlockedLifetime', s.lifetime.requestsBlocked)
+      pushSpark('guardrailsRedactedLifetime', s.lifetime.requestsRedacted)
+      pushSpark('guardrailsAlertedLifetime', s.lifetime.requestsAlerted)
+      pushSpark('guardrailsBypassesLifetime', s.lifetime.requestsBypassed)
+    }
 
     const tbody = document.querySelector('#guardrailsTable tbody')
     if (tableNeedsRebuild(tbody, s.detectors.all[0])) {
@@ -328,9 +345,13 @@ async function refreshGuardrailsAuto() {
     if (grHistRes.ok) {
       const body = await grHistRes.json()
       const rbody = document.querySelector('#guardrailsRecentTable tbody')
-      if (rbody) {
+      const grHistEvents = body.events ?? []
+      if (
+        rbody &&
+        tableNeedsRebuild(rbody, grHistEvents[0]?.ts ? fmtTime(grHistEvents[0].ts) : '')
+      ) {
         rbody.innerHTML = ''
-        for (const ev of body.events ?? []) {
+        for (const ev of grHistEvents) {
           const tr = document.createElement('tr')
           const det = ev.guardrailsDetectors || '—'
           tr.innerHTML = `<td>${fmtTimeShort(ev.ts)}</td>
@@ -355,20 +376,32 @@ async function refreshGuardrailsAuto() {
 
 // ─── Dashboard panel ─────────────────────────────────────────
 let dashSparklineChart = null
-let dashRpsHistory = []
-let dashErrHistory = []
-let dashP95History = []
 const DASH_SPARKLINE_POINTS = 30
+let dashRpsHistory = new Array(DASH_SPARKLINE_POINTS).fill(0)
+let dashWarnHistory = new Array(DASH_SPARKLINE_POINTS).fill(0)
+let dashErrHistory = new Array(DASH_SPARKLINE_POINTS).fill(0)
+let dashP95History = new Array(DASH_SPARKLINE_POINTS).fill(0)
+const DASH_LABELS = Array.from({ length: DASH_SPARKLINE_POINTS }, (_, i) => i)
+let dashLastWindowWasHistory = false
 
-function pushDashPoint(rps, p95, errRate) {
-  dashRpsHistory = [...dashRpsHistory, rps].slice(-DASH_SPARKLINE_POINTS)
-  dashErrHistory = [...dashErrHistory, (errRate ?? 0) * 100].slice(-DASH_SPARKLINE_POINTS)
-  dashP95History = [...dashP95History, p95].slice(-DASH_SPARKLINE_POINTS)
+function resetDashLiveHistory() {
+  dashRpsHistory = new Array(DASH_SPARKLINE_POINTS).fill(0)
+  dashWarnHistory = new Array(DASH_SPARKLINE_POINTS).fill(0)
+  dashErrHistory = new Array(DASH_SPARKLINE_POINTS).fill(0)
+  dashP95History = new Array(DASH_SPARKLINE_POINTS).fill(0)
+}
+
+function pushDashPoint(rps, p95, errCount, warnCount) {
+  dashRpsHistory = [...dashRpsHistory.slice(1), rps]
+  dashWarnHistory = [...dashWarnHistory.slice(1), warnCount ?? 0]
+  dashErrHistory = [...dashErrHistory.slice(1), errCount ?? 0]
+  dashP95History = [...dashP95History.slice(1), p95]
   if (dashSparklineChart) {
-    dashSparklineChart.data.labels = dashRpsHistory.map((_, i) => i)
+    dashSparklineChart.data.labels = DASH_LABELS
     dashSparklineChart.data.datasets[0].data = [...dashRpsHistory]
-    dashSparklineChart.data.datasets[1].data = [...dashErrHistory]
-    dashSparklineChart.data.datasets[2].data = [...dashP95History]
+    dashSparklineChart.data.datasets[1].data = [...dashWarnHistory]
+    dashSparklineChart.data.datasets[2].data = [...dashErrHistory]
+    dashSparklineChart.data.datasets[3].data = [...dashP95History]
     dashSparklineChart.update('none')
   }
 }
@@ -383,6 +416,7 @@ function rebuildDashChartFromHistory(events, windowKey) {
   const numBuckets = Math.max(1, Math.ceil(winSec / bucketSec))
 
   const counts = new Array(numBuckets).fill(0)
+  const warnCounts = new Array(numBuckets).fill(0)
   const errCounts = new Array(numBuckets).fill(0)
   const durations = Array.from({ length: numBuckets }, () => [])
 
@@ -392,18 +426,24 @@ function rebuildDashChartFromHistory(events, windowKey) {
     const idx = Math.floor((t - startMs) / bucketMs)
     if (idx < 0 || idx >= numBuckets) continue
     counts[idx]++
-    if (ev.error || (ev.status != null && ev.status >= 400)) errCounts[idx]++
+    if (ev.error || (ev.status != null && ev.status >= 500)) errCounts[idx]++
+    else if (ev.status != null && ev.status >= 400) warnCounts[idx]++
     if (typeof ev.durationMs === 'number') durations[idx].push(ev.durationMs)
   }
 
-  const labels = [], rps = [], errPct = [], p95 = []
+  const labels = [],
+    rps = [],
+    warns = [],
+    errs = [],
+    p95 = []
   let prevTs = null
   for (let i = 0; i < numBuckets; i++) {
     const bucketStartMs = startMs + i * bucketMs
     labels.push(fmtAxisTime(bucketStartMs, prevTs))
     prevTs = bucketStartMs
     rps.push(counts[i] / bucketSec)
-    errPct.push(counts[i] > 0 ? (errCounts[i] / counts[i]) * 100 : 0)
+    warns.push(warnCounts[i])
+    errs.push(errCounts[i])
     const sorted = durations[i].slice().sort((a, b) => a - b)
     const pi = Math.floor(sorted.length * 0.95)
     p95.push(sorted.length ? sorted[Math.min(pi, sorted.length - 1)] : 0)
@@ -411,8 +451,9 @@ function rebuildDashChartFromHistory(events, windowKey) {
 
   dashSparklineChart.data.labels = labels
   dashSparklineChart.data.datasets[0].data = rps
-  dashSparklineChart.data.datasets[1].data = errPct
-  dashSparklineChart.data.datasets[2].data = p95
+  dashSparklineChart.data.datasets[1].data = warns
+  dashSparklineChart.data.datasets[2].data = errs
+  dashSparklineChart.data.datasets[3].data = p95
   // Show x-axis labels in history mode
   dashSparklineChart.options.scales.x.display = true
   dashSparklineChart.update('none')
@@ -429,36 +470,50 @@ function initDashSparkline() {
         {
           label: 'RPS',
           data: [],
-          borderColor: '#6366f1',
-          backgroundColor: 'rgba(99,102,241,0.15)',
+          borderColor: '#22c55e',
+          backgroundColor: 'rgba(34,197,94,0.12)',
           borderWidth: 2,
           fill: false,
           tension: 0.3,
           pointRadius: 0,
+
+          yAxisID: 'y',
+          order: 3,
+        },
+        {
+          label: 'Warn (4xx)',
+          data: [],
+          type: 'bar',
+          backgroundColor: 'rgba(245,158,11,0.6)',
+          borderColor: 'rgba(245,158,11,0.85)',
+          borderWidth: 0,
+
           yAxisID: 'y',
           order: 2,
         },
         {
-          label: 'Errors %',
+          label: 'Error (5xx)',
           data: [],
           type: 'bar',
-          backgroundColor: 'rgba(239,68,68,0.55)',
-          borderColor: 'rgba(239,68,68,0.8)',
+          backgroundColor: 'rgba(239,68,68,0.65)',
+          borderColor: 'rgba(239,68,68,0.9)',
           borderWidth: 0,
+
           yAxisID: 'y',
           order: 1,
         },
         {
           label: 'p95 (ms)',
           data: [],
-          borderColor: '#f59e0b',
+          borderColor: '#6366f1',
           borderWidth: 2,
           borderDash: [4, 3],
           fill: false,
           tension: 0.3,
           pointRadius: 0,
+
           yAxisID: 'y1',
-          order: 3,
+          order: 4,
         },
       ],
     },
@@ -467,7 +522,7 @@ function initDashSparkline() {
       plugins: { legend: { display: true, position: 'bottom' } },
       scales: {
         x: { display: false },
-        y: { beginAtZero: true, position: 'left', title: { display: true, text: 'RPS / Err%' } },
+        y: { beginAtZero: true, position: 'left', title: { display: true, text: 'RPS / Count' } },
         y1: {
           beginAtZero: true,
           position: 'right',
@@ -665,17 +720,27 @@ async function refreshDashboard() {
       statusEl.className = 'status connected'
     }
 
-    const p95 = renderKpiRow(summary, compactor)
-    renderCacheKpi(cacheData)
-    const errRate = summary?.windows?.['1m']?.errorRate ?? summary?.window_1m?.errorRate ?? 0
     const dashWin = currentHistoryWindow()
+    const w1m = summary?.windows?.['1m'] ?? summary?.window_1m ?? {}
     if (dashWin === 'live') {
-      pushDashPoint(summary?.window_1m?.rps ?? 0, p95 ?? 0, errRate)
-      // Restore x-axis to hidden in live mode
+      if (dashLastWindowWasHistory) {
+        resetDashLiveHistory()
+        dashLastWindowWasHistory = false
+      }
+      const p95 = renderKpiRow(summary, compactor)
+      renderCacheKpi(cacheData)
+      pushDashPoint(
+        w1m.rps ?? 0,
+        p95 ?? 0,
+        w1m.statusBuckets?.['5xx'] ?? 0,
+        w1m.statusBuckets?.['4xx'] ?? 0,
+      )
       if (dashSparklineChart) {
         dashSparklineChart.options.scales.x.display = false
         dashSparklineChart.update('none')
       }
+    } else {
+      dashLastWindowWasHistory = true
     }
     renderRecentTable(recent)
     renderHealthSidebar(health, compactor, guardrails, cacheData)
@@ -686,8 +751,8 @@ async function refreshDashboard() {
       if (range) {
         const params = new URLSearchParams({ from: range.from, to: range.to, limit: '5000' })
         fetch('/api/metrics/history?' + params)
-          .then(r => r.ok ? r.json() : null)
-          .then(body => {
+          .then((r) => (r.ok ? r.json() : null))
+          .then((body) => {
             if (!body) return
             rebuildDashChartFromHistory(body.events ?? [], dashWin)
             renderDashboardHistoryKpis(body.events ?? [], dashWin)
@@ -763,28 +828,30 @@ async function refreshCache() {
     setPill('cacheDedupPill', s.dedup?.enabled, `Dedup ${s.dedup?.enabled ? 'on' : 'off'}`)
     setPill('cacheSpendPill', s.spend?.enabled, `Spend limits ${s.spend?.enabled ? 'on' : 'off'}`)
 
-    document.getElementById('cacheKpiHits1m').textContent = cacheFmt(s.window_1m?.exactHits)
-    document.getElementById('cacheKpiHitRate').textContent = cacheFmtPct(s.window_1m?.hitRate)
-    document.getElementById('cacheKpiBytesFromCache').textContent = cacheFmtBytes(
-      s.window_1m?.bytesFromCache,
-    )
-    document.getElementById('cacheKpiDedup').textContent = cacheFmt(s.window_1m?.dedupCoalesced)
-    document.getElementById('cacheKpiSpendRejects').textContent = cacheFmt(
-      s.window_1m?.spendRejected,
-    )
-    document.getElementById('cacheKpiHitsLifetime').textContent = cacheFmt(s.lifetime?.exactHits)
-    document.getElementById('cacheKpiHitRateLifetime').textContent = cacheFmtPct(
-      s.lifetime?.hitRate,
-    )
-    document.getElementById('cacheKpiKeyCount').textContent = cacheFmt(s.keyCount)
-    document.getElementById('cacheKpiInflight').textContent = cacheFmt(s.dedup?.inflight)
+    if ((document.getElementById('cacheHistoryWindow')?.value || 'live') === 'live') {
+      document.getElementById('cacheKpiHits1m').textContent = cacheFmt(s.window_1m?.exactHits)
+      document.getElementById('cacheKpiHitRate').textContent = cacheFmtPct(s.window_1m?.hitRate)
+      document.getElementById('cacheKpiBytesFromCache').textContent = cacheFmtBytes(
+        s.window_1m?.bytesFromCache,
+      )
+      document.getElementById('cacheKpiDedup').textContent = cacheFmt(s.window_1m?.dedupCoalesced)
+      document.getElementById('cacheKpiSpendRejects').textContent = cacheFmt(
+        s.window_1m?.spendRejected,
+      )
+      document.getElementById('cacheKpiHitsLifetime').textContent = cacheFmt(s.lifetime?.exactHits)
+      document.getElementById('cacheKpiHitRateLifetime').textContent = cacheFmtPct(
+        s.lifetime?.hitRate,
+      )
+      document.getElementById('cacheKpiKeyCount').textContent = cacheFmt(s.keyCount)
+      document.getElementById('cacheKpiInflight').textContent = cacheFmt(s.dedup?.inflight)
 
-    // Feed the 1-minute sparklines (same live-accumulation pattern as the other tabs).
-    pushSpark('cacheHits1m', s.window_1m?.exactHits ?? 0)
-    pushSpark('cacheHitRate', Math.round((s.window_1m?.hitRate ?? 0) * 100))
-    pushSpark('cacheBytesFromCache', s.window_1m?.bytesFromCache ?? 0)
-    pushSpark('cacheDedup1m', s.window_1m?.dedupCoalesced ?? 0)
-    pushSpark('cacheSpendRejects1m', s.window_1m?.spendRejected ?? 0)
+      // Feed the 1-minute sparklines (same live-accumulation pattern as the other tabs).
+      pushSpark('cacheHits1m', s.window_1m?.exactHits ?? 0)
+      pushSpark('cacheHitRate', Math.round((s.window_1m?.hitRate ?? 0) * 100))
+      pushSpark('cacheBytesFromCache', s.window_1m?.bytesFromCache ?? 0)
+      pushSpark('cacheDedup1m', s.window_1m?.dedupCoalesced ?? 0)
+      pushSpark('cacheSpendRejects1m', s.window_1m?.spendRejected ?? 0)
+    }
 
     const notice = document.getElementById('cacheDisabledNotice')
     const recentCard = document.getElementById('cacheRecentCard')
@@ -846,9 +913,13 @@ async function refreshCacheAuto() {
     if (cacheHistRes.ok) {
       const body = await cacheHistRes.json()
       const tbody = document.querySelector('#cacheRecentTable tbody')
-      if (tbody) {
+      const cacheHistEvents = body.events ?? []
+      if (
+        tbody &&
+        tableNeedsRebuild(tbody, cacheHistEvents[0]?.ts ? fmtTime(cacheHistEvents[0].ts) : '')
+      ) {
         tbody.innerHTML = ''
-        for (const ev of body.events ?? []) {
+        for (const ev of cacheHistEvents) {
           const tr = document.createElement('tr')
           const type = ev.type ?? ev.cacheEventType ?? '—'
           tr.innerHTML = `<td>${fmtTimeShort(ev.ts)}</td>
@@ -1664,7 +1735,10 @@ function fmtTimeShort(ts) {
 // against the first <td> so periodic polls skip DOM thrashing when nothing changed.
 function tableNeedsRebuild(tbody, topKey) {
   if (!tbody || !tbody.rows.length) return true
-  return tbody.querySelector('tr:first-child td:first-child')?.textContent?.trim() !== String(topKey ?? '')
+  return (
+    tbody.querySelector('tr:first-child td:first-child')?.textContent?.trim() !==
+    String(topKey ?? '')
+  )
 }
 
 // Chart-only x-axis formatter (UTC). Outputs `HH:MM:SS`, with a `DD.MM.YYYY ` prefix
@@ -2022,6 +2096,8 @@ async function loadRecent() {
     const r = await fetch('/api/metrics/recent?limit=500')
     if (!r.ok) return
     const events = await r.json()
+    const topKey = events.length ? fmtTime(events[events.length - 1]?.ts) : ''
+    if (!tableNeedsRebuild(recentTbody, topKey)) return
     recentTbody.innerHTML = ''
     // recent() returns oldest-first; prepend each to display newest at top.
     events.forEach(appendRequest)
@@ -2124,9 +2200,12 @@ function connectMetricsSSE() {
       }
       const dashPanel = document.getElementById('dashboardPanel')
       if (!dashPanel?.classList.contains('hidden')) {
-        const p95 = tick.windows?.['1m']?.p95 ?? tick.p95 ?? tick.window_1m?.p95 ?? 0
-        const rps = tick.windows?.['1m']?.rps ?? tick.rps ?? tick.window_1m?.rps ?? 0
-        pushDashPoint(rps, p95)
+        const tw = tick.windows?.['1m'] ?? tick.window_1m ?? {}
+        const p95 = tw.p95 ?? tick.p95 ?? 0
+        const rps = tw.rps ?? tick.rps ?? 0
+        if (currentHistoryWindow() === 'live') {
+          pushDashPoint(rps, p95, tw.statusBuckets?.['5xx'] ?? 0, tw.statusBuckets?.['4xx'] ?? 0)
+        }
         if (typeof p95 === 'number') {
           const p95El = document.getElementById('dashKpiP95')
           if (p95El) p95El.textContent = p95 + ' ms'
@@ -2314,9 +2393,11 @@ async function refreshRecentForWindow() {
     loadRecent()
     return
   }
+  const slice = events.slice(0, MAX_TABLE_ROWS)
+  const topKey = slice.length ? fmtTime(slice[0]?.ts) : ''
+  if (!tableNeedsRebuild(recentTbody, topKey)) return
   recentTbody.innerHTML = ''
   // events are newest-first; take most recent MAX_TABLE_ROWS then render oldest-first
-  const slice = events.slice(0, MAX_TABLE_ROWS)
   for (let i = slice.length - 1; i >= 0; i--) appendRequest(slice[i])
 }
 
@@ -2511,25 +2592,60 @@ async function refreshChartsForWindow() {
 // into scalars used by all the per-page renderXHistoryKpis helpers.
 function computeWindowKpis(events, winSec) {
   const empty = {
-    total: 0, rps: 0, p95: 0, p99: 0, errorRate: 0,
-    bytesIn: 0, bytesOut: 0, costTotal: 0, costPerMin: 0,
-    tokInPerSec: 0, tokOutPerSec: 0, toolCalls: 0,
-    avgCost: 0, avgTokens: 0, avgDur: 0, topModel: null,
-    compactorBytesSaved: 0, compactorFires: 0, compactorBytesIn: 0,
-    guardrailsScanned: 0, guardrailsHits: 0,
-    guardrailsBlocked: 0, guardrailsRedacted: 0,
-    guardrailsAlerted: 0, guardrailsBypassed: 0,
-    cacheHits: 0, cacheDenom: 0, cacheHitRate: 0, cacheBytesFromCache: 0,
+    total: 0,
+    rps: 0,
+    p95: 0,
+    p99: 0,
+    errorRate: 0,
+    bytesIn: 0,
+    bytesOut: 0,
+    costTotal: 0,
+    costPerMin: 0,
+    tokInPerSec: 0,
+    tokOutPerSec: 0,
+    toolCalls: 0,
+    avgCost: 0,
+    avgTokens: 0,
+    avgDur: 0,
+    topModel: null,
+    compactorBytesSaved: 0,
+    compactorFires: 0,
+    compactorBytesIn: 0,
+    guardrailsScanned: 0,
+    guardrailsHits: 0,
+    guardrailsBlocked: 0,
+    guardrailsRedacted: 0,
+    guardrailsAlerted: 0,
+    guardrailsBypassed: 0,
+    cacheHits: 0,
+    cacheDenom: 0,
+    cacheHitRate: 0,
+    cacheBytesFromCache: 0,
   }
   if (!events.length) return empty
   const ws = winSec || 1
-  let sumBytesIn = 0, sumBytesOut = 0, sumCost = 0
-  let sumTokIn = 0, sumTokOut = 0, sumToolCalls = 0, sumDur = 0
+  let sumBytesIn = 0,
+    sumBytesOut = 0,
+    sumCost = 0
+  let sumTokIn = 0,
+    sumTokOut = 0,
+    sumToolCalls = 0,
+    sumDur = 0
   let errCount = 0
-  const durations = [], modelCost = {}
-  let compFires = 0, compBytesSaved = 0, compBytesIn = 0
-  let grScanned = 0, grHits = 0, grBlocked = 0, grRedacted = 0, grAlerted = 0, grBypassed = 0
-  let cacheHits = 0, cacheDenom = 0, cacheBytesFromCache = 0
+  const durations = [],
+    modelCost = {}
+  let compFires = 0,
+    compBytesSaved = 0,
+    compBytesIn = 0
+  let grScanned = 0,
+    grHits = 0,
+    grBlocked = 0,
+    grRedacted = 0,
+    grAlerted = 0,
+    grBypassed = 0
+  let cacheHits = 0,
+    cacheDenom = 0,
+    cacheBytesFromCache = 0
 
   for (const ev of events) {
     sumBytesIn += ev.bytesIn ?? 0
@@ -2538,14 +2654,20 @@ function computeWindowKpis(events, winSec) {
     sumTokIn += ev.inputTokens ?? 0
     sumTokOut += ev.outputTokens ?? 0
     sumToolCalls += ev.toolCalls ?? 0
-    if (typeof ev.durationMs === 'number') { durations.push(ev.durationMs); sumDur += ev.durationMs }
+    if (typeof ev.durationMs === 'number') {
+      durations.push(ev.durationMs)
+      sumDur += ev.durationMs
+    }
     if (ev.error || (ev.status != null && ev.status >= 400)) errCount++
     if (ev.model) modelCost[ev.model] = (modelCost[ev.model] ?? 0) + (ev.costUsd ?? 0)
     if (ev.compactorActive) {
-      compFires++; compBytesSaved += ev.compactorSavedBytes ?? 0; compBytesIn += ev.bytesIn ?? 0
+      compFires++
+      compBytesSaved += ev.compactorSavedBytes ?? 0
+      compBytesIn += ev.bytesIn ?? 0
     }
     if (ev.guardrailsAction) {
-      grScanned++; grHits += ev.guardrailsHits ?? 0
+      grScanned++
+      grHits += ev.guardrailsHits ?? 0
       if (ev.guardrailsAction === 'block') grBlocked++
       else if (ev.guardrailsAction === 'redact') grRedacted++
       else if (ev.guardrailsAction === 'alert') grAlerted++
@@ -2567,21 +2689,34 @@ function computeWindowKpis(events, winSec) {
     if (!topModel || cost > topModel.cost) topModel = { name, cost }
   }
   return {
-    total, rps: total / ws, p95, p99,
+    total,
+    rps: total / ws,
+    p95,
+    p99,
     errorRate: total > 0 ? errCount / total : 0,
-    bytesIn: sumBytesIn, bytesOut: sumBytesOut,
-    costTotal: sumCost, costPerMin: sumCost / (ws / 60),
-    tokInPerSec: sumTokIn / ws, tokOutPerSec: sumTokOut / ws,
+    bytesIn: sumBytesIn,
+    bytesOut: sumBytesOut,
+    costTotal: sumCost,
+    costPerMin: sumCost / (ws / 60),
+    tokInPerSec: sumTokIn / ws,
+    tokOutPerSec: sumTokOut / ws,
     toolCalls: sumToolCalls,
     avgCost: total > 0 ? sumCost / total : 0,
     avgTokens: total > 0 ? (sumTokIn + sumTokOut) / total : 0,
     avgDur: durations.length > 0 ? sumDur / durations.length : 0,
     topModel: topModel?.name ?? null,
-    compactorBytesSaved: compBytesSaved, compactorFires: compFires, compactorBytesIn: compBytesIn,
-    guardrailsScanned: grScanned, guardrailsHits: grHits,
-    guardrailsBlocked: grBlocked, guardrailsRedacted: grRedacted,
-    guardrailsAlerted: grAlerted, guardrailsBypassed: grBypassed,
-    cacheHits, cacheDenom, cacheHitRate: cacheDenom > 0 ? cacheHits / cacheDenom : 0,
+    compactorBytesSaved: compBytesSaved,
+    compactorFires: compFires,
+    compactorBytesIn: compBytesIn,
+    guardrailsScanned: grScanned,
+    guardrailsHits: grHits,
+    guardrailsBlocked: grBlocked,
+    guardrailsRedacted: grRedacted,
+    guardrailsAlerted: grAlerted,
+    guardrailsBypassed: grBypassed,
+    cacheHits,
+    cacheDenom,
+    cacheHitRate: cacheDenom > 0 ? cacheHits / cacheDenom : 0,
     cacheBytesFromCache,
   }
 }
@@ -2605,7 +2740,8 @@ function renderMetricsHistoryKpis(events, win) {
   kpiCostTotal.textContent = fmtCost(k.costTotal)
   if (kpiAvgCost) kpiAvgCost.textContent = k.total > 0 ? fmtCost(k.avgCost) : '—'
   if (kpiAvgTokens) kpiAvgTokens.textContent = k.total > 0 ? fmtNum(k.avgTokens, 0) : '—'
-  if (kpiCacheHit) kpiCacheHit.textContent = k.cacheDenom > 0 ? (k.cacheHitRate * 100).toFixed(1) : '—'
+  if (kpiCacheHit)
+    kpiCacheHit.textContent = k.cacheDenom > 0 ? (k.cacheHitRate * 100).toFixed(1) : '—'
   if (kpiAvgDur) kpiAvgDur.textContent = k.total > 0 ? fmtNum(k.avgDur, 0) : '—'
   if (kpiTopModel) kpiTopModel.textContent = k.topModel ?? '—'
   const compBytesEl = document.getElementById('kpiCompactorBytesSaved5m')
@@ -2614,7 +2750,8 @@ function renderMetricsHistoryKpis(events, win) {
   if (compBytesEl) compBytesEl.textContent = fmtBytes(k.compactorBytesSaved)
   if (compFiresEl) compFiresEl.textContent = fmtNum(k.compactorFires)
   if (compRatioEl) {
-    const pct = k.compactorBytesIn > 0 ? Math.round((k.compactorBytesSaved / k.compactorBytesIn) * 100) : 0
+    const pct =
+      k.compactorBytesIn > 0 ? Math.round((k.compactorBytesSaved / k.compactorBytesIn) * 100) : 0
     compRatioEl.textContent = pct + '%'
   }
 }
@@ -2624,20 +2761,29 @@ function renderCompactorHistoryKpis(metricEvents, win) {
   const el = (id) => document.getElementById(id)
   if (el('compactorBytes1m')) el('compactorBytes1m').textContent = fmtBytes(k.compactorBytesSaved)
   if (el('compactorBytes5m')) el('compactorBytes5m').textContent = fmtBytes(k.compactorBytesSaved)
-  if (el('compactorBytesLifetime')) el('compactorBytesLifetime').textContent = fmtBytes(k.compactorBytesSaved)
-  if (el('compactorTokensLifetime')) el('compactorTokensLifetime').textContent = Math.floor(k.compactorBytesSaved / 4).toLocaleString()
+  if (el('compactorBytesLifetime'))
+    el('compactorBytesLifetime').textContent = fmtBytes(k.compactorBytesSaved)
+  if (el('compactorTokensLifetime'))
+    el('compactorTokensLifetime').textContent = Math.floor(
+      k.compactorBytesSaved / 4,
+    ).toLocaleString()
   if (el('compactorRatio5m')) {
     const r = k.compactorBytesIn > 0 ? k.compactorBytesSaved / k.compactorBytesIn : 0
     el('compactorRatio5m').textContent = k.compactorBytesIn > 0 ? `${Math.round(r * 100)}%` : '—'
   }
-  if (el('compactorBypasses')) el('compactorBypasses').textContent = metricEvents.filter(ev => ev.compactorBypass).length
+  if (el('compactorBypasses'))
+    el('compactorBypasses').textContent = metricEvents.filter((ev) => ev.compactorBypass).length
   // Per-compressor table: group fires + bytes from compactorCompressors field
   const byComp = {}
   for (const ev of metricEvents) {
     if (!ev.compactorActive || !ev.compactorCompressors) continue
-    for (const name of String(ev.compactorCompressors).split(',').map(s => s.trim()).filter(Boolean)) {
+    for (const name of String(ev.compactorCompressors)
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)) {
       if (!byComp[name]) byComp[name] = { fires: 0, saved: 0 }
-      byComp[name].fires++; byComp[name].saved += ev.compactorSavedBytes ?? 0
+      byComp[name].fires++
+      byComp[name].saved += ev.compactorSavedBytes ?? 0
     }
   }
   const tbody = document.querySelector('#compactorTable tbody')
@@ -2659,17 +2805,25 @@ function renderGuardrailsHistoryKpis(metricEvents, win) {
   const el = (id) => document.getElementById(id)
   if (el('guardrailsScanned1m')) el('guardrailsScanned1m').textContent = k.guardrailsScanned
   if (el('guardrailsHits1m')) el('guardrailsHits1m').textContent = k.guardrailsHits
-  if (el('guardrailsBlockedLifetime')) el('guardrailsBlockedLifetime').textContent = k.guardrailsBlocked
-  if (el('guardrailsRedactedLifetime')) el('guardrailsRedactedLifetime').textContent = k.guardrailsRedacted
-  if (el('guardrailsAlertedLifetime')) el('guardrailsAlertedLifetime').textContent = k.guardrailsAlerted
-  if (el('guardrailsBypassesLifetime')) el('guardrailsBypassesLifetime').textContent = k.guardrailsBypassed
+  if (el('guardrailsBlockedLifetime'))
+    el('guardrailsBlockedLifetime').textContent = k.guardrailsBlocked
+  if (el('guardrailsRedactedLifetime'))
+    el('guardrailsRedactedLifetime').textContent = k.guardrailsRedacted
+  if (el('guardrailsAlertedLifetime'))
+    el('guardrailsAlertedLifetime').textContent = k.guardrailsAlerted
+  if (el('guardrailsBypassesLifetime'))
+    el('guardrailsBypassesLifetime').textContent = k.guardrailsBypassed
   // Per-detector table
   const byDet = {}
   for (const ev of metricEvents) {
     if (!ev.guardrailsDetectors) continue
-    for (const name of String(ev.guardrailsDetectors).split(',').map(s => s.trim()).filter(Boolean)) {
+    for (const name of String(ev.guardrailsDetectors)
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)) {
       if (!byDet[name]) byDet[name] = { fires: 0, hits: 0 }
-      byDet[name].fires++; byDet[name].hits += ev.guardrailsHits ?? 0
+      byDet[name].fires++
+      byDet[name].hits += ev.guardrailsHits ?? 0
     }
   }
   const tbody = document.querySelector('#guardrailsTable tbody')
@@ -2691,11 +2845,13 @@ function renderCacheHistoryKpis(metricEvents, win) {
   const el = (id) => document.getElementById(id)
   if (el('cacheKpiHits1m')) el('cacheKpiHits1m').textContent = cacheFmt(k.cacheHits)
   if (el('cacheKpiHitRate')) el('cacheKpiHitRate').textContent = cacheFmtPct(k.cacheHitRate)
-  if (el('cacheKpiBytesFromCache')) el('cacheKpiBytesFromCache').textContent = cacheFmtBytes(k.cacheBytesFromCache)
+  if (el('cacheKpiBytesFromCache'))
+    el('cacheKpiBytesFromCache').textContent = cacheFmtBytes(k.cacheBytesFromCache)
   if (el('cacheKpiDedup')) el('cacheKpiDedup').textContent = '—'
   if (el('cacheKpiSpendRejects')) el('cacheKpiSpendRejects').textContent = '—'
   if (el('cacheKpiHitsLifetime')) el('cacheKpiHitsLifetime').textContent = cacheFmt(k.cacheHits)
-  if (el('cacheKpiHitRateLifetime')) el('cacheKpiHitRateLifetime').textContent = cacheFmtPct(k.cacheHitRate)
+  if (el('cacheKpiHitRateLifetime'))
+    el('cacheKpiHitRateLifetime').textContent = cacheFmtPct(k.cacheHitRate)
 }
 
 function renderDashboardHistoryKpis(metricEvents, win) {
@@ -2738,6 +2894,10 @@ function updateChartWindowLabels(win) {
   for (const el of document.querySelectorAll('#metricsPanel .chart-title')) {
     const orig = (el.dataset.origTitle ||= el.textContent)
     el.textContent = disp ? orig.replace(/last \d+ min/g, `last ${disp}`) : orig
+  }
+  const dashTitle = document.getElementById('dashActivityTitle')
+  if (dashTitle) {
+    dashTitle.textContent = disp ? `Activity (last ${disp})` : dashTitle.dataset.origTitle
   }
 }
 
@@ -2812,7 +2972,11 @@ if (csvBtn) {
 // the first refresh uses the persisted window instead of defaulting to Live.
 ;(function restoreHistoryWindow() {
   const saved = localStorage.getItem(HW_STORAGE_KEY)
-  if (saved) applyHistoryWindowToAll(saved)
+  if (saved) {
+    applyHistoryWindowToAll(saved)
+    updateKpiWindowLabels(saved)
+    updateChartWindowLabels(saved)
+  }
 })()
 
 const HASH_TO_TAB = {
