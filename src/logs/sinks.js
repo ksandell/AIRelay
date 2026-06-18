@@ -56,6 +56,7 @@ export function createFileSink(logDir) {
     close() {
       if (_stream) {
         try {
+          _stream.uncork()
           _stream.end()
         } catch {
           /* ignore */

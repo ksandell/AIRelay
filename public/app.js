@@ -35,22 +35,47 @@ function activateTab(name) {
   metricsPanel.classList.toggle('hidden', name !== 'metrics')
   if (compactorPanel) compactorPanel.classList.toggle('hidden', name !== 'compactor')
   if (guardrailsPanel) guardrailsPanel.classList.toggle('hidden', name !== 'guardrails')
+  const cachePanel = document.getElementById('cachePanel')
+  const cacheControls = document.getElementById('cacheControls')
+  if (cachePanel) cachePanel.classList.toggle('hidden', name !== 'cache')
+  if (cacheControls) cacheControls.classList.toggle('hidden', name !== 'cache')
   setupControls.classList.toggle('hidden', name !== 'setup')
   logsControls.classList.toggle('hidden', name !== 'logs')
   metricsControls.classList.toggle('hidden', name !== 'metrics')
   if (compactorControls) compactorControls.classList.toggle('hidden', name !== 'compactor')
   if (guardrailsControls) guardrailsControls.classList.toggle('hidden', name !== 'guardrails')
+  const dashboardPanel = document.getElementById('dashboardPanel')
+  const dashboardControls = document.getElementById('dashboardControls')
+  const settingsPanel = document.getElementById('settingsPanel')
+  const settingsControls = document.getElementById('settingsControls')
+  if (dashboardPanel) dashboardPanel.classList.toggle('hidden', name !== 'dashboard')
+  if (dashboardControls) dashboardControls.classList.toggle('hidden', name !== 'dashboard')
+  if (settingsPanel) settingsPanel.classList.toggle('hidden', name !== 'settings')
+  if (settingsControls) settingsControls.classList.toggle('hidden', name !== 'settings')
   location.hash = name
   if (name === 'compactor') refreshCompactor()
   if (name === 'guardrails') refreshGuardrails()
   // Re-pull ring-buffer data when the user lands on Logs/Metrics so tables
   // populate even if the tab was hidden when the proxy traffic arrived.
-  if (name === 'logs' && typeof loadLive === 'function' && !dateSelect?.value) {
+  // Only reload on first visit; SSE stream handles incremental updates after that.
+  if (
+    name === 'logs' &&
+    typeof loadLive === 'function' &&
+    !dateSelect?.value &&
+    logBuffer.length === 0
+  ) {
     loadLive().catch(() => {})
   }
   if (name === 'metrics' && typeof loadRecent === 'function') {
     loadRecent().catch(() => {})
+    if (currentHistoryWindow() !== 'live') {
+      lastHistoryChartRefresh = Date.now()
+      refreshChartsForWindow().catch(() => {})
+    }
   }
+  if (name === 'dashboard') refreshDashboard().catch(() => {})
+  if (name === 'settings') refreshSettings().catch(() => {})
+  if (name === 'cache') refreshCacheAuto().catch(() => {})
 }
 tabs.forEach((t) => t.addEventListener('click', () => activateTab(t.dataset.tab)))
 
@@ -63,7 +88,7 @@ async function refreshCompactor() {
   try {
     const [summaryRes, recentRes] = await Promise.all([
       fetch('/api/compactor/summary'),
-      fetch('/api/compactor/recent?limit=50'),
+      fetch('/api/compactor/recent?limit=500'),
     ])
     if (!summaryRes.ok || !recentRes.ok) throw new Error('fetch failed')
     const s = await summaryRes.json()
@@ -76,53 +101,61 @@ async function refreshCompactor() {
       enabledPill.textContent = s.enabled ? 'enabled' : 'disabled'
       enabledPill.className = s.enabled ? 'pill ok' : 'pill warn'
     }
-    document.getElementById('compactorBytes1m').textContent = fmtBytes(s.windows['1m'].bytesSaved)
-    document.getElementById('compactorBytes5m').textContent = fmtBytes(s.windows['5m'].bytesSaved)
-    document.getElementById('compactorBytesLifetime').textContent = fmtBytes(s.lifetime.bytesSaved)
-    document.getElementById('compactorTokensLifetime').textContent = Math.floor(
-      s.lifetime.bytesSaved / 4,
-    ).toLocaleString()
-    const r = s.windows['5m'].ratio
-    document.getElementById('compactorRatio5m').textContent =
-      r == null ? '—' : `${Math.round((1 - r) * 100)}%`
-    document.getElementById('compactorBypasses').textContent = s.lifetime.requestsBypassed
+    if ((compactorHistoryWindowEl?.value || 'live') === 'live') {
+      document.getElementById('compactorBytes1m').textContent = fmtBytes(s.windows['1m'].bytesSaved)
+      document.getElementById('compactorBytes5m').textContent = fmtBytes(s.windows['5m'].bytesSaved)
+      document.getElementById('compactorBytesLifetime').textContent = fmtBytes(
+        s.lifetime.bytesSaved,
+      )
+      document.getElementById('compactorTokensLifetime').textContent = fmtNum(
+        Math.floor(s.lifetime.bytesSaved / 4),
+      )
+      const r = s.windows['5m'].ratio
+      document.getElementById('compactorRatio5m').textContent =
+        r == null ? '—' : `${Math.round((1 - r) * 100)}%`
+      document.getElementById('compactorBypasses').textContent = s.lifetime.requestsBypassed
 
-    pushSpark('compactorBytes1m', s.windows['1m'].bytesSaved)
-    pushSpark('compactorBytes5m', s.windows['5m'].bytesSaved)
-    pushSpark('compactorBytesLifetime', s.lifetime.bytesSaved)
-    pushSpark('compactorTokensLifetime', Math.floor(s.lifetime.bytesSaved / 4))
-    pushSpark('compactorRatio5m', r == null ? 0 : Math.round((1 - r) * 100))
-    pushSpark('compactorBypasses', s.lifetime.requestsBypassed)
+      pushSpark('compactorBytes1m', s.windows['1m'].bytesSaved)
+      pushSpark('compactorBytes5m', s.windows['5m'].bytesSaved)
+      pushSpark('compactorBytesLifetime', s.lifetime.bytesSaved)
+      pushSpark('compactorTokensLifetime', Math.floor(s.lifetime.bytesSaved / 4))
+      pushSpark('compactorRatio5m', r == null ? 0 : Math.round((1 - r) * 100))
+      pushSpark('compactorBypasses', s.lifetime.requestsBypassed)
+    }
 
     const tbody = document.querySelector('#compactorTable tbody')
-    tbody.innerHTML = ''
-    const activeSet = new Set(s.compressors.active)
-    for (const name of s.compressors.all) {
-      const agg = s.lifetime.byCompressor[name]
-      const tr = document.createElement('tr')
-      const fires = agg?.fires ?? 0
-      const saved = agg?.bytesSaved ?? 0
-      const avgMicros = fires > 0 ? Math.round(agg.durationMicros / fires) : 0
-      tr.innerHTML = `<td><code>${name}</code></td>
-        <td>${activeSet.has(name) ? '✓' : '—'}</td>
-        <td>${fires}</td>
-        <td>${fmtBytes(saved)}</td>
-        <td>${avgMicros}</td>`
-      tbody.appendChild(tr)
+    if (tableNeedsRebuild(tbody, s.compressors.all[0])) {
+      tbody.innerHTML = ''
+      const activeSet = new Set(s.compressors.active)
+      for (const name of s.compressors.all) {
+        const agg = s.lifetime.byCompressor[name]
+        const tr = document.createElement('tr')
+        const fires = agg?.fires ?? 0
+        const saved = agg?.bytesSaved ?? 0
+        const avgMicros = fires > 0 ? Math.round(agg.durationMicros / fires) : 0
+        tr.innerHTML = `<td><code>${escHtml(name)}</code></td>
+          <td>${activeSet.has(name) ? '✓' : '—'}</td>
+          <td>${fires}</td>
+          <td>${fmtBytes(saved)}</td>
+          <td>${avgMicros}</td>`
+        tbody.appendChild(tr)
+      }
     }
 
     const rbody = document.querySelector('#compactorRecentTable tbody')
-    rbody.innerHTML = ''
-    for (const ev of recent) {
-      const tr = document.createElement('tr')
-      tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
-        <td>${ev.scope}</td>
-        <td>${ev.filtersFired.join(', ') || '—'}</td>
-        <td>${ev.bytesIn} → ${ev.bytesOut}</td>
-        <td>${fmtBytes(ev.bytesSaved)}</td>
-        <td>${ev.durationMicros}</td>
-        <td>${ev.bypassReason ?? ''}</td>`
-      rbody.appendChild(tr)
+    if (tableNeedsRebuild(rbody, recent[0]?.ts ? fmtTime(recent[0].ts) : '')) {
+      rbody.innerHTML = ''
+      for (const ev of recent) {
+        const tr = document.createElement('tr')
+        tr.innerHTML = `<td>${fmtTimeShort(ev.ts)}</td>
+          <td>${escHtml(ev.scope)}</td>
+          <td>${escHtml(ev.filtersFired.join(', ') || '—')}</td>
+          <td>${ev.bytesIn} → ${ev.bytesOut}</td>
+          <td>${fmtBytes(ev.bytesSaved)}</td>
+          <td>${ev.durationMicros}</td>
+          <td>${escHtml(ev.bypassReason ?? '')}</td>`
+        rbody.appendChild(tr)
+      }
     }
   } catch {
     if (statusEl) {
@@ -138,6 +171,20 @@ setInterval(() => {
   if (compactorPanel && !compactorPanel.classList.contains('hidden')) refreshCompactorAuto()
 }, 5000)
 
+// Keep the Cache tab's KPIs + sparklines live while it's the active panel.
+setInterval(() => {
+  const cp = document.getElementById('cachePanel')
+  if (cp && !cp.classList.contains('hidden')) refreshCacheAuto().catch(() => {})
+}, 5000)
+
+// Keep the Dashboard live while it's the active panel. Without this the activity
+// sparkline only ever receives a single data point (taken on tab-open) and
+// renders as a flat line; periodic refresh feeds pushDashPoint over time.
+setInterval(() => {
+  const dp = document.getElementById('dashboardPanel')
+  if (dp && !dp.classList.contains('hidden')) refreshDashboard().catch(() => {})
+}, 5000)
+
 const compactorHistoryWindowEl = document.getElementById('compactorHistoryWindow')
 if (compactorHistoryWindowEl) {
   compactorHistoryWindowEl.addEventListener('change', refreshCompactorAuto)
@@ -148,26 +195,39 @@ async function refreshCompactorAuto() {
   if (win === 'live') return refreshCompactor()
   const range = windowToRange(win)
   if (!range) return refreshCompactor()
-  await refreshCompactor() // keep KPIs fresh from in-memory
-  const params = new URLSearchParams({ from: range.from, to: range.to, limit: '500' })
+  await refreshCompactor() // get status/enabled pills from live summary
+  const params = new URLSearchParams({ from: range.from, to: range.to, limit: '5000' })
   try {
-    const r = await fetch('/api/compactor/history?' + params)
-    if (!r.ok) return
-    const body = await r.json()
-    const rbody = document.querySelector('#compactorRecentTable tbody')
-    if (!rbody) return
-    rbody.innerHTML = ''
-    for (const ev of body.events ?? []) {
-      const tr = document.createElement('tr')
-      const filters = ev.compactorCompressors || '—'
-      tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
-        <td>request</td>
-        <td>${filters}</td>
-        <td>${ev.bytesIn ?? 0} → ${ev.bytesOut ?? 0}</td>
-        <td>${fmtBytes(ev.compactorSavedBytes ?? 0)}</td>
-        <td>—</td>
-        <td>${ev.compactorBypass ? 'header' : ''}</td>`
-      rbody.appendChild(tr)
+    const [compHistRes, metHistRes] = await Promise.all([
+      fetch('/api/compactor/history?' + params),
+      fetch('/api/metrics/history?' + params),
+    ])
+    if (compHistRes.ok) {
+      const body = await compHistRes.json()
+      const rbody = document.querySelector('#compactorRecentTable tbody')
+      const compHistEvents = body.events ?? []
+      if (
+        rbody &&
+        tableNeedsRebuild(rbody, compHistEvents[0]?.ts ? fmtTime(compHistEvents[0].ts) : '')
+      ) {
+        rbody.innerHTML = ''
+        for (const ev of compHistEvents) {
+          const tr = document.createElement('tr')
+          const filters = ev.compactorCompressors || '—'
+          tr.innerHTML = `<td>${fmtTimeShort(ev.ts)}</td>
+            <td>request</td>
+            <td>${filters}</td>
+            <td>${ev.bytesIn ?? 0} → ${ev.bytesOut ?? 0}</td>
+            <td>${fmtBytes(ev.compactorSavedBytes ?? 0)}</td>
+            <td>—</td>
+            <td>${ev.compactorBypass ? 'header' : ''}</td>`
+          rbody.appendChild(tr)
+        }
+      }
+    }
+    if (metHistRes.ok) {
+      const body = await metHistRes.json()
+      renderCompactorHistoryKpis(body.events ?? [], win)
     }
   } catch {
     // ignore
@@ -181,7 +241,7 @@ async function refreshGuardrails() {
   try {
     const [summaryRes, recentRes] = await Promise.all([
       fetch('/api/guardrails/summary'),
-      fetch('/api/guardrails/recent?limit=50'),
+      fetch('/api/guardrails/recent?limit=500'),
     ])
     if (!summaryRes.ok || !recentRes.ok) throw new Error('fetch failed')
     const s = await summaryRes.json()
@@ -195,53 +255,61 @@ async function refreshGuardrails() {
       enabledPill.className = s.enabled ? 'pill ok' : 'pill warn'
     }
 
-    const scanned1m = s.windows['1m'].requestsScanned
-    const hits1m = s.windows['1m'].hits
-    document.getElementById('guardrailsScanned1m').textContent = scanned1m
-    document.getElementById('guardrailsHits1m').textContent = hits1m
-    document.getElementById('guardrailsBlockedLifetime').textContent = s.lifetime.requestsBlocked
-    document.getElementById('guardrailsRedactedLifetime').textContent = s.lifetime.requestsRedacted
-    document.getElementById('guardrailsAlertedLifetime').textContent = s.lifetime.requestsAlerted
-    document.getElementById('guardrailsBypassesLifetime').textContent = s.lifetime.requestsBypassed
+    if ((guardrailsHistoryWindowEl?.value || 'live') === 'live') {
+      const scanned1m = s.windows['1m'].requestsScanned
+      const hits1m = s.windows['1m'].hits
+      document.getElementById('guardrailsScanned1m').textContent = scanned1m
+      document.getElementById('guardrailsHits1m').textContent = hits1m
+      document.getElementById('guardrailsBlockedLifetime').textContent = s.lifetime.requestsBlocked
+      document.getElementById('guardrailsRedactedLifetime').textContent =
+        s.lifetime.requestsRedacted
+      document.getElementById('guardrailsAlertedLifetime').textContent = s.lifetime.requestsAlerted
+      document.getElementById('guardrailsBypassesLifetime').textContent =
+        s.lifetime.requestsBypassed
 
-    pushSpark('guardrailsScanned1m', scanned1m)
-    pushSpark('guardrailsHits1m', hits1m)
-    pushSpark('guardrailsBlockedLifetime', s.lifetime.requestsBlocked)
-    pushSpark('guardrailsRedactedLifetime', s.lifetime.requestsRedacted)
-    pushSpark('guardrailsAlertedLifetime', s.lifetime.requestsAlerted)
-    pushSpark('guardrailsBypassesLifetime', s.lifetime.requestsBypassed)
+      pushSpark('guardrailsScanned1m', scanned1m)
+      pushSpark('guardrailsHits1m', hits1m)
+      pushSpark('guardrailsBlockedLifetime', s.lifetime.requestsBlocked)
+      pushSpark('guardrailsRedactedLifetime', s.lifetime.requestsRedacted)
+      pushSpark('guardrailsAlertedLifetime', s.lifetime.requestsAlerted)
+      pushSpark('guardrailsBypassesLifetime', s.lifetime.requestsBypassed)
+    }
 
     const tbody = document.querySelector('#guardrailsTable tbody')
-    tbody.innerHTML = ''
-    const activeMap = new Map(s.detectors.active.map((d) => [d.name, d]))
-    for (const name of s.detectors.all) {
-      const active = activeMap.get(name)
-      const agg = s.lifetime.byDetector[name]
-      const tr = document.createElement('tr')
-      const fires = agg?.fires ?? 0
-      const hits = agg?.hits ?? 0
-      const bytesRedacted = agg?.bytesRedacted ?? 0
-      tr.innerHTML = `<td><code>${name}</code></td>
-        <td>${active ? active.category : '—'}</td>
-        <td>${active ? active.mode : 'off'}</td>
-        <td>${fires}</td>
-        <td>${hits}</td>
-        <td>${fmtBytes(bytesRedacted)}</td>`
-      tbody.appendChild(tr)
+    if (tableNeedsRebuild(tbody, s.detectors.all[0])) {
+      tbody.innerHTML = ''
+      const activeMap = new Map(s.detectors.active.map((d) => [d.name, d]))
+      for (const name of s.detectors.all) {
+        const active = activeMap.get(name)
+        const agg = s.lifetime.byDetector[name]
+        const tr = document.createElement('tr')
+        const fires = agg?.fires ?? 0
+        const hits = agg?.hits ?? 0
+        const bytesRedacted = agg?.bytesRedacted ?? 0
+        tr.innerHTML = `<td><code>${escHtml(name)}</code></td>
+          <td>${escHtml(active ? active.category : '—')}</td>
+          <td>${escHtml(active ? active.mode : 'off')}</td>
+          <td>${fires}</td>
+          <td>${hits}</td>
+          <td>${fmtBytes(bytesRedacted)}</td>`
+        tbody.appendChild(tr)
+      }
     }
 
     const rbody = document.querySelector('#guardrailsRecentTable tbody')
-    rbody.innerHTML = ''
-    for (const ev of recent) {
-      const tr = document.createElement('tr')
-      tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
-        <td>${ev.mode}</td>
-        <td>${ev.detectorsFired.join(', ') || '—'}</td>
-        <td>${ev.hits}</td>
-        <td>${ev.bytesIn} → ${ev.bytesOut}</td>
-        <td>${ev.blocked ? '✓' : ''}</td>
-        <td>${ev.bypassReason ?? ''}</td>`
-      rbody.appendChild(tr)
+    if (tableNeedsRebuild(rbody, recent[0]?.ts ? fmtTime(recent[0].ts) : '')) {
+      rbody.innerHTML = ''
+      for (const ev of recent) {
+        const tr = document.createElement('tr')
+        tr.innerHTML = `<td>${fmtTimeShort(ev.ts)}</td>
+          <td>${escHtml(ev.mode)}</td>
+          <td>${escHtml(ev.detectorsFired.join(', ') || '—')}</td>
+          <td>${ev.hits}</td>
+          <td>${ev.bytesIn} → ${ev.bytesOut}</td>
+          <td>${ev.blocked ? '✓' : ''}</td>
+          <td>${escHtml(ev.bypassReason ?? '')}</td>`
+        rbody.appendChild(tr)
+      }
     }
   } catch {
     if (statusEl) {
@@ -267,31 +335,759 @@ async function refreshGuardrailsAuto() {
   if (win === 'live') return refreshGuardrails()
   const range = windowToRange(win)
   if (!range) return refreshGuardrails()
-  await refreshGuardrails()
-  const params = new URLSearchParams({ from: range.from, to: range.to, limit: '500' })
+  await refreshGuardrails() // get status/enabled pills from live summary
+  const params = new URLSearchParams({ from: range.from, to: range.to, limit: '5000' })
   try {
-    const r = await fetch('/api/guardrails/history?' + params)
-    if (!r.ok) return
-    const body = await r.json()
-    const rbody = document.querySelector('#guardrailsRecentTable tbody')
-    if (!rbody) return
-    rbody.innerHTML = ''
-    for (const ev of body.events ?? []) {
-      const tr = document.createElement('tr')
-      const det = ev.guardrailsDetectors || '—'
-      tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
-        <td>${ev.guardrailsAction ?? '—'}</td>
-        <td>${det}</td>
-        <td>${ev.guardrailsHits ?? 0}</td>
-        <td>${ev.bytesIn ?? 0} → ${ev.bytesOut ?? 0}</td>
-        <td>${ev.guardrailsAction === 'block' ? '✓' : ''}</td>
-        <td>${ev.guardrailsAction === 'bypass' ? 'header' : ''}</td>`
-      rbody.appendChild(tr)
+    const [grHistRes, metHistRes] = await Promise.all([
+      fetch('/api/guardrails/history?' + params),
+      fetch('/api/metrics/history?' + params),
+    ])
+    if (grHistRes.ok) {
+      const body = await grHistRes.json()
+      const rbody = document.querySelector('#guardrailsRecentTable tbody')
+      const grHistEvents = body.events ?? []
+      if (
+        rbody &&
+        tableNeedsRebuild(rbody, grHistEvents[0]?.ts ? fmtTime(grHistEvents[0].ts) : '')
+      ) {
+        rbody.innerHTML = ''
+        for (const ev of grHistEvents) {
+          const tr = document.createElement('tr')
+          const det = ev.guardrailsDetectors || '—'
+          tr.innerHTML = `<td>${fmtTimeShort(ev.ts)}</td>
+            <td>${ev.guardrailsAction ?? '—'}</td>
+            <td>${det}</td>
+            <td>${ev.guardrailsHits ?? 0}</td>
+            <td>${ev.bytesIn ?? 0} → ${ev.bytesOut ?? 0}</td>
+            <td>${ev.guardrailsAction === 'block' ? '✓' : ''}</td>
+            <td>${ev.guardrailsAction === 'bypass' ? 'header' : ''}</td>`
+          rbody.appendChild(tr)
+        }
+      }
+    }
+    if (metHistRes.ok) {
+      const body = await metHistRes.json()
+      renderGuardrailsHistoryKpis(body.events ?? [], win)
     }
   } catch {
     // ignore
   }
 }
+
+// ─── Dashboard panel ─────────────────────────────────────────
+let dashSparklineChart = null
+const DASH_SPARKLINE_POINTS = 30
+let dashRpsHistory = new Array(DASH_SPARKLINE_POINTS).fill(0)
+let dashWarnHistory = new Array(DASH_SPARKLINE_POINTS).fill(0)
+let dashErrHistory = new Array(DASH_SPARKLINE_POINTS).fill(0)
+let dashP95History = new Array(DASH_SPARKLINE_POINTS).fill(0)
+const DASH_LABELS = Array.from({ length: DASH_SPARKLINE_POINTS }, (_, i) => i)
+let dashLastWindowWasHistory = false
+
+function resetDashLiveHistory() {
+  dashRpsHistory = new Array(DASH_SPARKLINE_POINTS).fill(0)
+  dashWarnHistory = new Array(DASH_SPARKLINE_POINTS).fill(0)
+  dashErrHistory = new Array(DASH_SPARKLINE_POINTS).fill(0)
+  dashP95History = new Array(DASH_SPARKLINE_POINTS).fill(0)
+}
+
+function pushDashPoint(rps, p95, errCount, warnCount) {
+  const warnRate = (warnCount ?? 0) / 60
+  const errRate = (errCount ?? 0) / 60
+  dashRpsHistory = [...dashRpsHistory.slice(1), rps]
+  dashWarnHistory = [...dashWarnHistory.slice(1), warnRate]
+  dashErrHistory = [...dashErrHistory.slice(1), errRate]
+  dashP95History = [...dashP95History.slice(1), p95]
+  if (dashSparklineChart) {
+    dashSparklineChart.data.labels = DASH_LABELS
+    dashSparklineChart.data.datasets[0].data = [...dashRpsHistory]
+    dashSparklineChart.data.datasets[1].data = [...dashWarnHistory]
+    dashSparklineChart.data.datasets[2].data = [...dashErrHistory]
+    dashSparklineChart.data.datasets[3].data = [...dashP95History]
+    dashSparklineChart.update('none')
+  }
+}
+
+function rebuildDashChartFromHistory(events, windowKey) {
+  const winSec = HISTORY_WINDOW_SECONDS[windowKey]
+  if (!winSec || !dashSparklineChart) return
+  const bucketSec = bucketSecondsFor(winSec)
+  const bucketMs = bucketSec * 1000
+  const nowMs = Date.now()
+  const startMs = nowMs - winSec * 1000
+  const numBuckets = Math.max(1, Math.ceil(winSec / bucketSec))
+
+  const counts = new Array(numBuckets).fill(0)
+  const warnCounts = new Array(numBuckets).fill(0)
+  const errCounts = new Array(numBuckets).fill(0)
+  const durations = Array.from({ length: numBuckets }, () => [])
+
+  for (const ev of events) {
+    const t = new Date(ev.ts).getTime()
+    if (isNaN(t)) continue
+    const idx = Math.floor((t - startMs) / bucketMs)
+    if (idx < 0 || idx >= numBuckets) continue
+    counts[idx]++
+    if (ev.error || (ev.status != null && ev.status >= 500)) errCounts[idx]++
+    else if (ev.status != null && ev.status >= 400) warnCounts[idx]++
+    if (typeof ev.durationMs === 'number') durations[idx].push(ev.durationMs)
+  }
+
+  const labels = [],
+    rps = [],
+    warns = [],
+    errs = [],
+    p95 = []
+  let prevTs = null
+  for (let i = 0; i < numBuckets; i++) {
+    const bucketStartMs = startMs + i * bucketMs
+    labels.push(fmtAxisTime(bucketStartMs, prevTs))
+    prevTs = bucketStartMs
+    rps.push(counts[i] / bucketSec)
+    warns.push(warnCounts[i])
+    errs.push(errCounts[i])
+    const sorted = durations[i].slice().sort((a, b) => a - b)
+    const pi = Math.floor(sorted.length * 0.95)
+    p95.push(sorted.length ? sorted[Math.min(pi, sorted.length - 1)] : 0)
+  }
+
+  dashSparklineChart.data.labels = labels
+  dashSparklineChart.data.datasets[0].data = rps
+  dashSparklineChart.data.datasets[1].data = warnCounts.map((v) => v / bucketSec)
+  dashSparklineChart.data.datasets[2].data = errCounts.map((v) => v / bucketSec)
+  dashSparklineChart.data.datasets[3].data = p95
+  // Show x-axis labels in history mode
+  dashSparklineChart.options.scales.x.display = true
+  dashSparklineChart.update('none')
+}
+
+function initDashSparkline() {
+  const canvas = document.getElementById('dashSparkline')
+  if (!canvas || dashSparklineChart) return
+  dashSparklineChart = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        {
+          label: 'RPS',
+          data: [],
+          borderColor: '#22c55e',
+          backgroundColor: 'rgba(34,197,94,0.12)',
+          borderWidth: 2,
+          fill: false,
+          tension: 0.3,
+          pointRadius: 0,
+
+          yAxisID: 'y',
+          order: 3,
+        },
+        {
+          label: 'Warn/s (4xx)',
+          data: [],
+          type: 'bar',
+          backgroundColor: 'rgba(245,158,11,0.6)',
+          borderColor: 'rgba(245,158,11,0.85)',
+          borderWidth: 0,
+          stack: 'counts',
+          yAxisID: 'y',
+          order: 2,
+        },
+        {
+          label: 'Err/s (5xx)',
+          data: [],
+          type: 'bar',
+          backgroundColor: 'rgba(239,68,68,0.65)',
+          borderColor: 'rgba(239,68,68,0.9)',
+          borderWidth: 0,
+          stack: 'counts',
+          yAxisID: 'y',
+          order: 1,
+        },
+        {
+          label: 'p95 (ms)',
+          data: [],
+          borderColor: '#6366f1',
+          borderWidth: 2,
+          borderDash: [4, 3],
+          fill: false,
+          tension: 0.3,
+          pointRadius: 0,
+
+          yAxisID: 'y1',
+          order: 4,
+        },
+      ],
+    },
+    options: {
+      animation: TEST_MODE ? false : { duration: 200 },
+      plugins: { legend: { display: true, position: 'bottom' } },
+      scales: {
+        x: { display: false },
+        y: { beginAtZero: true, stacked: true, position: 'left', title: { display: true, text: 'req/s' } },
+        y1: {
+          beginAtZero: true,
+          position: 'right',
+          grid: { drawOnChartArea: false },
+          title: { display: true, text: 'ms' },
+        },
+      },
+      responsive: true,
+      maintainAspectRatio: false,
+    },
+  })
+}
+
+function setHealthDot(id, state) {
+  const el = document.getElementById(id)
+  if (!el) return
+  el.className = `health-dot dot-${state}`
+}
+
+function buildRecommendations(health, compactorSummary, guardrailsSummary, cacheData) {
+  const recs = []
+  if (!guardrailsSummary?.enabled) {
+    recs.push({ text: '⚠ Guardrails disabled — enable at least alert mode', tab: 'settings' })
+  }
+  if (compactorSummary?.enabled && compactorSummary?.settings?.toolResultOnly === false) {
+    recs.push({ text: 'ℹ Tool-result-only off — tighter scope available', tab: 'settings' })
+  }
+  if (health && !health.proxy?.enabled) {
+    recs.push({ text: '✕ No upstream configured', tab: 'settings' })
+  }
+  if (health && health.status !== 'ok') {
+    recs.push({ text: '✕ Proxy health check failing — check upstream URL', tab: null })
+  }
+  if (cacheData?.enabled && !cacheData?.connected) {
+    recs.push({
+      text: '✕ Cache enabled but Dragonfly disconnected — check CACHE_REDIS_URL',
+      tab: null,
+    })
+  }
+  return recs
+}
+
+function renderKpiRow(summary, compactor) {
+  // Ring-buffer count since boot (snapshot().count) is the most reliable
+  // "total" we have without a persistent DB. Label reflects "session" scope.
+  const total = summary?.count
+  document.getElementById('dashKpiRequests').textContent =
+    typeof total === 'number' ? fmtNum(total) : '—'
+  // Cost: use the SSE-accumulated running total (seeded from ring buffer on boot).
+  document.getElementById('dashKpiCost').textContent = fmtCost(totalCostSinceBoot)
+  const p95 = summary?.windows?.['1m']?.p95 ?? summary?.window_1m?.p95
+  document.getElementById('dashKpiP95').textContent = typeof p95 === 'number' ? p95 + ' ms' : '—'
+  const bytesSavedCard = document.getElementById('dashKpiBytesSavedCard')
+  if (compactor?.enabled && bytesSavedCard) {
+    bytesSavedCard.hidden = false
+    const saved = compactor.lifetime?.bytesSaved ?? 0
+    const bytesIn = compactor.lifetime?.bytesIn ?? 0
+    const pct = bytesIn > 0 ? Math.round((saved / bytesIn) * 100) : 0
+    document.getElementById('dashKpiBytesSaved').textContent = pct + '%'
+  } else if (bytesSavedCard) {
+    bytesSavedCard.hidden = true
+  }
+  return p95
+}
+
+function renderCacheKpi(cacheData) {
+  const cacheKpiCard = document.getElementById('dashKpiCacheCard')
+  if (!cacheKpiCard) return
+  if (cacheData?.enabled) {
+    cacheKpiCard.hidden = false
+    const rate = cacheData.lifetime?.hitRate ?? 0
+    document.getElementById('dashKpiCacheHitRate').textContent = fmtNum(rate * 100, 1) + '%'
+  } else {
+    cacheKpiCard.hidden = true
+  }
+}
+
+function dashRecentRow(ev) {
+  const tr = document.createElement('tr')
+  const tokens = (ev.inputTokens ?? ev.tokensIn ?? 0) + (ev.outputTokens ?? ev.tokensOut ?? 0)
+  tr.innerHTML = `<td>${fmtTimeShort(ev.ts)}</td>
+    <td><code>${escHtml(ev.model ?? '—')}</code></td>
+    <td>${tokens}</td>
+    <td>${ev.costUsd != null ? fmtCost(ev.costUsd) : '—'}</td>
+    <td>${ev.durationMs != null ? fmtNum(ev.durationMs, 0) + ' ms' : '—'}</td>`
+  return tr
+}
+
+function renderRecentTable(recent) {
+  const tbody = document.querySelector('#dashRecentTable tbody')
+  if (!tbody) return
+  const src = Array.isArray(recent) ? recent : (recent.events ?? [])
+  const rows = src.slice().reverse().slice(0, 5)
+  if (!tableNeedsRebuild(tbody, rows[0]?.ts ? fmtTime(rows[0].ts) : '')) return
+  tbody.innerHTML = ''
+  for (const ev of rows) tbody.appendChild(dashRecentRow(ev))
+}
+
+// Called from SSE request handler to keep the dashboard recent table live.
+function updateDashRecent(ev) {
+  const tbody = document.querySelector('#dashRecentTable tbody')
+  if (!tbody) return
+  tbody.prepend(dashRecentRow(ev))
+  while (tbody.children.length > 5) tbody.removeChild(tbody.lastChild)
+}
+
+function renderHealthSidebar(health, compactor, guardrails, cacheData) {
+  const proxyOk = health.status === 'ok'
+  setHealthDot('dashHealthProxy', proxyOk ? 'ok' : 'error')
+  document.getElementById('dashHealthProxyLabel').textContent = proxyOk
+    ? 'OK'
+    : (health.status ?? 'Unknown')
+
+  const compEnabled = compactor?.enabled ?? false
+  const compActive = compactor?.compressors?.active?.length ?? 0
+  const compAll = compactor?.compressors?.all?.length ?? 0
+  setHealthDot('dashHealthCompactor', compEnabled ? 'ok' : 'neutral')
+  document.getElementById('dashHealthCompactorLabel').textContent = compEnabled
+    ? `On (${compActive}/${compAll} active)`
+    : 'Off'
+
+  const grEnabled = guardrails?.enabled ?? false
+  const grActive = guardrails?.detectors?.active?.length ?? 0
+  const grAll = guardrails?.detectors?.all?.length ?? 0
+  setHealthDot('dashHealthGuardrails', grEnabled ? 'ok' : 'warn')
+  document.getElementById('dashHealthGuardrailsLabel').textContent = grEnabled
+    ? `On (${grActive}/${grAll} active)`
+    : 'Off'
+
+  const cacheEnabled = cacheData?.enabled ?? false
+  const cacheConnected = cacheData?.connected ?? false
+  const cacheState = !cacheEnabled ? 'neutral' : cacheConnected ? 'ok' : 'error'
+  setHealthDot('dashHealthCache', cacheState)
+  const cacheLabel = document.getElementById('dashHealthCacheLabel')
+  if (cacheLabel) {
+    cacheLabel.textContent = !cacheEnabled
+      ? 'Off'
+      : cacheConnected
+        ? `Connected (${cacheData.keyCount ?? 0} keys)`
+        : 'Disconnected'
+  }
+}
+
+function renderRecommendations(health, compactor, guardrails, cacheData) {
+  const recs = buildRecommendations(health, compactor, guardrails, cacheData)
+  const recCard = document.getElementById('dashRecommendationsCard')
+  const recList = document.getElementById('dashRecommendationsList')
+  if (!recCard || !recList) return
+  recCard.hidden = recs.length === 0
+  recList.innerHTML = ''
+  for (const rec of recs) {
+    const li = document.createElement('li')
+    if (rec.tab) {
+      const btn = document.createElement('button')
+      btn.className = 'rec-link'
+      btn.textContent = rec.text + ' →'
+      btn.addEventListener('click', () => activateTab(rec.tab))
+      li.appendChild(btn)
+    } else {
+      li.textContent = rec.text
+    }
+    recList.appendChild(li)
+  }
+}
+
+async function refreshDashboard() {
+  const statusEl = document.getElementById('dashboardStatus')
+  try {
+    initDashSparkline()
+    const [healthRes, summaryRes, recentRes, compactorRes, guardrailsRes, cacheRes] =
+      await Promise.all([
+        fetch('/health'),
+        fetch('/api/metrics/summary'),
+        fetch('/api/metrics/recent?limit=5'),
+        fetch('/api/compactor/summary'),
+        fetch('/api/guardrails/summary'),
+        fetch('/api/cache/summary'),
+      ])
+    if (!healthRes.ok) throw new Error('health fetch failed')
+    const health = await healthRes.json()
+    const versionEl = document.getElementById('appVersion')
+    if (versionEl && health.version && !versionEl.dataset.set) {
+      versionEl.textContent = `v${health.version}`
+      versionEl.dataset.set = '1'
+    }
+    if (!summaryRes.ok) console.warn('refreshDashboard: summary fetch failed', summaryRes.status)
+    if (!recentRes.ok) console.warn('refreshDashboard: recent fetch failed', recentRes.status)
+    if (!compactorRes.ok)
+      console.warn('refreshDashboard: compactor fetch failed', compactorRes.status)
+    if (!guardrailsRes.ok)
+      console.warn('refreshDashboard: guardrails fetch failed', guardrailsRes.status)
+    const summary = summaryRes.ok ? await summaryRes.json() : null
+    const recent = recentRes.ok ? await recentRes.json() : []
+    const compactor = compactorRes.ok ? await compactorRes.json() : null
+    const guardrails = guardrailsRes.ok ? await guardrailsRes.json() : null
+    const cacheData = cacheRes.ok ? await cacheRes.json() : null
+
+    if (statusEl) {
+      statusEl.textContent = 'Live'
+      statusEl.className = 'status connected'
+    }
+
+    const dashWin = currentHistoryWindow()
+    const w1m = summary?.windows?.['1m'] ?? summary?.window_1m ?? {}
+    if (dashWin === 'live') {
+      if (dashLastWindowWasHistory) {
+        resetDashLiveHistory()
+        dashLastWindowWasHistory = false
+      }
+      const p95 = renderKpiRow(summary, compactor)
+      renderCacheKpi(cacheData)
+      pushDashPoint(
+        w1m.rps ?? 0,
+        p95 ?? 0,
+        w1m.statusBuckets?.['5xx'] ?? 0,
+        w1m.statusBuckets?.['4xx'] ?? 0,
+      )
+      if (dashSparklineChart) {
+        dashSparklineChart.options.scales.x.display = false
+        dashSparklineChart.update('none')
+      }
+    } else {
+      dashLastWindowWasHistory = true
+    }
+    renderRecentTable(recent)
+    renderHealthSidebar(health, compactor, guardrails, cacheData)
+    renderRecommendations(health, compactor, guardrails, cacheData)
+    // History mode: fetch events, rebuild chart + override KPIs
+    if (dashWin !== 'live') {
+      const range = windowToRange(dashWin)
+      if (range) {
+        const params = new URLSearchParams({ from: range.from, to: range.to, limit: '5000' })
+        fetch('/api/metrics/history?' + params)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((body) => {
+            if (!body) return
+            rebuildDashChartFromHistory(body.events ?? [], dashWin)
+            renderDashboardHistoryKpis(body.events ?? [], dashWin)
+          })
+          .catch(() => {})
+      }
+    }
+  } catch {
+    if (statusEl) {
+      statusEl.textContent = 'Error'
+      statusEl.className = 'status disconnected'
+    }
+  }
+}
+
+// ─── Cache tab ────────────────────────────────────────
+function cacheFmt(n) {
+  return n == null ? '—' : fmtNum(n)
+}
+function cacheFmtPct(r) {
+  return r == null ? '—' : fmtNum(r * 100, 1) + '%'
+}
+function cacheFmtBytes(b) {
+  if (b == null) return '—'
+  if (b >= 1_048_576) return (b / 1_048_576).toFixed(1) + ' MB'
+  if (b >= 1024) return (b / 1024).toFixed(1) + ' KB'
+  return b + ' B'
+}
+
+async function refreshCache() {
+  const statusEl = document.getElementById('cacheStatus')
+  try {
+    const [summaryRes, recentRes] = await Promise.all([
+      fetch('/api/cache/summary'),
+      fetch('/api/cache/recent?limit=500'),
+    ])
+    if (!summaryRes.ok) throw new Error('cache summary fetch failed')
+    const s = await summaryRes.json()
+    const recent = recentRes.ok ? await recentRes.json() : []
+
+    const enabled = s.enabled
+    const connected = s.connected
+
+    if (statusEl) {
+      statusEl.textContent = !enabled ? 'Disabled' : connected ? 'Connected' : 'Disconnected'
+      statusEl.className =
+        'status ' + (!enabled ? 'disconnected' : connected ? 'connected' : 'disconnected')
+    }
+
+    const dot = document.getElementById('cacheConnDot')
+    const label = document.getElementById('cacheConnLabel')
+    if (dot)
+      dot.className =
+        'health-dot ' + (!enabled ? 'dot-neutral' : connected ? 'dot-ok' : 'dot-error')
+    if (label)
+      label.textContent = !enabled
+        ? 'Cache disabled'
+        : connected
+          ? `Connected (${s.keyCount ?? 0} keys)`
+          : 'Disconnected — check CACHE_REDIS_URL'
+
+    const setPill = (id, on, text) => {
+      const el = document.getElementById(id)
+      if (!el) return
+      el.textContent = text
+      el.className = 'cache-status-pill ' + (on ? 'pill-on' : 'pill-off')
+    }
+    setPill(
+      'cacheExactPill',
+      s.exactMatch?.enabled,
+      `Exact ${s.exactMatch?.enabled ? 'on' : 'off'}`,
+    )
+    setPill('cacheDedupPill', s.dedup?.enabled, `Dedup ${s.dedup?.enabled ? 'on' : 'off'}`)
+    setPill('cacheSpendPill', s.spend?.enabled, `Spend limits ${s.spend?.enabled ? 'on' : 'off'}`)
+
+    if ((document.getElementById('cacheHistoryWindow')?.value || 'live') === 'live') {
+      document.getElementById('cacheKpiHits1m').textContent = cacheFmt(s.window_1m?.exactHits)
+      document.getElementById('cacheKpiHitRate').textContent = cacheFmtPct(s.window_1m?.hitRate)
+      document.getElementById('cacheKpiBytesFromCache').textContent = cacheFmtBytes(
+        s.window_1m?.bytesFromCache,
+      )
+      document.getElementById('cacheKpiDedup').textContent = cacheFmt(s.window_1m?.dedupCoalesced)
+      document.getElementById('cacheKpiSpendRejects').textContent = cacheFmt(
+        s.window_1m?.spendRejected,
+      )
+      document.getElementById('cacheKpiHitsLifetime').textContent = cacheFmt(s.lifetime?.exactHits)
+      document.getElementById('cacheKpiHitRateLifetime').textContent = cacheFmtPct(
+        s.lifetime?.hitRate,
+      )
+      document.getElementById('cacheKpiKeyCount').textContent = cacheFmt(s.keyCount)
+      document.getElementById('cacheKpiInflight').textContent = cacheFmt(s.dedup?.inflight)
+
+      // Feed the 1-minute sparklines (same live-accumulation pattern as the other tabs).
+      pushSpark('cacheHits1m', s.window_1m?.exactHits ?? 0)
+      pushSpark('cacheHitRate', Math.round((s.window_1m?.hitRate ?? 0) * 100))
+      pushSpark('cacheBytesFromCache', s.window_1m?.bytesFromCache ?? 0)
+      pushSpark('cacheDedup1m', s.window_1m?.dedupCoalesced ?? 0)
+      pushSpark('cacheSpendRejects1m', s.window_1m?.spendRejected ?? 0)
+    }
+
+    const notice = document.getElementById('cacheDisabledNotice')
+    const recentCard = document.getElementById('cacheRecentCard')
+    if (notice) notice.hidden = enabled
+    if (recentCard) recentCard.hidden = !enabled
+
+    const tbody = document.querySelector('#cacheRecentTable tbody')
+    if (tbody && tableNeedsRebuild(tbody, recent[0]?.ts ? fmtTime(recent[0].ts) : '')) {
+      tbody.innerHTML = ''
+      for (const ev of recent) {
+        const tr = document.createElement('tr')
+        const type = ev.type ?? '—'
+        tr.innerHTML = `<td>${fmtTimeShort(ev.ts)}</td>
+          <td><span class="cache-type-badge cache-${String(type).toLowerCase()}">${escHtml(type)}</span></td>
+          <td><code>${escHtml(ev.keyPrefix ?? '—')}</code></td>
+          <td>${ev.keyAgeS ?? '—'}</td>
+          <td>${ev.bytes != null ? cacheFmtBytes(ev.bytes) : '—'}</td>`
+        tbody.appendChild(tr)
+      }
+    }
+  } catch {
+    if (statusEl) {
+      statusEl.textContent = 'Error'
+      statusEl.className = 'status disconnected'
+    }
+  }
+}
+
+const cacheHistoryWindowEl = document.getElementById('cacheHistoryWindow')
+const cacheRefreshBtn = document.getElementById('cacheRefreshBtn')
+
+async function refreshCacheAuto() {
+  const win = cacheHistoryWindowEl?.value || 'live'
+  if (win === 'live') {
+    // Resize sparklines now that the panel is visible — Chart.js may have
+    // created them at zero size while the panel was hidden.
+    requestAnimationFrame(() => {
+      for (const k of [
+        'cacheHits1m',
+        'cacheHitRate',
+        'cacheBytesFromCache',
+        'cacheDedup1m',
+        'cacheSpendRejects1m',
+      ]) {
+        sparkCharts[k]?.resize()
+      }
+    })
+    return refreshCache()
+  }
+  const range = windowToRange(win)
+  if (!range) return refreshCache()
+  await refreshCache() // get status/enabled pills from live summary
+  const params = new URLSearchParams({ from: range.from, to: range.to, limit: '5000' })
+  try {
+    const [cacheHistRes, metHistRes] = await Promise.all([
+      fetch('/api/cache/history?' + params),
+      fetch('/api/metrics/history?' + params),
+    ])
+    if (cacheHistRes.ok) {
+      const body = await cacheHistRes.json()
+      const tbody = document.querySelector('#cacheRecentTable tbody')
+      const cacheHistEvents = body.events ?? []
+      if (
+        tbody &&
+        tableNeedsRebuild(tbody, cacheHistEvents[0]?.ts ? fmtTime(cacheHistEvents[0].ts) : '')
+      ) {
+        tbody.innerHTML = ''
+        for (const ev of cacheHistEvents) {
+          const tr = document.createElement('tr')
+          const type = ev.type ?? ev.cacheEventType ?? '—'
+          tr.innerHTML = `<td>${fmtTimeShort(ev.ts)}</td>
+            <td><span class="cache-type-badge cache-${String(type).toLowerCase()}">${escHtml(type)}</span></td>
+            <td><code>${escHtml(ev.keyPrefix ?? ev.cacheKey?.slice(0, 16) ?? '—')}</code></td>
+            <td>${ev.keyAgeS ?? '—'}</td>
+            <td>${ev.bytes != null ? cacheFmtBytes(ev.bytes) : '—'}</td>`
+          tbody.appendChild(tr)
+        }
+      }
+    }
+    if (metHistRes.ok) {
+      const body = await metHistRes.json()
+      renderCacheHistoryKpis(body.events ?? [], win)
+    }
+  } catch {
+    // ignore
+  }
+}
+
+if (cacheHistoryWindowEl)
+  cacheHistoryWindowEl.addEventListener('change', () =>
+    syncHistoryWindow(cacheHistoryWindowEl.value),
+  )
+if (cacheRefreshBtn) cacheRefreshBtn.addEventListener('click', refreshCacheAuto)
+
+// Wire "View all in Logs →" link
+document.getElementById('dashLogsLink')?.addEventListener('click', (e) => {
+  e.preventDefault()
+  activateTab('logs')
+})
+// Wire Quick links
+document.querySelectorAll('.tab-link[data-tab]').forEach((a) => {
+  a.addEventListener('click', (e) => {
+    e.preventDefault()
+    activateTab(a.dataset.tab)
+  })
+})
+
+// ─── Settings tab ─────────────────────────────────────────────
+let _serverSettings = {}
+let _pendingChanges = {}
+
+function settingsIsDirty() {
+  return Object.keys(_pendingChanges).length > 0
+}
+
+function updateDirtyBanner() {
+  const pill = document.getElementById('settingsDirtyPill')
+  const save = document.getElementById('settingsSaveBtn')
+  const discard = document.getElementById('settingsDiscardBtn')
+  const dirty = settingsIsDirty()
+  if (pill) pill.hidden = !dirty
+  if (save) save.hidden = !dirty
+  if (discard) discard.hidden = !dirty
+}
+
+function applySettingsToUI(effective) {
+  // Checkboxes
+  for (const input of document.querySelectorAll(
+    '#settingsPanel input[type="checkbox"][data-key]',
+  )) {
+    const key = input.dataset.key
+    if (key in effective) input.checked = effective[key]
+  }
+  // Mode pills
+  for (const group of document.querySelectorAll('#settingsPanel .mode-pills[data-key]')) {
+    const key = group.dataset.key
+    const val = effective[key]
+    for (const pill of group.querySelectorAll('.mode-pill')) {
+      pill.classList.toggle('active', pill.dataset.mode === val)
+    }
+    const card = group.closest('.category-card')
+    if (card) card.className = `category-card mode-${val ?? 'off'}`
+  }
+  // Dim compressor cards
+  for (const card of document.querySelectorAll('#compressorGrid .compressor-card')) {
+    const key = card.dataset.key
+    if (key in effective) card.classList.toggle('off', !effective[key])
+  }
+  // Dim detector cards
+  for (const card of document.querySelectorAll('#detectorGrid .compressor-card')) {
+    const key = card.dataset.key
+    if (key in effective) card.classList.toggle('off', !effective[key])
+  }
+  // Compactor subsection dimming
+  const compSub = document.getElementById('compactorSubsection')
+  if (compSub) compSub.style.opacity = effective.compactorEnabled ? '1' : '0.5'
+  // Guardrails subsection dimming
+  const grSub = document.getElementById('guardrailsSubsection')
+  if (grSub) grSub.style.opacity = effective.guardrailsEnabled ? '1' : '0.5'
+}
+
+async function refreshSettings() {
+  try {
+    const res = await fetch('/api/settings')
+    if (!res.ok) throw new Error('settings fetch failed')
+    const data = await res.json()
+    _serverSettings = { ...data.effective }
+    _pendingChanges = {}
+    applySettingsToUI(data.effective)
+    updateDirtyBanner()
+  } catch (err) {
+    console.error('refreshSettings failed:', err)
+    // retain current UI state on error
+  }
+}
+
+// Wire checkbox changes
+document.querySelectorAll('#settingsPanel input[type="checkbox"][data-key]').forEach((input) => {
+  input.addEventListener('change', () => {
+    const key = input.dataset.key
+    _pendingChanges[key] = input.checked
+    applySettingsToUI({ ..._serverSettings, ..._pendingChanges })
+    updateDirtyBanner()
+  })
+})
+
+// Wire mode pill clicks
+document.querySelectorAll('#settingsPanel .mode-pill').forEach((pill) => {
+  pill.addEventListener('click', () => {
+    const group = pill.closest('.mode-pills')
+    if (!group) return
+    const key = group.dataset.key
+    const mode = pill.dataset.mode
+    _pendingChanges[key] = mode
+    applySettingsToUI({ ..._serverSettings, ..._pendingChanges })
+    updateDirtyBanner()
+  })
+})
+
+// Save button
+document.getElementById('settingsSaveBtn')?.addEventListener('click', async () => {
+  if (!settingsIsDirty()) return
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(_pendingChanges),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      alert('Save failed: ' + (err.error ?? 'unknown error'))
+      return
+    }
+    const data = await res.json()
+    _serverSettings = { ...data.effective }
+    _pendingChanges = {}
+    applySettingsToUI(data.effective)
+    updateDirtyBanner()
+  } catch {
+    alert('Save failed: network error')
+  }
+})
+
+// Discard button
+document.getElementById('settingsDiscardBtn')?.addEventListener('click', () => {
+  _pendingChanges = {}
+  applySettingsToUI(_serverSettings)
+  updateDirtyBanner()
+})
 
 // ─── Setup panel ─────────────────────────────────────────────
 // `proxyProvider` is the value of PROXY_PROVIDER for pricing/parser dispatch.
@@ -537,7 +1333,7 @@ let paused = false
 let count = 0
 
 // ─── Log panel state ─────────────────────────────────────────
-const LOG_BUFFER_MAX = 2000
+const LOG_BUFFER_MAX = 100
 const logBuffer = [] // { type: 'proxy'|'internal'|'system', entry: object }
 
 const filterProxy = document.getElementById('filterProxy')
@@ -713,8 +1509,8 @@ async function loadLive() {
   // both sources so the Logs panel shows historical proxy traffic on first
   // render, not just events that arrive over SSE after the page loads.
   const [logsR, recentR] = await Promise.all([
-    fetch('/api/logs?limit=500').catch(() => null),
-    fetch('/api/metrics/recent?limit=500').catch(() => null),
+    fetch('/api/logs?limit=100').catch(() => null),
+    fetch('/api/metrics/recent?limit=100').catch(() => null),
   ])
   const appEntries = logsR && logsR.ok ? await logsR.json() : []
   const proxyEntries = recentR && recentR.ok ? await recentR.json() : []
@@ -850,11 +1646,12 @@ let totalCostSinceBoot = 0
 let totalCostSeeded = false
 
 const MAX_TICKS = 300 // 5 minutes at 1Hz
-const MAX_TABLE_ROWS = 40
+const MAX_TABLE_ROWS = 500
 
 const tickLabels = []
 const tickTimestamps = []
 let chartMode = 'live'
+let lastHistoryChartRefresh = 0
 const rpsSeries = []
 const p95Series = []
 const tokenInSeries = []
@@ -915,28 +1712,43 @@ function fmtCost(n) {
   return `$${n.toFixed(6)}`
 }
 
-function fmtNum(n, decimals = 0) {
-  if (n == null || isNaN(n)) return '—'
-  const [int, dec] = n.toFixed(decimals).split('.')
-  const intFormatted = int.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
-  return decimals > 0 ? `${intFormatted}.${dec}` : intFormatted
+function fmtNum(v, decimals = 0) {
+  if (v == null || isNaN(v)) return '—'
+  const parts = Number(v).toFixed(decimals).split('.')
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  return parts.join('.')
 }
 
-// Browser-local timestamp with millisecond precision: `YYYY-MM-DD HH:MM:SS.mmm`.
-// The native `Date` getters already return values in the browser's timezone, so
-// there's no need to pull in a library for this — manual zero-padding gives us
-// a stable, sortable, copy-pasteable format for log lines + recent-request rows.
+// UTC timestamp with millisecond precision: `YYYY-MM-DD HH:MM:SS.mmm UTC`.
+// All timestamps in the UI are UTC, 24-hour format.
+// Full UTC timestamp for all log/table cells: `YYYY-MM-DD HH:MM:SS.mmm`
+// No "UTC" suffix — column headers state the timezone.
 function fmtTime(ts) {
   const d = new Date(ts)
   if (isNaN(d.getTime())) return ''
   const p = (n, w = 2) => String(n).padStart(w, '0')
   return (
-    `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
-    `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`
+    `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ` +
+    `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}.${p(d.getUTCMilliseconds(), 3)}`
   )
 }
 
-// Chart-only x-axis formatter. Outputs `HH:MM:SS`, with a `DD.MM.YYYY ` prefix
+// All table cells use the same format — date + time + ms, no UTC suffix.
+function fmtTimeShort(ts) {
+  return fmtTime(ts)
+}
+
+// Returns true when a tbody needs rebuilding. Compares the top-row key
+// against the first <td> so periodic polls skip DOM thrashing when nothing changed.
+function tableNeedsRebuild(tbody, topKey) {
+  if (!tbody || !tbody.rows.length) return true
+  return (
+    tbody.querySelector('tr:first-child td:first-child')?.textContent?.trim() !==
+    String(topKey ?? '')
+  )
+}
+
+// Chart-only x-axis formatter (UTC). Outputs `HH:MM:SS`, with a `DD.MM.YYYY ` prefix
 // when the date differs from the previous label (or when no previous label is
 // given). Keeps tick labels short for live charts while still disambiguating
 // day rollovers in long-range views (7d).
@@ -944,8 +1756,8 @@ function fmtAxisTime(ts, prevTs) {
   const d = new Date(ts)
   if (isNaN(d.getTime())) return ''
   const p = (n, w = 2) => String(n).padStart(w, '0')
-  const hhmmss = `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
-  const dateStr = `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()}`
+  const hhmmss = `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`
+  const dateStr = `${p(d.getUTCDate())}.${p(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}`
   if (prevTs == null) return hhmmss
   const prev = new Date(prevTs)
   if (isNaN(prev.getTime())) return hhmmss
@@ -1139,6 +1951,11 @@ function initSparklines() {
     ['sparkGuardrailsRedactedLifetime', '#a371f7', 'guardrailsRedactedLifetime'],
     ['sparkGuardrailsAlertedLifetime', '#f0b72f', 'guardrailsAlertedLifetime'],
     ['sparkGuardrailsBypassesLifetime', '#d29922', 'guardrailsBypassesLifetime'],
+    ['sparkCacheHits1m', '#3fb950', 'cacheHits1m'],
+    ['sparkCacheHitRate', '#58a6ff', 'cacheHitRate'],
+    ['sparkCacheBytesFromCache', '#3fb950', 'cacheBytesFromCache'],
+    ['sparkCacheDedup1m', '#a371f7', 'cacheDedup1m'],
+    ['sparkCacheSpendRejects1m', '#d29922', 'cacheSpendRejects1m'],
   ]
   for (const [id, color, key] of specs) {
     const ch = makeSparkline(id, color)
@@ -1148,13 +1965,20 @@ function initSparklines() {
 initSparklines()
 
 function pushTick(tick) {
+  // In history mode KPI tiles are owned by renderXHistoryKpis — only the
+  // instantaneous in-flight counter stays live.
+  if (currentHistoryWindow() !== 'live') {
+    inFlightPill.textContent = `in-flight: ${tick.inFlight}`
+    if (kpiInFlight) kpiInFlight.textContent = fmtNum(tick.inFlight ?? 0)
+    return
+  }
   const w1 = tick.windows['1m']
   const w5 = tick.windows['5m']
 
-  kpiRps.textContent = w1.rps.toFixed(2)
-  kpiP95.textContent = w1.p95
-  kpiP99.textContent = w1.p99
-  kpiErr.textContent = (w1.errorRate * 100).toFixed(1)
+  kpiRps.textContent = fmtNum(w1.rps, 2)
+  kpiP95.textContent = fmtNum(w1.p95, 0)
+  kpiP99.textContent = fmtNum(w1.p99, 0)
+  kpiErr.textContent = fmtNum(w1.errorRate * 100, 1)
   kpiTotal.textContent = fmtNum(w5.total)
   kpiBytesIn.textContent = fmtBytes(w5.bytesIn)
   kpiBytesOut.textContent = fmtBytes(w5.bytesOut)
@@ -1180,7 +2004,7 @@ function pushTick(tick) {
   const cacheRead = w1.cacheReadTokens ?? 0
   const cacheDenom = cacheRead + (w1.inputTokens ?? inTok)
   if (kpiCacheHit)
-    kpiCacheHit.textContent = cacheDenom > 0 ? ((cacheRead / cacheDenom) * 100).toFixed(1) : '—'
+    kpiCacheHit.textContent = cacheDenom > 0 ? fmtNum((cacheRead / cacheDenom) * 100, 1) : '—'
   const avgDur = w1.avgDurationMs ?? w1.meanDurationMs
   if (kpiAvgDur) kpiAvgDur.textContent = avgDur != null ? fmtNum(avgDur, 0) : '—'
   if (kpiInFlight) kpiInFlight.textContent = fmtNum(tick.inFlight ?? 0)
@@ -1276,9 +2100,11 @@ function appendRequest(ev) {
 
 async function loadRecent() {
   try {
-    const r = await fetch('/api/metrics/recent?limit=200')
+    const r = await fetch('/api/metrics/recent?limit=500')
     if (!r.ok) return
     const events = await r.json()
+    const topKey = events.length ? fmtTime(events[events.length - 1]?.ts) : ''
+    if (!tableNeedsRebuild(recentTbody, topKey)) return
     recentTbody.innerHTML = ''
     // recent() returns oldest-first; prepend each to display newest at top.
     events.forEach(appendRequest)
@@ -1369,7 +2195,31 @@ function connectMetricsSSE() {
   }
   es.addEventListener('tick', (e) => {
     try {
-      pushTick(JSON.parse(e.data))
+      const tick = JSON.parse(e.data)
+      pushTick(tick)
+      // History mode: charts don't update via pushTick, so re-fetch on a 30s throttle.
+      if (chartMode === 'history') {
+        const now = Date.now()
+        if (now - lastHistoryChartRefresh >= 30_000) {
+          lastHistoryChartRefresh = now
+          refreshChartsForWindow().catch(() => {})
+        }
+      }
+      const dashPanel = document.getElementById('dashboardPanel')
+      if (!dashPanel?.classList.contains('hidden')) {
+        const tw = tick.windows?.['1m'] ?? tick.window_1m ?? {}
+        const p95 = tw.p95 ?? tick.p95 ?? 0
+        const rps = tw.rps ?? tick.rps ?? 0
+        if (currentHistoryWindow() === 'live') {
+          pushDashPoint(rps, p95, tw.statusBuckets?.['5xx'] ?? 0, tw.statusBuckets?.['4xx'] ?? 0)
+        }
+        if (typeof p95 === 'number') {
+          const p95El = document.getElementById('dashKpiP95')
+          if (p95El) p95El.textContent = p95 + ' ms'
+        }
+        const infEl = document.getElementById('dashInFlight')
+        if (infEl) infEl.textContent = tick.inFlight ?? '0'
+      }
     } catch {}
   })
   es.addEventListener('request', (e) => {
@@ -1380,6 +2230,14 @@ function connectMetricsSSE() {
       if (ev && typeof ev.costUsd === 'number') {
         totalCostSinceBoot += ev.costUsd
         kpiCostTotal.textContent = fmtCost(totalCostSinceBoot)
+      }
+      // Keep dashboard live: update recent table and KPI values in real time.
+      const dashPanel = document.getElementById('dashboardPanel')
+      if (!dashPanel?.classList.contains('hidden')) {
+        updateDashRecent(ev)
+        // Refresh the cost KPI immediately so "Cost (session)" stays current.
+        const costEl = document.getElementById('dashKpiCost')
+        if (costEl) costEl.textContent = fmtCost(totalCostSinceBoot)
       }
     } catch {}
   })
@@ -1498,6 +2356,8 @@ async function loadRoutesIntoFilter() {
       routeFilterEl.appendChild(opt)
     }
     if (current && routes.some((r) => r.prefix === current)) routeFilterEl.value = current
+    // Hide the route filter when there's only one route (no meaningful choice).
+    routeFilterEl.hidden = routes.length <= 1
   } catch {
     // ignore
   }
@@ -1512,6 +2372,19 @@ async function loadHistoryEvents() {
   if (route) params.set('route', route)
   try {
     const r = await fetch('/api/metrics/history?' + params)
+    if (r.status === 503) {
+      // Persistence not configured — fall back to the in-memory ring buffer and
+      // filter it to the requested time window so the charts still show data.
+      const rb = await fetch('/api/metrics/recent?limit=5000')
+      if (!rb.ok) return []
+      const all = await rb.json()
+      const fromMs = new Date(range.from).getTime()
+      const toMs = new Date(range.to).getTime()
+      return all.filter((ev) => {
+        const t = new Date(ev.ts).getTime()
+        return t >= fromMs && t <= toMs
+      })
+    }
     if (!r.ok) return []
     const body = await r.json()
     return body.events ?? []
@@ -1527,9 +2400,12 @@ async function refreshRecentForWindow() {
     loadRecent()
     return
   }
+  const slice = events.slice(0, MAX_TABLE_ROWS)
+  const topKey = slice.length ? fmtTime(slice[0]?.ts) : ''
+  if (!tableNeedsRebuild(recentTbody, topKey)) return
   recentTbody.innerHTML = ''
-  // history returns newest-first; render in that order with prepend → reverse
-  for (let i = events.length - 1; i >= 0; i--) appendRequest(events[i])
+  // events are newest-first; take most recent MAX_TABLE_ROWS then render oldest-first
+  for (let i = slice.length - 1; i >= 0; i--) appendRequest(slice[i])
 }
 
 // Bucket size (seconds) chosen so we render ~60–120 points regardless of window
@@ -1560,6 +2436,10 @@ function rebuildChartsFromHistory(events, windowKey) {
   const outTok = new Array(numBuckets).fill(0)
   const toolIn = new Array(numBuckets).fill(0)
   const toolOut = new Array(numBuckets).fill(0)
+  const costs = new Array(numBuckets).fill(0)
+  const errCounts = new Array(numBuckets).fill(0)
+  const bytesInBucket = new Array(numBuckets).fill(0)
+  const bytesOutBucket = new Array(numBuckets).fill(0)
 
   for (const ev of events) {
     const t = new Date(ev.ts).getTime()
@@ -1570,8 +2450,10 @@ function rebuildChartsFromHistory(events, windowKey) {
     if (typeof ev.durationMs === 'number') durations[idx].push(ev.durationMs)
     inTok[idx] += ev.inputTokens ?? 0
     outTok[idx] += ev.outputTokens ?? 0
-    toolIn[idx] += ev.toolBytesIn ? 0 : 0 // no per-event tool-token field; leave at 0
-    toolOut[idx] += 0
+    costs[idx] += ev.costUsd ?? 0
+    if (ev.error || (ev.status != null && ev.status >= 400)) errCounts[idx]++
+    bytesInBucket[idx] += ev.bytesIn ?? 0
+    bytesOutBucket[idx] += ev.bytesOut ?? 0
   }
 
   const labels = []
@@ -1595,9 +2477,9 @@ function rebuildChartsFromHistory(events, windowKey) {
       p95.push(0)
     }
     tokInRate.push(inTok[i] / bucketSec)
-    tokToolInRate.push(toolIn[i] / bucketSec)
+    tokToolInRate.push(0) // no per-event tool-token field
     tokOutRate.push(-(outTok[i] / bucketSec))
-    tokToolOutRate.push(-(toolOut[i] / bucketSec))
+    tokToolOutRate.push(0)
   }
 
   // Mutate the shared label array in place so all three charts pick up the
@@ -1634,30 +2516,415 @@ function rebuildChartsFromHistory(events, windowKey) {
   chartTokens.options.scales.y.suggestedMin = -peak
   chartTokens.options.scales.y.suggestedMax = peak
   chartTokens.update('none')
+
+  // Push bucketed history data into KPI sparklines so they match the charts.
+  const overwriteSpark = (key, data) => {
+    const slice = data.slice(-SPARK_TICKS)
+    sparkSeries[key] = slice.slice()
+    const ch = sparkCharts[key]
+    if (!ch) return
+    ch.data.labels = slice.map((_, i) => i)
+    ch.data.datasets[0].data = slice
+    ch.update('none')
+  }
+  overwriteSpark('rps', rps)
+  overwriteSpark('p95', p95)
+  overwriteSpark('tokIn', tokInRate)
+  overwriteSpark('tokOut', tokOutRate.map(Math.abs))
+  overwriteSpark(
+    'costPerMin',
+    costs.map((c) => (c / bucketSec) * 60),
+  )
+  overwriteSpark('bytesIn', bytesInBucket)
+  overwriteSpark('bytesOut', bytesOutBucket)
+  overwriteSpark(
+    'err',
+    counts.map((n, i) => (n > 0 ? (errCounts[i] / n) * 100 : 0)),
+  )
 }
 
 async function refreshChartsForWindow() {
   const win = currentHistoryWindow()
   if (win === 'live') {
     chartMode = 'live'
-    // Reset arrays so the live SSE stream starts fresh and doesn't graft new
-    // ticks onto stale history buckets.
-    tickLabels.length = 0
-    tickTimestamps.length = 0
-    rpsSeries.length = 0
-    p95Series.length = 0
-    tokenInSeries.length = 0
-    tokenToolInSeries.length = 0
-    tokenOutSeries.length = 0
-    tokenToolOutSeries.length = 0
-    chartRps.update('none')
-    chartLat.update('none')
-    chartTokens.update('none')
+    // Repopulate charts from the in-memory ring buffer so switching back to
+    // Live doesn't show blank charts. Use recent events (~5 min window) to
+    // seed the series; the SSE tick stream then appends from here.
+    try {
+      const rb = await fetch('/api/metrics/recent?limit=5000')
+      if (rb.ok) {
+        const all = await rb.json()
+        const fiveMinAgo = Date.now() - 5 * 60 * 1000
+        const recent5m = all.filter((ev) => new Date(ev.ts).getTime() >= fiveMinAgo)
+        if (recent5m.length > 0) {
+          rebuildChartsFromHistory(recent5m, '5m')
+        } else {
+          tickLabels.length = 0
+          tickTimestamps.length = 0
+          rpsSeries.length = 0
+          p95Series.length = 0
+          tokenInSeries.length = 0
+          tokenToolInSeries.length = 0
+          tokenOutSeries.length = 0
+          tokenToolOutSeries.length = 0
+          chartRps.update('none')
+          chartLat.update('none')
+          chartTokens.update('none')
+        }
+      }
+    } catch {
+      // fallback: clear arrays
+      tickLabels.length = 0
+      tickTimestamps.length = 0
+      rpsSeries.length = 0
+      p95Series.length = 0
+      tokenInSeries.length = 0
+      tokenToolInSeries.length = 0
+      tokenOutSeries.length = 0
+      tokenToolOutSeries.length = 0
+      chartRps.update('none')
+      chartLat.update('none')
+      chartTokens.update('none')
+    }
     return
   }
   chartMode = 'history'
   const events = await loadHistoryEvents()
   rebuildChartsFromHistory(events ?? [], win)
+  renderMetricsHistoryKpis(events ?? [], win)
+}
+
+// ─── Window-aware KPI computation ────────────────────────────
+// Aggregates a flat metrics-history events array (from /api/metrics/history)
+// into scalars used by all the per-page renderXHistoryKpis helpers.
+function computeWindowKpis(events, winSec) {
+  const empty = {
+    total: 0,
+    rps: 0,
+    p95: 0,
+    p99: 0,
+    errorRate: 0,
+    bytesIn: 0,
+    bytesOut: 0,
+    costTotal: 0,
+    costPerMin: 0,
+    tokInPerSec: 0,
+    tokOutPerSec: 0,
+    toolCalls: 0,
+    avgCost: 0,
+    avgTokens: 0,
+    avgDur: 0,
+    topModel: null,
+    compactorBytesSaved: 0,
+    compactorFires: 0,
+    compactorBytesIn: 0,
+    guardrailsScanned: 0,
+    guardrailsHits: 0,
+    guardrailsBlocked: 0,
+    guardrailsRedacted: 0,
+    guardrailsAlerted: 0,
+    guardrailsBypassed: 0,
+    cacheHits: 0,
+    cacheDenom: 0,
+    cacheHitRate: 0,
+    cacheBytesFromCache: 0,
+  }
+  if (!events.length) return empty
+  const ws = winSec || 1
+  let sumBytesIn = 0,
+    sumBytesOut = 0,
+    sumCost = 0
+  let sumTokIn = 0,
+    sumTokOut = 0,
+    sumToolCalls = 0,
+    sumDur = 0
+  let errCount = 0
+  const durations = [],
+    modelCost = {}
+  let compFires = 0,
+    compBytesSaved = 0,
+    compBytesIn = 0
+  let grScanned = 0,
+    grHits = 0,
+    grBlocked = 0,
+    grRedacted = 0,
+    grAlerted = 0,
+    grBypassed = 0
+  let cacheHits = 0,
+    cacheDenom = 0,
+    cacheBytesFromCache = 0
+
+  for (const ev of events) {
+    sumBytesIn += ev.bytesIn ?? 0
+    sumBytesOut += ev.bytesOut ?? 0
+    sumCost += ev.costUsd ?? 0
+    sumTokIn += ev.inputTokens ?? 0
+    sumTokOut += ev.outputTokens ?? 0
+    sumToolCalls += ev.toolCalls ?? 0
+    if (typeof ev.durationMs === 'number') {
+      durations.push(ev.durationMs)
+      sumDur += ev.durationMs
+    }
+    if (ev.error || (ev.status != null && ev.status >= 400)) errCount++
+    if (ev.model) modelCost[ev.model] = (modelCost[ev.model] ?? 0) + (ev.costUsd ?? 0)
+    if (ev.compactorActive) {
+      compFires++
+      compBytesSaved += ev.compactorSavedBytes ?? 0
+      compBytesIn += ev.bytesIn ?? 0
+    }
+    if (ev.guardrailsAction) {
+      grScanned++
+      grHits += ev.guardrailsHits ?? 0
+      if (ev.guardrailsAction === 'block') grBlocked++
+      else if (ev.guardrailsAction === 'redact') grRedacted++
+      else if (ev.guardrailsAction === 'alert') grAlerted++
+      else if (ev.guardrailsAction === 'bypass') grBypassed++
+    }
+    if (ev.cacheStatus != null) {
+      cacheDenom++
+      if (ev.cacheStatus === 'hit') cacheHits++
+      cacheBytesFromCache += ev.bytesFromCache ?? 0
+    }
+  }
+
+  durations.sort((a, b) => a - b)
+  const total = events.length
+  const p95 = durations.length ? (durations[Math.floor(durations.length * 0.95)] ?? 0) : 0
+  const p99 = durations.length ? (durations[Math.floor(durations.length * 0.99)] ?? 0) : 0
+  let topModel = null
+  for (const [name, cost] of Object.entries(modelCost)) {
+    if (!topModel || cost > topModel.cost) topModel = { name, cost }
+  }
+  return {
+    total,
+    rps: total / ws,
+    p95,
+    p99,
+    errorRate: total > 0 ? errCount / total : 0,
+    bytesIn: sumBytesIn,
+    bytesOut: sumBytesOut,
+    costTotal: sumCost,
+    costPerMin: sumCost / (ws / 60),
+    tokInPerSec: sumTokIn / ws,
+    tokOutPerSec: sumTokOut / ws,
+    toolCalls: sumToolCalls,
+    avgCost: total > 0 ? sumCost / total : 0,
+    avgTokens: total > 0 ? (sumTokIn + sumTokOut) / total : 0,
+    avgDur: durations.length > 0 ? sumDur / durations.length : 0,
+    topModel: topModel?.name ?? null,
+    compactorBytesSaved: compBytesSaved,
+    compactorFires: compFires,
+    compactorBytesIn: compBytesIn,
+    guardrailsScanned: grScanned,
+    guardrailsHits: grHits,
+    guardrailsBlocked: grBlocked,
+    guardrailsRedacted: grRedacted,
+    guardrailsAlerted: grAlerted,
+    guardrailsBypassed: grBypassed,
+    cacheHits,
+    cacheDenom,
+    cacheHitRate: cacheDenom > 0 ? cacheHits / cacheDenom : 0,
+    cacheBytesFromCache,
+  }
+}
+
+function renderMetricsHistoryKpis(events, win) {
+  const k = computeWindowKpis(events, HISTORY_WINDOW_SECONDS[win] ?? 60)
+  kpiRps.textContent = fmtNum(k.rps, 2)
+  kpiP95.textContent = fmtNum(k.p95, 0)
+  kpiP99.textContent = fmtNum(k.p99, 0)
+  kpiErr.textContent = fmtNum(k.errorRate * 100, 1)
+  kpiTotal.textContent = fmtNum(k.total)
+  kpiBytesIn.textContent = fmtBytes(k.bytesIn)
+  kpiBytesOut.textContent = fmtBytes(k.bytesOut)
+  kpiCostPerMin.textContent = fmtCost(k.costPerMin)
+  kpiCostPerHr.textContent = fmtCost(k.costPerMin * 60)
+  if (kpiCostPerDay) kpiCostPerDay.textContent = fmtCost(k.costPerMin * 1440)
+  if (kpiCostPerMonth) kpiCostPerMonth.textContent = fmtCost(k.costPerMin * 1440 * 30)
+  kpiTokensIn.textContent = fmtNum(k.tokInPerSec, 2)
+  kpiTokensOut.textContent = fmtNum(k.tokOutPerSec, 2)
+  kpiToolCalls.textContent = fmtNum(k.toolCalls)
+  kpiCostTotal.textContent = fmtCost(k.costTotal)
+  if (kpiAvgCost) kpiAvgCost.textContent = k.total > 0 ? fmtCost(k.avgCost) : '—'
+  if (kpiAvgTokens) kpiAvgTokens.textContent = k.total > 0 ? fmtNum(k.avgTokens, 0) : '—'
+  if (kpiCacheHit)
+    kpiCacheHit.textContent = k.cacheDenom > 0 ? fmtNum(k.cacheHitRate * 100, 1) : '—'
+  if (kpiAvgDur) kpiAvgDur.textContent = k.total > 0 ? fmtNum(k.avgDur, 0) : '—'
+  if (kpiTopModel) kpiTopModel.textContent = k.topModel ?? '—'
+  const compBytesEl = document.getElementById('kpiCompactorBytesSaved5m')
+  const compFiresEl = document.getElementById('kpiCompactorFires5m')
+  const compRatioEl = document.getElementById('kpiCompactorRatio5m')
+  if (compBytesEl) compBytesEl.textContent = fmtBytes(k.compactorBytesSaved)
+  if (compFiresEl) compFiresEl.textContent = fmtNum(k.compactorFires)
+  if (compRatioEl) {
+    const pct =
+      k.compactorBytesIn > 0 ? Math.round((k.compactorBytesSaved / k.compactorBytesIn) * 100) : 0
+    compRatioEl.textContent = pct + '%'
+  }
+}
+
+function renderCompactorHistoryKpis(metricEvents, win) {
+  const k = computeWindowKpis(metricEvents, HISTORY_WINDOW_SECONDS[win] ?? 60)
+  const el = (id) => document.getElementById(id)
+  if (el('compactorBytes1m')) el('compactorBytes1m').textContent = fmtBytes(k.compactorBytesSaved)
+  if (el('compactorBytes5m')) el('compactorBytes5m').textContent = fmtBytes(k.compactorBytesSaved)
+  if (el('compactorBytesLifetime'))
+    el('compactorBytesLifetime').textContent = fmtBytes(k.compactorBytesSaved)
+  if (el('compactorTokensLifetime'))
+    el('compactorTokensLifetime').textContent = fmtNum(Math.floor(k.compactorBytesSaved / 4))
+  if (el('compactorRatio5m')) {
+    const r = k.compactorBytesIn > 0 ? k.compactorBytesSaved / k.compactorBytesIn : 0
+    el('compactorRatio5m').textContent = k.compactorBytesIn > 0 ? `${Math.round(r * 100)}%` : '—'
+  }
+  if (el('compactorBypasses'))
+    el('compactorBypasses').textContent = metricEvents.filter((ev) => ev.compactorBypass).length
+  // Per-compressor table: group fires + bytes from compactorCompressors field
+  const byComp = {}
+  for (const ev of metricEvents) {
+    if (!ev.compactorActive || !ev.compactorCompressors) continue
+    for (const name of String(ev.compactorCompressors)
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)) {
+      if (!byComp[name]) byComp[name] = { fires: 0, saved: 0 }
+      byComp[name].fires++
+      byComp[name].saved += ev.compactorSavedBytes ?? 0
+    }
+  }
+  const tbody = document.querySelector('#compactorTable tbody')
+  if (tbody) {
+    for (const tr of tbody.querySelectorAll('tr')) {
+      const code = tr.querySelector('td:first-child code')
+      if (!code) continue
+      const agg = byComp[code.textContent] ?? { fires: 0, saved: 0 }
+      const cells = tr.querySelectorAll('td')
+      if (cells[2]) cells[2].textContent = agg.fires
+      if (cells[3]) cells[3].textContent = fmtBytes(agg.saved)
+      if (cells[4]) cells[4].textContent = '—'
+    }
+  }
+}
+
+function renderGuardrailsHistoryKpis(metricEvents, win) {
+  const k = computeWindowKpis(metricEvents, HISTORY_WINDOW_SECONDS[win] ?? 60)
+  const el = (id) => document.getElementById(id)
+  if (el('guardrailsScanned1m')) el('guardrailsScanned1m').textContent = k.guardrailsScanned
+  if (el('guardrailsHits1m')) el('guardrailsHits1m').textContent = k.guardrailsHits
+  if (el('guardrailsBlockedLifetime'))
+    el('guardrailsBlockedLifetime').textContent = k.guardrailsBlocked
+  if (el('guardrailsRedactedLifetime'))
+    el('guardrailsRedactedLifetime').textContent = k.guardrailsRedacted
+  if (el('guardrailsAlertedLifetime'))
+    el('guardrailsAlertedLifetime').textContent = k.guardrailsAlerted
+  if (el('guardrailsBypassesLifetime'))
+    el('guardrailsBypassesLifetime').textContent = k.guardrailsBypassed
+  // Per-detector table
+  const byDet = {}
+  for (const ev of metricEvents) {
+    if (!ev.guardrailsDetectors) continue
+    for (const name of String(ev.guardrailsDetectors)
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)) {
+      if (!byDet[name]) byDet[name] = { fires: 0, hits: 0 }
+      byDet[name].fires++
+      byDet[name].hits += ev.guardrailsHits ?? 0
+    }
+  }
+  const tbody = document.querySelector('#guardrailsTable tbody')
+  if (tbody) {
+    for (const tr of tbody.querySelectorAll('tr')) {
+      const code = tr.querySelector('td:first-child code')
+      if (!code) continue
+      const agg = byDet[code.textContent] ?? { fires: 0, hits: 0 }
+      const cells = tr.querySelectorAll('td')
+      if (cells[3]) cells[3].textContent = agg.fires
+      if (cells[4]) cells[4].textContent = agg.hits
+      if (cells[5]) cells[5].textContent = '—'
+    }
+  }
+}
+
+function renderCacheHistoryKpis(metricEvents, win) {
+  const k = computeWindowKpis(metricEvents, HISTORY_WINDOW_SECONDS[win] ?? 60)
+  const el = (id) => document.getElementById(id)
+  if (el('cacheKpiHits1m')) el('cacheKpiHits1m').textContent = cacheFmt(k.cacheHits)
+  if (el('cacheKpiHitRate')) el('cacheKpiHitRate').textContent = cacheFmtPct(k.cacheHitRate)
+  if (el('cacheKpiBytesFromCache'))
+    el('cacheKpiBytesFromCache').textContent = cacheFmtBytes(k.cacheBytesFromCache)
+  if (el('cacheKpiDedup')) el('cacheKpiDedup').textContent = '—'
+  if (el('cacheKpiSpendRejects')) el('cacheKpiSpendRejects').textContent = '—'
+  if (el('cacheKpiHitsLifetime')) el('cacheKpiHitsLifetime').textContent = cacheFmt(k.cacheHits)
+  if (el('cacheKpiHitRateLifetime'))
+    el('cacheKpiHitRateLifetime').textContent = cacheFmtPct(k.cacheHitRate)
+}
+
+function renderDashboardHistoryKpis(metricEvents, win) {
+  const k = computeWindowKpis(metricEvents, HISTORY_WINDOW_SECONDS[win] ?? 60)
+  document.getElementById('dashKpiRequests').textContent = fmtNum(k.total)
+  document.getElementById('dashKpiCost').textContent = fmtCost(k.costTotal)
+  document.getElementById('dashKpiP95').textContent = k.p95 > 0 ? fmtNum(k.p95, 0) + ' ms' : '—'
+  const bytesSavedCard = document.getElementById('dashKpiBytesSavedCard')
+  if (bytesSavedCard && !bytesSavedCard.hidden && k.compactorBytesIn > 0) {
+    const pct = Math.round((k.compactorBytesSaved / k.compactorBytesIn) * 100)
+    document.getElementById('dashKpiBytesSaved').textContent = pct + '%'
+  }
+  const cacheKpiCard = document.getElementById('dashKpiCacheCard')
+  if (cacheKpiCard && !cacheKpiCard.hidden) {
+    document.getElementById('dashKpiCacheHitRate').textContent = cacheFmtPct(k.cacheHitRate)
+  }
+}
+
+// ─── History-window persistence + cross-tab sync ─────────────
+// All [data-history-window] selects share one value, stored in localStorage.
+// Changing any one syncs the others and triggers the current tab's refresh.
+const HW_STORAGE_KEY = 'airelay_historyWindow'
+
+function applyHistoryWindowToAll(value) {
+  for (const sel of document.querySelectorAll('[data-history-window]')) {
+    if (sel.value !== value) sel.value = value
+  }
+}
+
+function updateKpiWindowLabels(win) {
+  const disp = win === 'live' ? null : win
+  for (const el of document.querySelectorAll('#metricsPanel .kpi-label')) {
+    const orig = (el.dataset.origLabel ||= el.textContent)
+    el.textContent = disp ? orig.replace(/\(\d+ min\)/g, `(${disp})`) : orig
+  }
+}
+
+function updateChartWindowLabels(win) {
+  const disp = win === 'live' ? null : win
+  for (const el of document.querySelectorAll('#metricsPanel .chart-title')) {
+    const orig = (el.dataset.origTitle ||= el.textContent)
+    el.textContent = disp ? orig.replace(/last \d+ min/g, `last ${disp}`) : orig
+  }
+  const dashTitle = document.getElementById('dashActivityTitle')
+  if (dashTitle) {
+    dashTitle.textContent = disp ? `Activity (last ${disp})` : dashTitle.dataset.origTitle
+  }
+}
+
+function syncHistoryWindow(value) {
+  localStorage.setItem(HW_STORAGE_KEY, value)
+  applyHistoryWindowToAll(value)
+  updateKpiWindowLabels(value)
+  updateChartWindowLabels(value)
+  const tab = location.hash.replace('#', '') || 'dashboard'
+  if (tab === 'dashboard') {
+    refreshDashboard().catch(() => {})
+  } else if (tab === 'metrics') {
+    refreshChartsForWindow()
+      .then(() => refreshRecentForWindow())
+      .catch(() => {})
+  } else if (tab === 'compactor') {
+    refreshCompactorAuto().catch(() => {})
+  } else if (tab === 'guardrails') {
+    refreshGuardrailsAuto().catch(() => {})
+  } else if (tab === 'cache') {
+    refreshCacheAuto().catch(() => {})
+  }
 }
 
 if (routeFilterEl) {
@@ -1667,10 +2934,23 @@ if (routeFilterEl) {
   })
 }
 if (historyWindowEl) {
-  historyWindowEl.addEventListener('change', async () => {
-    await refreshChartsForWindow()
-    await refreshRecentForWindow()
-  })
+  historyWindowEl.addEventListener('change', () => syncHistoryWindow(historyWindowEl.value))
+}
+const dashHistoryWindowEl = document.getElementById('dashHistoryWindow')
+if (dashHistoryWindowEl) {
+  dashHistoryWindowEl.addEventListener('change', () => syncHistoryWindow(dashHistoryWindowEl.value))
+}
+if (compactorHistoryWindowEl) {
+  compactorHistoryWindowEl.removeEventListener('change', refreshCompactorAuto)
+  compactorHistoryWindowEl.addEventListener('change', () =>
+    syncHistoryWindow(compactorHistoryWindowEl.value),
+  )
+}
+if (guardrailsHistoryWindowEl) {
+  guardrailsHistoryWindowEl.removeEventListener('change', refreshGuardrailsAuto)
+  guardrailsHistoryWindowEl.addEventListener('change', () =>
+    syncHistoryWindow(guardrailsHistoryWindowEl.value),
+  )
 }
 if (csvBtn) {
   csvBtn.addEventListener('click', () => {
@@ -1693,14 +2973,28 @@ if (csvBtn) {
 }
 
 // ─── Boot ────────────────────────────────────────────────────
+// Restore saved history-window choice before activating the initial tab so
+// the first refresh uses the persisted window instead of defaulting to Live.
+;(function restoreHistoryWindow() {
+  const saved = localStorage.getItem(HW_STORAGE_KEY)
+  if (saved) {
+    applyHistoryWindowToAll(saved)
+    updateKpiWindowLabels(saved)
+    updateChartWindowLabels(saved)
+  }
+})()
+
 const HASH_TO_TAB = {
+  '#dashboard': 'dashboard',
   '#metrics': 'metrics',
   '#setup': 'setup',
   '#compactor': 'compactor',
   '#guardrails': 'guardrails',
+  '#cache': 'cache',
   '#logs': 'logs',
+  '#settings': 'settings',
 }
-const initialTab = HASH_TO_TAB[location.hash] ?? 'logs'
+const initialTab = HASH_TO_TAB[location.hash] ?? 'dashboard'
 activateTab(initialTab)
 
 // Hash navigation (deep links, back/forward, programmatic location.hash) must
@@ -1727,6 +3021,11 @@ setInterval(() => {
   loadTopCost().catch(() => {})
   refreshMetricsCompactorKpis().catch(() => {})
 }, 5000)
+// Refresh dashboard KPIs periodically so "session requests" counter stays current.
+setInterval(() => {
+  const dashPanel = document.getElementById('dashboardPanel')
+  if (!dashPanel?.classList.contains('hidden')) refreshDashboard().catch(() => {})
+}, 30_000)
 
 // Expose chart instances and chartMode so Playwright specs (under ?testMode=1)
 // can verify dropdown-driven label/data changes without poking at internals.

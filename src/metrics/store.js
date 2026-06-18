@@ -59,13 +59,18 @@ CREATE TABLE IF NOT EXISTS events (
   compactor_compressors TEXT,
   guardrails_action TEXT,
   guardrails_hits INTEGER,
-  guardrails_detectors TEXT
+  guardrails_detectors TEXT,
+  cache_status TEXT,
+  cache_key_prefix TEXT,
+  cache_age_s INTEGER,
+  bytes_from_cache INTEGER
 );
 CREATE INDEX IF NOT EXISTS events_ts ON events(ts);
 CREATE INDEX IF NOT EXISTS events_route_ts ON events(route, ts);
 CREATE INDEX IF NOT EXISTS events_model_ts ON events(model, ts);
 CREATE INDEX IF NOT EXISTS events_compactor_ts ON events(compactor_active, ts);
 CREATE INDEX IF NOT EXISTS events_guardrails_ts ON events(guardrails_action, ts);
+CREATE INDEX IF NOT EXISTS events_cache_ts ON events(cache_status, ts);
 `
 
 // Idempotent migration for v0.4.x → adds new columns on databases that pre-date
@@ -78,7 +83,14 @@ const ADD_COLUMNS = [
   ['guardrails_action', 'TEXT'],
   ['guardrails_hits', 'INTEGER'],
   ['guardrails_detectors', 'TEXT'],
+  ['cache_status', 'TEXT'],
+  ['cache_key_prefix', 'TEXT'],
+  ['cache_age_s', 'INTEGER'],
+  ['bytes_from_cache', 'INTEGER'],
 ]
+
+const ALLOWED_COL_TYPES = new Set(['TEXT', 'INTEGER', 'REAL'])
+const VALID_COL_NAME = /^[a-z_]+$/
 
 function migrate(database) {
   const existing = new Set(
@@ -88,6 +100,9 @@ function migrate(database) {
       .map((r) => r.name),
   )
   for (const [name, type] of ADD_COLUMNS) {
+    if (!VALID_COL_NAME.test(name) || !ALLOWED_COL_TYPES.has(type)) {
+      throw new Error(`migrate: invalid column definition ${name} ${type}`)
+    }
     if (!existing.has(name)) {
       database.exec(`ALTER TABLE events ADD COLUMN ${name} ${type}`)
     }
@@ -95,6 +110,7 @@ function migrate(database) {
   database.exec(`
     CREATE INDEX IF NOT EXISTS events_compactor_ts ON events(compactor_active, ts);
     CREATE INDEX IF NOT EXISTS events_guardrails_ts ON events(guardrails_action, ts);
+    CREATE INDEX IF NOT EXISTS events_cache_ts ON events(cache_status, ts);
   `)
 }
 
@@ -137,14 +153,16 @@ export async function open(dbPath) {
       input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, total_tokens,
       cost_usd, tool_calls, tool_bytes_in, tool_bytes_out,
       compactor_active, compactor_bypass, compactor_saved_bytes, compactor_compressors,
-      guardrails_action, guardrails_hits, guardrails_detectors
+      guardrails_action, guardrails_hits, guardrails_detectors,
+      cache_status, cache_key_prefix, cache_age_s, bytes_from_cache
     ) VALUES (
       @ts, @method, @path, @status, @duration_ms, @bytes_in, @bytes_out,
       @upstream, @route, @error, @provider, @model,
       @input_tokens, @output_tokens, @cache_read_tokens, @cache_write_tokens, @total_tokens,
       @cost_usd, @tool_calls, @tool_bytes_in, @tool_bytes_out,
       @compactor_active, @compactor_bypass, @compactor_saved_bytes, @compactor_compressors,
-      @guardrails_action, @guardrails_hits, @guardrails_detectors
+      @guardrails_action, @guardrails_hits, @guardrails_detectors,
+      @cache_status, @cache_key_prefix, @cache_age_s, @bytes_from_cache
     )
   `)
 
@@ -188,6 +206,10 @@ function toRow(ev) {
     guardrails_action: ev.guardrailsAction ?? null,
     guardrails_hits: ev.guardrailsHits ?? null,
     guardrails_detectors: ev.guardrailsDetectors ?? null,
+    cache_status: ev.cacheStatus ?? null,
+    cache_key_prefix: ev.cacheKeyPrefix ?? null,
+    cache_age_s: ev.cacheAgeS ?? null,
+    bytes_from_cache: ev.bytesFromCache ?? null,
   }
 }
 
@@ -239,6 +261,8 @@ export function queryRange({
   compactorActive = null,
   guardrailsAction = null,
   guardrailsAny = false,
+  cacheActive = null,
+  cacheStatus = null,
   limit = 5000,
 } = {}) {
   if (!opened) return []
@@ -256,6 +280,11 @@ export function queryRange({
   if (compactorActive === true) where.push('compactor_active = 1')
   else if (compactorActive === false)
     where.push('(compactor_active IS NULL OR compactor_active = 0)')
+  if (cacheActive === true) where.push('cache_status IS NOT NULL')
+  if (cacheStatus) {
+    where.push('cache_status = @cache_status')
+    params.cache_status = cacheStatus
+  }
   if (guardrailsAction) {
     where.push('guardrails_action = @guardrails_action')
     params.guardrails_action = guardrailsAction
@@ -317,7 +346,11 @@ export function rollups({
       COALESCE(SUM(compactor_saved_bytes), 0) AS compactorSavedBytes,
       SUM(CASE WHEN compactor_active = 1 THEN 1 ELSE 0 END) AS compactorRequests,
       SUM(CASE WHEN guardrails_hits > 0 THEN 1 ELSE 0 END) AS guardrailsHitRequests,
-      SUM(CASE WHEN guardrails_action = 'block' THEN 1 ELSE 0 END) AS guardrailsBlocks
+      SUM(CASE WHEN guardrails_action = 'block' THEN 1 ELSE 0 END) AS guardrailsBlocks,
+      SUM(CASE WHEN cache_status = 'HIT' THEN 1 ELSE 0 END) AS cacheHits,
+      SUM(CASE WHEN cache_status = 'MISS' THEN 1 ELSE 0 END) AS cacheMisses,
+      SUM(CASE WHEN cache_status = 'DEDUP' THEN 1 ELSE 0 END) AS cacheDedup,
+      COALESCE(SUM(bytes_from_cache), 0) AS bytesFromCache
     FROM events
     WHERE ${where.join(' AND ')}
     GROUP BY bucket
@@ -377,6 +410,10 @@ function rowToEvent(r) {
     guardrailsAction: r.guardrails_action,
     guardrailsHits: r.guardrails_hits,
     guardrailsDetectors: r.guardrails_detectors,
+    cacheStatus: r.cache_status,
+    cacheKeyPrefix: r.cache_key_prefix,
+    cacheAgeS: r.cache_age_s,
+    bytesFromCache: r.bytes_from_cache,
   }
 }
 

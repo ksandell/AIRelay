@@ -57,4 +57,25 @@ test.describe('visual: dashboard tabs', () => {
     await page.waitForTimeout(300)
     await expect(page).toHaveScreenshot('setup.png', { fullPage: true })
   })
+
+  test('dashboard tab — empty state', async ({ page }) => {
+    await page.goto('/?testMode=1#dashboard')
+    await page.waitForSelector('#dashboardPanel:not(.hidden)')
+    await page.waitForTimeout(500) // let SSE connect + KPI zero-state render
+    await expect(page).toHaveScreenshot('dashboard-empty.png', { fullPage: true })
+  })
+
+  test('settings tab — initial load', async ({ page }) => {
+    await page.goto('/?testMode=1#settings')
+    await page.waitForSelector('#settingsPanel:not(.hidden)')
+    await page.waitForTimeout(300) // let settings fetch settle
+    await expect(page).toHaveScreenshot('settings-initial.png', { fullPage: true })
+  })
+
+  test('cache tab — disabled state', async ({ page }) => {
+    await page.goto('/?testMode=1#cache')
+    await page.waitForSelector('#cachePanel:not(.hidden)')
+    await page.waitForTimeout(300) // let cache summary fetch settle
+    await expect(page).toHaveScreenshot('cache-disabled.png', { fullPage: true })
+  })
 })

@@ -8,7 +8,7 @@ test.describe('Metrics tab', () => {
     // KPI sections present
     await expect(page.locator('.kpis').first()).toBeVisible()
     // Chart canvases exist
-    await expect(page.locator('canvas').first()).toBeVisible({ timeout: 10_000 })
+    await expect(page.locator('#metricsPanel canvas').first()).toBeVisible({ timeout: 10_000 })
   })
 
   test('in-flight pill updates and seeded traffic flows into recent table', async ({

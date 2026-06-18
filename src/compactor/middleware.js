@@ -13,6 +13,12 @@ function shouldRun(req) {
 }
 
 function readBody(req, cap) {
+  // Cache middleware may have already buffered the body.
+  if (req._cacheBodyBuffer) {
+    const buf = req._cacheBodyBuffer
+    if (buf.length > cap) return Promise.resolve({ overflowed: true, buf: null })
+    return Promise.resolve({ overflowed: false, buf })
+  }
   return new Promise((resolve, reject) => {
     const chunks = []
     let total = 0

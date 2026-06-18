@@ -67,6 +67,48 @@ describe('metrics/store', () => {
     expect(out[0].costUsd).toBeCloseTo(0.0015)
   })
 
+  it('round-trips cache fields (status, key prefix, age, bytesFromCache)', () => {
+    store.enqueue(
+      makeEvent({
+        cacheStatus: 'HIT',
+        cacheKeyPrefix: 'a14f0336',
+        cacheAgeS: 42,
+        bytesFromCache: 1500,
+      }),
+    )
+    store.flushSync()
+    const out = store.queryRange({
+      from: '1970-01-01T00:00:00.000Z',
+      to: '2099-01-01T00:00:00.000Z',
+    })
+    expect(out[0].cacheStatus).toBe('HIT')
+    expect(out[0].cacheKeyPrefix).toBe('a14f0336')
+    expect(out[0].cacheAgeS).toBe(42)
+    expect(out[0].bytesFromCache).toBe(1500)
+  })
+
+  it('defaults cache fields to null for non-cache events', () => {
+    store.enqueue(makeEvent())
+    store.flushSync()
+    const out = store.queryRange({
+      from: '1970-01-01T00:00:00.000Z',
+      to: '2099-01-01T00:00:00.000Z',
+    })
+    expect(out[0].cacheStatus).toBeNull()
+    expect(out[0].bytesFromCache).toBeNull()
+  })
+
+  it('filters by cacheActive and cacheStatus', () => {
+    store.enqueue(makeEvent({ cacheStatus: 'HIT', cacheKeyPrefix: 'aaa' }))
+    store.enqueue(makeEvent({ cacheStatus: 'MISS', cacheKeyPrefix: 'bbb' }))
+    store.enqueue(makeEvent()) // no cache status
+    store.flushSync()
+    const range = { from: '1970-01-01T00:00:00.000Z', to: '2099-01-01T00:00:00.000Z' }
+    expect(store.queryRange({ ...range, cacheActive: true })).toHaveLength(2)
+    expect(store.queryRange({ ...range, cacheStatus: 'HIT' })).toHaveLength(1)
+    expect(store.queryRange({ ...range, cacheStatus: 'HIT' })[0].cacheKeyPrefix).toBe('aaa')
+  })
+
   it('preserves null token fields', () => {
     store.enqueue(
       makeEvent({

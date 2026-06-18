@@ -85,6 +85,7 @@ Every variable, what it does, and when you'd touch it. Defaults match `.env.exam
 |---|---|---|
 | `LOG_DIR` | `./data/logs` | Where app log files live. Container default: `/data/logs` (persistent volume). |
 | `LOG_LEVEL` | `info` | One of `debug`, `info`, `warn`, `error`. |
+| `LOG_SINK` | `file` | Log output destination: `file` (append to `LOG_DIR`), `stdout` (JSON to stdout), `noop` (silence). |
 | `LOG_RETENTION_DAYS` | `7` | Rotated files older than this are deleted. |
 | `MAX_LOG_SIZE_MB` | `50` | If active log exceeds this, rotation triggers (checked every 5 min). |
 | `CRON_SCHEDULE` | `0 0 * * *` | Daily rotation cron. UTC. |
@@ -295,6 +296,35 @@ Prices are expressed in **USD per million tokens** (`$/MTok`). The bundled file 
 
 ---
 
+## Cache (v0.6.0)
+
+Optional Dragonfly response cache. All paths gracefully degrade — if Dragonfly
+is absent or disconnected, every request passes through to upstream unchanged.
+The dashboard **Cache** tab shows connection status and hit metrics.
+
+**Quick start:**
+```bash
+# Start AIRelay + Dragonfly together
+CACHE_ENABLED=true docker compose --profile cache up
+```
+
+| Variable | Default | Runtime | Description |
+|---|---|---|---|
+| `CACHE_ENABLED` | `false` | ✓ | Master switch. Zero overhead when false. |
+| `CACHE_REDIS_URL` | `redis://dragonfly:6379` | ✗ | Dragonfly connection URL. Restart required to change. |
+| `CACHE_EXACT_MATCH_ENABLED` | `true` | ✓ | Exact-match response cache via SHA-256 key. |
+| `CACHE_EXACT_TTL_SECONDS` | `3600` | ✓ | Response TTL in seconds. |
+| `CACHE_DEDUP_ENABLED` | `true` | ✓ | Coalesce identical in-flight requests in-process. |
+| `CACHE_SPEND_ENABLED` | `false` | ✓ | Per-API-key daily/monthly spend gate. |
+| `CACHE_SPEND_DAILY_LIMIT_USD` | — | ✓ | Daily budget per key hash. Empty = no limit. |
+| `CACHE_SPEND_MONTHLY_LIMIT_USD` | — | ✓ | Monthly budget per key hash. Empty = no limit. |
+| `CACHE_SSE_FANOUT_ENABLED` | `false` | ✓ | Redis pub/sub SSE tick sync for multi-instance deployments. |
+| `CACHE_MAX_RESPONSE_BYTES` | `5242880` | ✗ | Max response size (bytes) to store in cache. Responses larger than this are not cached. Default 5 MiB. |
+
+**Runtime = ✓:** configurable via Settings tab or `POST /api/settings` without restart.
+
+---
+
 ## Provider recipes
 
 Drop these into your `.env`:
@@ -322,11 +352,12 @@ Quick links for every named provider the proxy recognises (`PROXY_PROVIDER` valu
 | Cerebras (`cerebras`) | [cerebras.ai](https://cerebras.ai/) | [pricing](https://cerebras.ai/inference) | [docs](https://inference-docs.cerebras.ai/) |
 | Azure OpenAI (`azure`) | [azure.microsoft.com/openai](https://azure.microsoft.com/products/ai-services/openai-service) | [pricing](https://azure.microsoft.com/pricing/details/cognitive-services/openai-service/) | [docs](https://learn.microsoft.com/azure/ai-services/openai/) |
 
+| AnLinkAI (`anlinkai`) | [anlinkai.com](https://anlinkai.com/) | private beta | — |
+
 > **`azure` vs `microsoft`**: use `PROXY_PROVIDER=azure` for Azure OpenAI Service
 > (api-key header, per-deployment URL, `api-version` query — proxy handles all of
 > it). `microsoft` is a legacy alias that uses OpenAI's wire format against
 > `api.openai.com` and is kept only for back-compat.
-| AnLinkAI (`anlinkai`) | [anlinkai.com](https://anlinkai.com/) | private beta | — |
 
 
 ### Anthropic (Claude API)

@@ -1,0 +1,16 @@
+<svg width="178" height="39" viewBox="4 14 178 39" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AIRelay">
+  <defs>
+    <linearGradient id="airelayTeal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2dd4bf"/>
+      <stop offset="1" stop-color="#0d9488"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke="url(#airelayTeal)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="8,18 21,32 8,46" opacity="0.25"/>
+    <polyline points="19,18 32,32 19,46" opacity="0.55"/>
+    <polyline points="30,18 43,32 30,46" opacity="1"/>
+  </g>
+  <text x="58" y="44" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="36" font-weight="600" letter-spacing="0.2">
+    <tspan fill="#ffffff">AI</tspan><tspan fill="#0d9488">Relay</tspan>
+  </text>
+</svg>

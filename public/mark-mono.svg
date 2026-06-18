@@ -1,0 +1,7 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AIRelay">
+  <g fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="14,14 29,32 14,50" opacity="0.3"/>
+    <polyline points="26,14 41,32 26,50" opacity="0.6"/>
+    <polyline points="38,14 53,32 38,50" opacity="1"/>
+  </g>
+</svg>

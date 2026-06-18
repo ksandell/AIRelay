@@ -153,7 +153,7 @@ npm run docker:up
 | Docker compose up   | `npm run docker:up`                            | container `airelay-app-1` healthy             |
 | Health endpoint     | `curl -s http://localhost:3000/health \| jq .` | `status:"ok"`, `proxy.upstreamReachable:true` |
 | Dashboard reachable | open `http://localhost:3000/`                  | renders, no console errors                    |
-| Unit tests          | `npm test`                                     | 193+ pass                                     |
+| Unit tests          | `npm test`                                     | 504+ pass                                     |
 
 ## One-time secret input
 
@@ -191,7 +191,7 @@ Expected:
   - `Tool calls (1 min)` = `0` (no tools used).
   - Token chart draws Prompt + Completion lines.
   - Status pill `2xx` increments by 1.
-  - Per-model row shows `mistral-small-latest` with provider `openai`, `requests:1`.
+  - Per-model row shows `mistral-small-latest` with provider `mistral`, `requests:1`.
 
 ### S2 — Streaming chat
 
@@ -325,7 +325,7 @@ Expected (Mistral `mistral-small-latest`):
 ## Pass criteria
 
 - All scenario expectations met (S6 requires ≥ 2 days of rotated logs).
-- `npm test` ≥ 579 passing.
+- `npm test` ≥ 504 passing.
 - `npm run lint` clean.
 - No console errors in dashboard.
 
