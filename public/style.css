@@ -75,7 +75,7 @@ header {
 .brand-identity {
   display: flex;
   align-items: flex-end;
-  gap: 6px;
+  gap: 2px;
 }
 .app-version {
   font-size: 0.72rem;
