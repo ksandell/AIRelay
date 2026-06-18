@@ -997,10 +997,18 @@ footer {
   background: var(--text-muted);
 }
 
-.health-dot.dot-ok { background: #22c55e; }
-.health-dot.dot-warn { background: #f59e0b; }
-.health-dot.dot-error { background: #ef4444; }
-.health-dot.dot-neutral { background: var(--text-muted); }
+.health-dot.dot-ok {
+  background: #22c55e;
+}
+.health-dot.dot-warn {
+  background: #f59e0b;
+}
+.health-dot.dot-error {
+  background: #ef4444;
+}
+.health-dot.dot-neutral {
+  background: var(--text-muted);
+}
 
 #dashRecommendationsList {
   list-style: none;
@@ -1034,7 +1042,9 @@ footer {
   font-size: 0.9rem;
 }
 
-.quick-links a:hover { text-decoration: underline; }
+.quick-links a:hover {
+  text-decoration: underline;
+}
 
 .link-subtle {
   font-size: 0.8rem;
@@ -1043,7 +1053,9 @@ footer {
   font-weight: 400;
 }
 
-.link-subtle:hover { text-decoration: underline; }
+.link-subtle:hover {
+  text-decoration: underline;
+}
 
 /* ─── Settings tab ───────────────────────────────────── */
 .settings-note {
@@ -1100,7 +1112,7 @@ footer {
   user-select: none;
 }
 
-.toggle-label input[type="checkbox"] {
+.toggle-label input[type='checkbox'] {
   width: 1.1rem;
   height: 1.1rem;
   accent-color: var(--accent, #6366f1);
@@ -1159,9 +1171,18 @@ footer {
   text-transform: uppercase;
 }
 
-.category-badge.secrets { background: rgba(239,68,68,0.12); color: #ef4444; }
-.category-badge.pii     { background: rgba(245,158,11,0.12); color: #f59e0b; }
-.category-badge.injection { background: rgba(99,102,241,0.12); color: #6366f1; }
+.category-badge.secrets {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+.category-badge.pii {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+}
+.category-badge.injection {
+  background: rgba(99, 102, 241, 0.12);
+  color: #6366f1;
+}
 
 .category-cards {
   display: grid;
@@ -1174,13 +1195,23 @@ footer {
   border: 2px solid var(--border);
   border-radius: 8px;
   padding: 1rem;
-  transition: border-color 0.15s, opacity 0.15s;
+  transition:
+    border-color 0.15s,
+    opacity 0.15s;
 }
 
-.category-card.mode-off     { border-color: var(--border); }
-.category-card.mode-alert   { border-color: #f59e0b; }
-.category-card.mode-block   { border-color: #ef4444; }
-.category-card.mode-redact  { border-color: #6366f1; }
+.category-card.mode-off {
+  border-color: var(--border);
+}
+.category-card.mode-alert {
+  border-color: #f59e0b;
+}
+.category-card.mode-block {
+  border-color: #ef4444;
+}
+.category-card.mode-redact {
+  border-color: #6366f1;
+}
 
 .category-card-header {
   margin-bottom: 0.5rem;
@@ -1212,7 +1243,10 @@ footer {
   cursor: pointer;
   font-size: 0.78rem;
   color: var(--text-muted);
-  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s,
+    border-color 0.1s;
 }
 
 .mode-pill.active {
@@ -1222,10 +1256,26 @@ footer {
   background: var(--surface);
 }
 
-.mode-pill.active[data-mode="alert"]  { background: rgba(245,158,11,0.15); border-color: #f59e0b; color: #f59e0b; }
-.mode-pill.active[data-mode="block"]  { background: rgba(239,68,68,0.15);  border-color: #ef4444; color: #ef4444; }
-.mode-pill.active[data-mode="redact"] { background: rgba(99,102,241,0.15); border-color: #6366f1; color: #6366f1; }
-.mode-pill.active[data-mode="off"]    { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
+.mode-pill.active[data-mode='alert'] {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: #f59e0b;
+  color: #f59e0b;
+}
+.mode-pill.active[data-mode='block'] {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+  color: #ef4444;
+}
+.mode-pill.active[data-mode='redact'] {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: #6366f1;
+  color: #6366f1;
+}
+.mode-pill.active[data-mode='off'] {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text-muted);
+}
 
 .settings-footer {
   font-size: 0.78rem;
@@ -1235,7 +1285,7 @@ footer {
 }
 
 #settingsDirtyPill {
-  background: rgba(245,158,11,0.15);
+  background: rgba(245, 158, 11, 0.15);
   border: 1px solid #f59e0b;
   color: #f59e0b;
   border-radius: 9999px;

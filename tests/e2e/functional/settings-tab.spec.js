@@ -66,7 +66,7 @@ test.describe('Settings tab', () => {
     await expect(page.locator('#settingsSaveBtn')).toBeVisible()
 
     const settingsRequest = page.waitForRequest(
-      req => req.url().includes('/api/settings') && req.method() === 'POST'
+      (req) => req.url().includes('/api/settings') && req.method() === 'POST',
     )
     await page.locator('#settingsSaveBtn').click()
     const req = await settingsRequest

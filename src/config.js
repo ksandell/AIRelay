@@ -6,7 +6,9 @@ const DEFAULT_SETTINGS_PATH = path.resolve('./data/settings.json')
 let _overrides = {}
 let _settingsPath = DEFAULT_SETTINGS_PATH
 
-export function _getOverrides() { return _overrides }
+export function _getOverrides() {
+  return _overrides
+}
 
 export async function loadOverrides(filePath = DEFAULT_SETTINGS_PATH) {
   _settingsPath = filePath
@@ -41,13 +43,6 @@ function int(name, fallback) {
 }
 
 const GUARDRAILS_MODES = new Set(['off', 'alert', 'block', 'redact'])
-function mode(name, fallback) {
-  const val = (process.env[name] ?? fallback).toLowerCase()
-  if (!GUARDRAILS_MODES.has(val)) {
-    throw new Error(`Env var ${name} must be one of off|alert|block|redact, got: ${val}`)
-  }
-  return val
-}
 
 export const config = {
   // Server
@@ -127,25 +122,85 @@ export const config = {
   // traffic. When enabled, mutates request/response bodies through a pipeline of
   // deterministic compressors. See docs/COMPACTOR.md.
   // Compactor — override layer checks _overrides first, falls back to env
-  get compactorEnabled()     { return _overrides.compactorEnabled     ?? process.env.COMPACTOR_ENABLED === 'true' },
-  get compactorRequestBody() { return _overrides.compactorRequestBody ?? process.env.COMPACTOR_REQUEST_BODY !== 'false' },
-  get compactorResponseBody(){ return _overrides.compactorResponseBody?? process.env.COMPACTOR_RESPONSE_BODY === 'true' },
-  get compactorToolResultOnly(){ return _overrides.compactorToolResultOnly ?? process.env.COMPACTOR_TOOL_RESULT_ONLY !== 'false' },
-  get compactorAllowRisky()  { return _overrides.compactorAllowRisky  ?? process.env.COMPACTOR_ALLOW_RISKY === 'true' },
+  get compactorEnabled() {
+    return _overrides.compactorEnabled ?? process.env.COMPACTOR_ENABLED === 'true'
+  },
+  get compactorRequestBody() {
+    return _overrides.compactorRequestBody ?? process.env.COMPACTOR_REQUEST_BODY !== 'false'
+  },
+  get compactorResponseBody() {
+    return _overrides.compactorResponseBody ?? process.env.COMPACTOR_RESPONSE_BODY === 'true'
+  },
+  get compactorToolResultOnly() {
+    return _overrides.compactorToolResultOnly ?? process.env.COMPACTOR_TOOL_RESULT_ONLY !== 'false'
+  },
+  get compactorAllowRisky() {
+    return _overrides.compactorAllowRisky ?? process.env.COMPACTOR_ALLOW_RISKY === 'true'
+  },
   compactorMaxReqBytes: int('COMPACTOR_MAX_REQ_BYTES', 4_194_304),
   compactorLongFileThreshold: int('COMPACTOR_LONG_FILE_THRESHOLD', 400),
   get compactor() {
     return {
-      get ansiStrip()        { return _overrides.compactorAnsiStripEnabled        ?? process.env.COMPACTOR_ANSI_STRIP_ENABLED !== 'false' },
-      get blanklineCollapse(){ return _overrides.compactorBlanklineCollapseEnabled ?? process.env.COMPACTOR_BLANKLINE_COLLAPSE_ENABLED !== 'false' },
-      get diffCollapse()     { return _overrides.compactorDiffCollapseEnabled      ?? process.env.COMPACTOR_DIFF_COLLAPSE_ENABLED !== 'false' },
-      get lockfileDrop()     { return _overrides.compactorLockfileDropEnabled      ?? process.env.COMPACTOR_LOCKFILE_DROP_ENABLED !== 'false' },
-      get lsLongShrink()     { return _overrides.compactorLsLongShrinkEnabled      ?? process.env.COMPACTOR_LS_LONG_SHRINK_ENABLED !== 'false' },
-      get npmNoiseStrip()    { return _overrides.compactorNpmNoiseStripEnabled     ?? process.env.COMPACTOR_NPM_NOISE_STRIP_ENABLED !== 'false' },
-      get repeatLineDedupe() { return _overrides.compactorRepeatLineDedupeEnabled  ?? process.env.COMPACTOR_REPEAT_LINE_DEDUPE_ENABLED !== 'false' },
-      get stacktraceDedupe() { return _overrides.compactorStacktraceDedupeEnabled  ?? process.env.COMPACTOR_STACKTRACE_DEDUPE_ENABLED !== 'false' },
-      get longFileElide()    { return _overrides.compactorLongFileElideEnabled     ?? process.env.COMPACTOR_LONG_FILE_ELIDE_ENABLED !== 'false' },
-      get base64Truncate()   { return _overrides.compactorBase64TruncateEnabled    ?? process.env.COMPACTOR_BASE64_TRUNCATE_ENABLED !== 'false' },
+      get ansiStrip() {
+        return (
+          _overrides.compactorAnsiStripEnabled ??
+          process.env.COMPACTOR_ANSI_STRIP_ENABLED !== 'false'
+        )
+      },
+      get blanklineCollapse() {
+        return (
+          _overrides.compactorBlanklineCollapseEnabled ??
+          process.env.COMPACTOR_BLANKLINE_COLLAPSE_ENABLED !== 'false'
+        )
+      },
+      get diffCollapse() {
+        return (
+          _overrides.compactorDiffCollapseEnabled ??
+          process.env.COMPACTOR_DIFF_COLLAPSE_ENABLED !== 'false'
+        )
+      },
+      get lockfileDrop() {
+        return (
+          _overrides.compactorLockfileDropEnabled ??
+          process.env.COMPACTOR_LOCKFILE_DROP_ENABLED !== 'false'
+        )
+      },
+      get lsLongShrink() {
+        return (
+          _overrides.compactorLsLongShrinkEnabled ??
+          process.env.COMPACTOR_LS_LONG_SHRINK_ENABLED !== 'false'
+        )
+      },
+      get npmNoiseStrip() {
+        return (
+          _overrides.compactorNpmNoiseStripEnabled ??
+          process.env.COMPACTOR_NPM_NOISE_STRIP_ENABLED !== 'false'
+        )
+      },
+      get repeatLineDedupe() {
+        return (
+          _overrides.compactorRepeatLineDedupeEnabled ??
+          process.env.COMPACTOR_REPEAT_LINE_DEDUPE_ENABLED !== 'false'
+        )
+      },
+      get stacktraceDedupe() {
+        return (
+          _overrides.compactorStacktraceDedupeEnabled ??
+          process.env.COMPACTOR_STACKTRACE_DEDUPE_ENABLED !== 'false'
+        )
+      },
+      get longFileElide() {
+        return (
+          _overrides.compactorLongFileElideEnabled ??
+          process.env.COMPACTOR_LONG_FILE_ELIDE_ENABLED !== 'false'
+        )
+      },
+      get base64Truncate() {
+        return (
+          _overrides.compactorBase64TruncateEnabled ??
+          process.env.COMPACTOR_BASE64_TRUNCATE_ENABLED !== 'false'
+        )
+      },
     }
   },
 
@@ -157,19 +212,21 @@ export const config = {
   //   block  — detect + reject with 4xx (no mutation, no forward)
   //   redact — detect + replace match with <redacted:NAME>, forward modified
   // See docs/GUARDRAILS.md.
-  get guardrailsEnabled()      { return _overrides.guardrailsEnabled      ?? process.env.GUARDRAILS_ENABLED === 'true' },
+  get guardrailsEnabled() {
+    return _overrides.guardrailsEnabled ?? process.env.GUARDRAILS_ENABLED === 'true'
+  },
   guardrailsMaxReqBytes: int('GUARDRAILS_MAX_REQ_BYTES', 4_194_304),
-  get guardrailsSecretsMode()  {
+  get guardrailsSecretsMode() {
     const v = _overrides.guardrailsSecretsMode ?? process.env.GUARDRAILS_SECRETS_MODE ?? 'off'
     if (!GUARDRAILS_MODES.has(v.toLowerCase())) return 'off'
     return v.toLowerCase()
   },
-  get guardrailsPiiMode()      {
+  get guardrailsPiiMode() {
     const v = _overrides.guardrailsPiiMode ?? process.env.GUARDRAILS_PII_MODE ?? 'off'
     if (!GUARDRAILS_MODES.has(v.toLowerCase())) return 'off'
     return v.toLowerCase()
   },
-  get guardrailsInjectionMode(){
+  get guardrailsInjectionMode() {
     const v = _overrides.guardrailsInjectionMode ?? process.env.GUARDRAILS_INJECTION_MODE ?? 'off'
     if (!GUARDRAILS_MODES.has(v.toLowerCase())) return 'off'
     return v.toLowerCase()
@@ -177,20 +234,78 @@ export const config = {
   guardrailsCustomPatternsFile: process.env.GUARDRAILS_CUSTOM_PATTERNS_FILE ?? null,
   get guardrails() {
     return {
-      get awsAccessKey()        { return _overrides.guardrailsAwsAccessKeyEnabled        ?? process.env.GUARDRAILS_AWS_ACCESS_KEY_ENABLED !== 'false' },
-      get githubPat()           { return _overrides.guardrailsGithubPatEnabled           ?? process.env.GUARDRAILS_GITHUB_PAT_ENABLED !== 'false' },
-      get anthropicKey()        { return _overrides.guardrailsAnthropicKeyEnabled        ?? process.env.GUARDRAILS_ANTHROPIC_KEY_ENABLED !== 'false' },
-      get openaiKey()           { return _overrides.guardrailsOpenaiKeyEnabled           ?? process.env.GUARDRAILS_OPENAI_KEY_ENABLED !== 'false' },
-      get privateKey()          { return _overrides.guardrailsPrivateKeyEnabled          ?? process.env.GUARDRAILS_PRIVATE_KEY_ENABLED !== 'false' },
-      get jwt()                 { return _overrides.guardrailsJwtEnabled                 ?? process.env.GUARDRAILS_JWT_ENABLED !== 'false' },
-      get genericHighEntropy()  { return _overrides.guardrailsGenericHighEntropyEnabled  ?? process.env.GUARDRAILS_GENERIC_HIGH_ENTROPY_ENABLED === 'true' },
-      get email()               { return _overrides.guardrailsEmailEnabled               ?? process.env.GUARDRAILS_EMAIL_ENABLED !== 'false' },
-      get phone()               { return _overrides.guardrailsPhoneEnabled               ?? process.env.GUARDRAILS_PHONE_ENABLED !== 'false' },
-      get ssnUs()               { return _overrides.guardrailsSsnUsEnabled               ?? process.env.GUARDRAILS_SSN_ENABLED === 'true' },
-      get creditCard()          { return _overrides.guardrailsCreditCardEnabled          ?? process.env.GUARDRAILS_CREDIT_CARD_ENABLED !== 'false' },
-      get roleOverride()        { return _overrides.guardrailsRoleOverrideEnabled        ?? process.env.GUARDRAILS_ROLE_OVERRIDE_ENABLED !== 'false' },
-      get systemPromptLeak()    { return _overrides.guardrailsSystemPromptLeakEnabled    ?? process.env.GUARDRAILS_SYSTEM_PROMPT_LEAK_ENABLED !== 'false' },
-      get toolOverride()        { return _overrides.guardrailsToolOverrideEnabled        ?? process.env.GUARDRAILS_TOOL_OVERRIDE_ENABLED !== 'false' },
+      get awsAccessKey() {
+        return (
+          _overrides.guardrailsAwsAccessKeyEnabled ??
+          process.env.GUARDRAILS_AWS_ACCESS_KEY_ENABLED !== 'false'
+        )
+      },
+      get githubPat() {
+        return (
+          _overrides.guardrailsGithubPatEnabled ??
+          process.env.GUARDRAILS_GITHUB_PAT_ENABLED !== 'false'
+        )
+      },
+      get anthropicKey() {
+        return (
+          _overrides.guardrailsAnthropicKeyEnabled ??
+          process.env.GUARDRAILS_ANTHROPIC_KEY_ENABLED !== 'false'
+        )
+      },
+      get openaiKey() {
+        return (
+          _overrides.guardrailsOpenaiKeyEnabled ??
+          process.env.GUARDRAILS_OPENAI_KEY_ENABLED !== 'false'
+        )
+      },
+      get privateKey() {
+        return (
+          _overrides.guardrailsPrivateKeyEnabled ??
+          process.env.GUARDRAILS_PRIVATE_KEY_ENABLED !== 'false'
+        )
+      },
+      get jwt() {
+        return _overrides.guardrailsJwtEnabled ?? process.env.GUARDRAILS_JWT_ENABLED !== 'false'
+      },
+      get genericHighEntropy() {
+        return (
+          _overrides.guardrailsGenericHighEntropyEnabled ??
+          process.env.GUARDRAILS_GENERIC_HIGH_ENTROPY_ENABLED === 'true'
+        )
+      },
+      get email() {
+        return _overrides.guardrailsEmailEnabled ?? process.env.GUARDRAILS_EMAIL_ENABLED !== 'false'
+      },
+      get phone() {
+        return _overrides.guardrailsPhoneEnabled ?? process.env.GUARDRAILS_PHONE_ENABLED !== 'false'
+      },
+      get ssnUs() {
+        return _overrides.guardrailsSsnUsEnabled ?? process.env.GUARDRAILS_SSN_ENABLED === 'true'
+      },
+      get creditCard() {
+        return (
+          _overrides.guardrailsCreditCardEnabled ??
+          process.env.GUARDRAILS_CREDIT_CARD_ENABLED !== 'false'
+        )
+      },
+      get roleOverride() {
+        return (
+          _overrides.guardrailsRoleOverrideEnabled ??
+          process.env.GUARDRAILS_ROLE_OVERRIDE_ENABLED !== 'false'
+        )
+      },
+      get systemPromptLeak() {
+        return (
+          _overrides.guardrailsSystemPromptLeakEnabled ??
+          process.env.GUARDRAILS_SYSTEM_PROMPT_LEAK_ENABLED !== 'false'
+        )
+      },
+      get toolOverride() {
+        return (
+          _overrides.guardrailsToolOverrideEnabled ??
+          process.env.GUARDRAILS_TOOL_OVERRIDE_ENABLED !== 'false'
+        )
+      },
     }
   },
 

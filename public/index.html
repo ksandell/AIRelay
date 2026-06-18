@@ -127,7 +127,9 @@
       </div>
 
       <div class="controls hidden" id="dashboardControls">
-        <span id="dashboardStatus" class="status disconnected" role="status" aria-live="polite">Loading…</span>
+        <span id="dashboardStatus" class="status disconnected" role="status" aria-live="polite"
+          >Loading…</span
+        >
       </div>
 
       <div class="controls hidden" id="settingsControls">
@@ -167,11 +169,20 @@
             <canvas id="dashSparkline" height="80"></canvas>
           </div>
           <div class="card">
-            <h3>Recent requests <a id="dashLogsLink" href="#logs" class="link-subtle">View all in Logs →</a></h3>
+            <h3>
+              Recent requests
+              <a id="dashLogsLink" href="#logs" class="link-subtle">View all in Logs →</a>
+            </h3>
             <table id="dashRecentTable">
-              <thead><tr>
-                <th>Time</th><th>Model</th><th>Tokens</th><th>Cost</th><th>Latency</th>
-              </tr></thead>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Model</th>
+                  <th>Tokens</th>
+                  <th>Cost</th>
+                  <th>Latency</th>
+                </tr>
+              </thead>
               <tbody></tbody>
             </table>
           </div>
@@ -182,10 +193,22 @@
           <div class="card">
             <h3>System health</h3>
             <ul class="health-list" id="dashHealthList">
-              <li><span class="health-dot" id="dashHealthProxy"></span> Proxy <span id="dashHealthProxyLabel">—</span></li>
-              <li><span class="health-dot" id="dashHealthCompactor"></span> Compactors <span id="dashHealthCompactorLabel">—</span></li>
-              <li><span class="health-dot" id="dashHealthGuardrails"></span> Guardrails <span id="dashHealthGuardrailsLabel">—</span></li>
-              <li><span class="health-dot dot-neutral"></span> In-flight <span id="dashInFlight">0</span></li>
+              <li>
+                <span class="health-dot" id="dashHealthProxy"></span> Proxy
+                <span id="dashHealthProxyLabel">—</span>
+              </li>
+              <li>
+                <span class="health-dot" id="dashHealthCompactor"></span> Compactors
+                <span id="dashHealthCompactorLabel">—</span>
+              </li>
+              <li>
+                <span class="health-dot" id="dashHealthGuardrails"></span> Guardrails
+                <span id="dashHealthGuardrailsLabel">—</span>
+              </li>
+              <li>
+                <span class="health-dot dot-neutral"></span> In-flight
+                <span id="dashInFlight">0</span>
+              </li>
             </ul>
           </div>
           <div class="card" id="dashRecommendationsCard" hidden>
@@ -801,14 +824,17 @@ npm run dev</pre
 
     <main id="settingsPanel" class="panel hidden">
       <h2>Runtime Settings</h2>
-      <p class="settings-note">Saved to <code>data/settings.json</code> · Base <code>.env</code> never modified · No restart required</p>
+      <p class="settings-note">
+        Saved to <code>data/settings.json</code> · Base <code>.env</code> never modified · No
+        restart required
+      </p>
 
       <!-- Compactors section -->
       <div class="settings-section">
         <div class="settings-section-header">
           <h3>Compactors</h3>
           <label class="toggle-label">
-            <input type="checkbox" id="settingCompactorEnabled" data-key="compactorEnabled">
+            <input type="checkbox" id="settingCompactorEnabled" data-key="compactorEnabled" />
             <span>Enable</span>
           </label>
         </div>
@@ -816,10 +842,26 @@ npm run dev</pre
         <div class="settings-subsection" id="compactorSubsection">
           <h4>Scope</h4>
           <div class="toggle-grid">
-            <label class="toggle-label"><input type="checkbox" data-key="compactorRequestBody"><span>Request body</span></label>
-            <label class="toggle-label"><input type="checkbox" data-key="compactorResponseBody"><span>Response body</span></label>
-            <label class="toggle-label"><input type="checkbox" data-key="compactorToolResultOnly"><span>Tool results only</span></label>
-            <label class="toggle-label"><input type="checkbox" data-key="compactorAllowRisky"><span>Allow risky <span class="badge-risky">⚠</span></span></label>
+            <label class="toggle-label"
+              ><input type="checkbox" data-key="compactorRequestBody" /><span
+                >Request body</span
+              ></label
+            >
+            <label class="toggle-label"
+              ><input type="checkbox" data-key="compactorResponseBody" /><span
+                >Response body</span
+              ></label
+            >
+            <label class="toggle-label"
+              ><input type="checkbox" data-key="compactorToolResultOnly" /><span
+                >Tool results only</span
+              ></label
+            >
+            <label class="toggle-label"
+              ><input type="checkbox" data-key="compactorAllowRisky" /><span
+                >Allow risky <span class="badge-risky">⚠</span></span
+              ></label
+            >
           </div>
 
           <h4>Compressors</h4>
@@ -827,70 +869,92 @@ npm run dev</pre
             <div class="compressor-card" data-key="compactorAnsiStripEnabled">
               <div class="compressor-card-header">
                 <span class="compressor-name">ansi-strip</span>
-                <label class="toggle-label"><input type="checkbox" data-key="compactorAnsiStripEnabled"></label>
+                <label class="toggle-label"
+                  ><input type="checkbox" data-key="compactorAnsiStripEnabled"
+                /></label>
               </div>
               <p class="compressor-desc">Strip ANSI escape codes from terminal output</p>
             </div>
             <div class="compressor-card" data-key="compactorBlanklineCollapseEnabled">
               <div class="compressor-card-header">
                 <span class="compressor-name">blankline-collapse</span>
-                <label class="toggle-label"><input type="checkbox" data-key="compactorBlanklineCollapseEnabled"></label>
+                <label class="toggle-label"
+                  ><input type="checkbox" data-key="compactorBlanklineCollapseEnabled"
+                /></label>
               </div>
               <p class="compressor-desc">Collapse consecutive blank lines to one</p>
             </div>
             <div class="compressor-card" data-key="compactorDiffCollapseEnabled">
               <div class="compressor-card-header">
                 <span class="compressor-name">diff-collapse</span>
-                <label class="toggle-label"><input type="checkbox" data-key="compactorDiffCollapseEnabled"></label>
+                <label class="toggle-label"
+                  ><input type="checkbox" data-key="compactorDiffCollapseEnabled"
+                /></label>
               </div>
               <p class="compressor-desc">Collapse unchanged diff hunks to a summary line</p>
             </div>
             <div class="compressor-card" data-key="compactorLockfileDropEnabled">
               <div class="compressor-card-header">
                 <span class="compressor-name">lockfile-drop</span>
-                <label class="toggle-label"><input type="checkbox" data-key="compactorLockfileDropEnabled"></label>
+                <label class="toggle-label"
+                  ><input type="checkbox" data-key="compactorLockfileDropEnabled"
+                /></label>
               </div>
               <p class="compressor-desc">Replace lockfile content with a size summary</p>
             </div>
             <div class="compressor-card" data-key="compactorLsLongShrinkEnabled">
               <div class="compressor-card-header">
                 <span class="compressor-name">ls-long-shrink</span>
-                <label class="toggle-label"><input type="checkbox" data-key="compactorLsLongShrinkEnabled"></label>
+                <label class="toggle-label"
+                  ><input type="checkbox" data-key="compactorLsLongShrinkEnabled"
+                /></label>
               </div>
               <p class="compressor-desc">Shrink verbose ls -l permission / owner columns</p>
             </div>
             <div class="compressor-card" data-key="compactorNpmNoiseStripEnabled">
               <div class="compressor-card-header">
                 <span class="compressor-name">npm-noise-strip</span>
-                <label class="toggle-label"><input type="checkbox" data-key="compactorNpmNoiseStripEnabled"></label>
+                <label class="toggle-label"
+                  ><input type="checkbox" data-key="compactorNpmNoiseStripEnabled"
+                /></label>
               </div>
               <p class="compressor-desc">Remove npm WARN deprecated lines from install output</p>
             </div>
             <div class="compressor-card" data-key="compactorRepeatLineDedupeEnabled">
               <div class="compressor-card-header">
                 <span class="compressor-name">repeat-line-dedupe</span>
-                <label class="toggle-label"><input type="checkbox" data-key="compactorRepeatLineDedupeEnabled"></label>
+                <label class="toggle-label"
+                  ><input type="checkbox" data-key="compactorRepeatLineDedupeEnabled"
+                /></label>
               </div>
               <p class="compressor-desc">Deduplicate repeated identical lines</p>
             </div>
             <div class="compressor-card" data-key="compactorStacktraceDedupeEnabled">
               <div class="compressor-card-header">
                 <span class="compressor-name">stacktrace-dedupe</span>
-                <label class="toggle-label"><input type="checkbox" data-key="compactorStacktraceDedupeEnabled"></label>
+                <label class="toggle-label"
+                  ><input type="checkbox" data-key="compactorStacktraceDedupeEnabled"
+                /></label>
               </div>
               <p class="compressor-desc">Collapse duplicate stack frames in exception traces</p>
             </div>
             <div class="compressor-card" data-key="compactorLongFileElideEnabled">
               <div class="compressor-card-header">
-                <span class="compressor-name">long-file-elide <span class="badge-risky">⚠</span></span>
-                <label class="toggle-label"><input type="checkbox" data-key="compactorLongFileElideEnabled"></label>
+                <span class="compressor-name"
+                  >long-file-elide <span class="badge-risky">⚠</span></span
+                >
+                <label class="toggle-label"
+                  ><input type="checkbox" data-key="compactorLongFileElideEnabled"
+                /></label>
               </div>
               <p class="compressor-desc">Elide middle of very long files, keep head + tail</p>
             </div>
             <div class="compressor-card" data-key="compactorBase64TruncateEnabled">
               <div class="compressor-card-header">
                 <span class="compressor-name">base64-truncate</span>
-                <label class="toggle-label"><input type="checkbox" data-key="compactorBase64TruncateEnabled"></label>
+                <label class="toggle-label"
+                  ><input type="checkbox" data-key="compactorBase64TruncateEnabled"
+                /></label>
               </div>
               <p class="compressor-desc">Truncate long base64 blobs and note their original size</p>
             </div>
@@ -903,7 +967,7 @@ npm run dev</pre
         <div class="settings-section-header">
           <h3>Guardrails</h3>
           <label class="toggle-label">
-            <input type="checkbox" id="settingGuardrailsEnabled" data-key="guardrailsEnabled">
+            <input type="checkbox" id="settingGuardrailsEnabled" data-key="guardrailsEnabled" />
             <span>Enable</span>
           </label>
         </div>
@@ -951,25 +1015,139 @@ npm run dev</pre
 
           <h4>Detectors</h4>
           <div class="compressor-grid" id="detectorGrid">
-            <div class="compressor-card" data-key="guardrailsAwsAccessKeyEnabled"><div class="compressor-card-header"><span class="compressor-name">aws-access-key</span><span class="category-badge secrets">secrets</span><label class="toggle-label"><input type="checkbox" data-key="guardrailsAwsAccessKeyEnabled"></label></div></div>
-            <div class="compressor-card" data-key="guardrailsGithubPatEnabled"><div class="compressor-card-header"><span class="compressor-name">github-pat</span><span class="category-badge secrets">secrets</span><label class="toggle-label"><input type="checkbox" data-key="guardrailsGithubPatEnabled"></label></div></div>
-            <div class="compressor-card" data-key="guardrailsAnthropicKeyEnabled"><div class="compressor-card-header"><span class="compressor-name">anthropic-key</span><span class="category-badge secrets">secrets</span><label class="toggle-label"><input type="checkbox" data-key="guardrailsAnthropicKeyEnabled"></label></div></div>
-            <div class="compressor-card" data-key="guardrailsOpenaiKeyEnabled"><div class="compressor-card-header"><span class="compressor-name">openai-key</span><span class="category-badge secrets">secrets</span><label class="toggle-label"><input type="checkbox" data-key="guardrailsOpenaiKeyEnabled"></label></div></div>
-            <div class="compressor-card" data-key="guardrailsPrivateKeyEnabled"><div class="compressor-card-header"><span class="compressor-name">private-key</span><span class="category-badge secrets">secrets</span><label class="toggle-label"><input type="checkbox" data-key="guardrailsPrivateKeyEnabled"></label></div></div>
-            <div class="compressor-card" data-key="guardrailsJwtEnabled"><div class="compressor-card-header"><span class="compressor-name">jwt</span><span class="category-badge secrets">secrets</span><label class="toggle-label"><input type="checkbox" data-key="guardrailsJwtEnabled"></label></div></div>
-            <div class="compressor-card" data-key="guardrailsGenericHighEntropyEnabled"><div class="compressor-card-header"><span class="compressor-name">generic-high-entropy</span><span class="category-badge secrets">secrets</span><label class="toggle-label"><input type="checkbox" data-key="guardrailsGenericHighEntropyEnabled"></label></div></div>
-            <div class="compressor-card" data-key="guardrailsEmailEnabled"><div class="compressor-card-header"><span class="compressor-name">email</span><span class="category-badge pii">pii</span><label class="toggle-label"><input type="checkbox" data-key="guardrailsEmailEnabled"></label></div></div>
-            <div class="compressor-card" data-key="guardrailsPhoneEnabled"><div class="compressor-card-header"><span class="compressor-name">phone-e164</span><span class="category-badge pii">pii</span><label class="toggle-label"><input type="checkbox" data-key="guardrailsPhoneEnabled"></label></div></div>
-            <div class="compressor-card" data-key="guardrailsSsnUsEnabled"><div class="compressor-card-header"><span class="compressor-name">ssn-us</span><span class="category-badge pii">pii</span><label class="toggle-label"><input type="checkbox" data-key="guardrailsSsnUsEnabled"></label></div></div>
-            <div class="compressor-card" data-key="guardrailsCreditCardEnabled"><div class="compressor-card-header"><span class="compressor-name">credit-card</span><span class="category-badge pii">pii</span><label class="toggle-label"><input type="checkbox" data-key="guardrailsCreditCardEnabled"></label></div></div>
-            <div class="compressor-card" data-key="guardrailsRoleOverrideEnabled"><div class="compressor-card-header"><span class="compressor-name">role-override</span><span class="category-badge injection">injection</span><label class="toggle-label"><input type="checkbox" data-key="guardrailsRoleOverrideEnabled"></label></div></div>
-            <div class="compressor-card" data-key="guardrailsSystemPromptLeakEnabled"><div class="compressor-card-header"><span class="compressor-name">system-prompt-leak</span><span class="category-badge injection">injection</span><label class="toggle-label"><input type="checkbox" data-key="guardrailsSystemPromptLeakEnabled"></label></div></div>
-            <div class="compressor-card" data-key="guardrailsToolOverrideEnabled"><div class="compressor-card-header"><span class="compressor-name">tool-override</span><span class="category-badge injection">injection</span><label class="toggle-label"><input type="checkbox" data-key="guardrailsToolOverrideEnabled"></label></div></div>
+            <div class="compressor-card" data-key="guardrailsAwsAccessKeyEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">aws-access-key</span
+                ><span class="category-badge secrets">secrets</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsAwsAccessKeyEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsGithubPatEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">github-pat</span
+                ><span class="category-badge secrets">secrets</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsGithubPatEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsAnthropicKeyEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">anthropic-key</span
+                ><span class="category-badge secrets">secrets</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsAnthropicKeyEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsOpenaiKeyEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">openai-key</span
+                ><span class="category-badge secrets">secrets</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsOpenaiKeyEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsPrivateKeyEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">private-key</span
+                ><span class="category-badge secrets">secrets</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsPrivateKeyEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsJwtEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">jwt</span
+                ><span class="category-badge secrets">secrets</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsJwtEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsGenericHighEntropyEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">generic-high-entropy</span
+                ><span class="category-badge secrets">secrets</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsGenericHighEntropyEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsEmailEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">email</span><span class="category-badge pii">pii</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsEmailEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsPhoneEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">phone-e164</span
+                ><span class="category-badge pii">pii</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsPhoneEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsSsnUsEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">ssn-us</span
+                ><span class="category-badge pii">pii</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsSsnUsEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsCreditCardEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">credit-card</span
+                ><span class="category-badge pii">pii</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsCreditCardEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsRoleOverrideEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">role-override</span
+                ><span class="category-badge injection">injection</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsRoleOverrideEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsSystemPromptLeakEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">system-prompt-leak</span
+                ><span class="category-badge injection">injection</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsSystemPromptLeakEnabled"
+                /></label>
+              </div>
+            </div>
+            <div class="compressor-card" data-key="guardrailsToolOverrideEnabled">
+              <div class="compressor-card-header">
+                <span class="compressor-name">tool-override</span
+                ><span class="category-badge injection">injection</span
+                ><label class="toggle-label"
+                  ><input type="checkbox" data-key="guardrailsToolOverrideEnabled"
+                /></label>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <p class="settings-footer">Saved to <code>data/settings.json</code> · Base <code>.env</code> never modified · No restart required</p>
+      <p class="settings-footer">
+        Saved to <code>data/settings.json</code> · Base <code>.env</code> never modified · No
+        restart required
+      </p>
     </main>
 
     <footer id="statusBar">

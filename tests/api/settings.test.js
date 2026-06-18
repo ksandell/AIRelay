@@ -40,9 +40,7 @@ describe('GET /api/settings', () => {
 
 describe('POST /api/settings', () => {
   it('returns 200 with new effective config on valid patch', async () => {
-    const res = await request(app)
-      .post('/api/settings')
-      .send({ compactorEnabled: true })
+    const res = await request(app).post('/api/settings').send({ compactorEnabled: true })
     expect(res.status).toBe(200)
     expect(res.body.effective.compactorEnabled).toBe(true)
   })
@@ -55,33 +53,25 @@ describe('POST /api/settings', () => {
   })
 
   it('returns 400 for unknown key', async () => {
-    const res = await request(app)
-      .post('/api/settings')
-      .send({ nonExistentKey: true })
+    const res = await request(app).post('/api/settings').send({ nonExistentKey: true })
     expect(res.status).toBe(400)
     expect(res.body.error).toMatch(/unknown setting key/i)
   })
 
   it('returns 400 for wrong value type — boolean field gets string', async () => {
-    const res = await request(app)
-      .post('/api/settings')
-      .send({ compactorEnabled: 'yes' })
+    const res = await request(app).post('/api/settings').send({ compactorEnabled: 'yes' })
     expect(res.status).toBe(400)
     expect(res.body.error).toMatch(/invalid value/i)
   })
 
   it('returns 400 for bad guardrails mode value', async () => {
-    const res = await request(app)
-      .post('/api/settings')
-      .send({ guardrailsSecretsMode: 'banana' })
+    const res = await request(app).post('/api/settings').send({ guardrailsSecretsMode: 'banana' })
     expect(res.status).toBe(400)
     expect(res.body.error).toMatch(/invalid value/i)
   })
 
   it('returns 200 for valid guardrails mode', async () => {
-    const res = await request(app)
-      .post('/api/settings')
-      .send({ guardrailsSecretsMode: 'alert' })
+    const res = await request(app).post('/api/settings').send({ guardrailsSecretsMode: 'alert' })
     expect(res.status).toBe(200)
     expect(res.body.effective.guardrailsSecretsMode).toBe('alert')
   })
