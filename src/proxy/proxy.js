@@ -1,10 +1,30 @@
 import httpProxy from 'http-proxy-3'
 import { Readable } from 'node:stream'
 import { gunzipSync, inflateSync, brotliDecompressSync } from 'node:zlib'
+import { URL } from 'node:url'
 import { config } from '../config.js'
 import { pickAgent } from './agent.js'
 import { record, incInFlight, decInFlight } from '../metrics/collector.js'
 import { incrementSpend } from '../cache/spend.js'
+
+// Strip well-known secret query-param names before storing in metrics DB.
+const SECRET_PARAMS = new Set(['key', 'token', 'api_key', 'apikey', 'access_token', 'secret'])
+function redactUrl(rawUrl) {
+  try {
+    const u = new URL(rawUrl, 'http://x')
+    let changed = false
+    for (const name of SECRET_PARAMS) {
+      if (u.searchParams.has(name)) {
+        u.searchParams.set(name, '[REDACTED]')
+        changed = true
+      }
+    }
+    if (!changed) return rawUrl
+    return u.pathname + (u.search !== '?' ? u.search : '')
+  } catch {
+    return rawUrl
+  }
+}
 
 // Off the hot path: decode the (possibly compressed) teed response body
 // for token/tool extraction. Mistral & friends ship brotli-compressed JSON
@@ -256,7 +276,7 @@ export function createProxyHandler(route) {
       ts: new Date().toISOString(),
       start: Date.now(),
       method: req.method,
-      path: req.originalUrl,
+      path: redactUrl(req.originalUrl),
       routePrefix: route.prefix,
       upstream: route.upstream,
       status: 0,

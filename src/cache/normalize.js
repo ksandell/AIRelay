@@ -18,10 +18,19 @@ export function hashBody(body) {
 }
 
 function canonicalJSON(obj) {
-  if (obj === null || obj === undefined) return JSON.stringify(obj)
-  if (typeof obj !== 'object' || Array.isArray(obj)) return JSON.stringify(obj)
-
+  if (obj === null || obj === undefined || typeof obj !== 'object' || Array.isArray(obj)) {
+    return JSON.stringify(obj)
+  }
   const keys = Object.keys(obj).sort()
-  const pairs = keys.map((k) => `"${k}":${canonicalJSON(obj[k])}`)
-  return '{' + pairs.join(',') + '}'
+  const sorted = Object.fromEntries(keys.map((k) => [k, obj[k]]))
+  return JSON.stringify(sorted, (_, v) => {
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      return Object.fromEntries(
+        Object.keys(v)
+          .sort()
+          .map((k) => [k, v[k]]),
+      )
+    }
+    return v
+  })
 }

@@ -118,7 +118,7 @@ async function refreshCompactor() {
       const fires = agg?.fires ?? 0
       const saved = agg?.bytesSaved ?? 0
       const avgMicros = fires > 0 ? Math.round(agg.durationMicros / fires) : 0
-      tr.innerHTML = `<td><code>${name}</code></td>
+      tr.innerHTML = `<td><code>${escHtml(name)}</code></td>
         <td>${activeSet.has(name) ? '✓' : '—'}</td>
         <td>${fires}</td>
         <td>${fmtBytes(saved)}</td>
@@ -131,12 +131,12 @@ async function refreshCompactor() {
     for (const ev of recent) {
       const tr = document.createElement('tr')
       tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
-        <td>${ev.scope}</td>
-        <td>${ev.filtersFired.join(', ') || '—'}</td>
+        <td>${escHtml(ev.scope)}</td>
+        <td>${escHtml(ev.filtersFired.join(', ') || '—')}</td>
         <td>${ev.bytesIn} → ${ev.bytesOut}</td>
         <td>${fmtBytes(ev.bytesSaved)}</td>
         <td>${ev.durationMicros}</td>
-        <td>${ev.bypassReason ?? ''}</td>`
+        <td>${escHtml(ev.bypassReason ?? '')}</td>`
       rbody.appendChild(tr)
     }
   } catch {
@@ -250,9 +250,9 @@ async function refreshGuardrails() {
       const fires = agg?.fires ?? 0
       const hits = agg?.hits ?? 0
       const bytesRedacted = agg?.bytesRedacted ?? 0
-      tr.innerHTML = `<td><code>${name}</code></td>
-        <td>${active ? active.category : '—'}</td>
-        <td>${active ? active.mode : 'off'}</td>
+      tr.innerHTML = `<td><code>${escHtml(name)}</code></td>
+        <td>${escHtml(active ? active.category : '—')}</td>
+        <td>${escHtml(active ? active.mode : 'off')}</td>
         <td>${fires}</td>
         <td>${hits}</td>
         <td>${fmtBytes(bytesRedacted)}</td>`
@@ -264,12 +264,12 @@ async function refreshGuardrails() {
     for (const ev of recent) {
       const tr = document.createElement('tr')
       tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
-        <td>${ev.mode}</td>
-        <td>${ev.detectorsFired.join(', ') || '—'}</td>
+        <td>${escHtml(ev.mode)}</td>
+        <td>${escHtml(ev.detectorsFired.join(', ') || '—')}</td>
         <td>${ev.hits}</td>
         <td>${ev.bytesIn} → ${ev.bytesOut}</td>
         <td>${ev.blocked ? '✓' : ''}</td>
-        <td>${ev.bypassReason ?? ''}</td>`
+        <td>${escHtml(ev.bypassReason ?? '')}</td>`
       rbody.appendChild(tr)
     }
   } catch {

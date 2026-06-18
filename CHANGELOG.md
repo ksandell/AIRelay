@@ -5,22 +5,32 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.6.1] — 2026-06-18 — Cache metrics, dashboard polish, security hardening
 
 ### Added
 
-- **Brand identity** — AIRelay logo (relay-chevron "motion trail" mark) with full asset set: gradient mark, monocolor mark, horizontal lockup, and favicon/app-tile (`svg` + `ico` + `png`) under `public/`. Wired into the dashboard header, README, and docs. Brand guidelines (palette, typography, usage rules) documented in [`docs/brand/README.md`](docs/brand/README.md).
+- **Brand identity** — AIRelay logo (relay-chevron "motion trail" mark) with full asset set: gradient mark, monocolor mark, horizontal lockup, and favicon/app-tile (`svg` + `ico` + `png`) under `public/`. Wired into the dashboard header, README, and docs.
 - **Cache outcomes persisted to the metrics DB** — four nullable columns on the `events` table (`cache_status`, `cache_key_prefix`, `cache_age_s`, `bytes_from_cache`), via the same idempotent migration as the compactor/guardrails columns. The cache middleware emits a full metrics event for every cache-served response (`HIT` / `DEDUP` / spend-reject), so cached traffic shows up in Metrics, Logs, recent feeds, and history exactly like a proxied request (zero cost, `cacheStatus` tagged). Proxied requests carry a `MISS` tag on their existing row — one event per request, no double-counting.
 - **`GET /api/cache/history`** — per-event history over a time window, filtered to cache-tagged events, with optional `status=HIT|MISS|DEDUP`. Requires `METRICS_DB_PATH`.
 - **`GET /api/cache/rollups`** — bucketed cache aggregates (`cacheHits`, `cacheMisses`, `cacheDedup`, `bytesFromCache`) at minute → week granularity.
 - **Cache tab sparklines** — live 60-tick mini-charts on the 1-minute KPI cards (hits, hit rate, bytes from cache, dedup coalesced, spend rejects), matching the Compactor/Guardrails sparkline pattern.
+- **Load-test script** — `docs/load-test.sh` sends concurrent Anthropic-shaped POST batches to the proxy for performance profiling.
 
 ### Fixed
 
+- **Secret query params redacted from metrics DB** — provider keys passed as `?key=` / `?token=` / `?api_key=` in the upstream URL are stripped from the stored `path` field before writing to SQLite or SSE feeds.
+- **Spend key uses full SHA-256** — `src/cache/spend.js` now stores the full 64-hex-char digest rather than a 16-char slice, eliminating birthday-collision risk at scale.
+- **Cache canonical JSON uses `JSON.stringify`** — `src/cache/normalize.js` replaced manual string concatenation with `JSON.stringify` + a replacer that sorts keys recursively, preventing hash collisions from keys containing `"` or `\`.
+- **XSS via unescaped `innerHTML`** — `escHtml()` now applied to compressor names, detector names, modes, categories, `filtersFired`, `detectorsFired`, and `bypassReason` in the Compressors and Guardrails table renderers.
+- **Metrics DB migration validates column names/types** — `ALTER TABLE` now checks column names against `/^[a-z_]+$/` and types against a `TEXT/INTEGER/REAL` allowlist before executing.
+- **Upstream URL removed from `/health` response** — `proxy.upstream` field removed to avoid leaking internal service addresses to unauthenticated callers.
 - **Hermetic test env** — `tests/setup-env.js` + Playwright `webServer.env` pin the cache OFF so the unit + E2E suites don't inherit `CACHE_ENABLED` from a developer's local `.env`.
 - **Dashboard activity sparkline** no longer grows unbounded (Chart.js resize feedback loop) — pinned canvas height.
 - **Dashboard activity sparkline now populates** — the dashboard refreshes periodically while visible, so the RPS/p95 line accumulates points instead of rendering a single flat point taken on tab-open.
 - **Dashboard recent-requests table** — added column spacing (Time / Model / Tokens / Cost / Latency previously ran together with no padding).
+- **Dashboard KPI history fallback** — history endpoints return gracefully when persistence is off.
+- **Dashboard LIVE dropdown persistence** — selected window survives tab navigation.
+- **Log stream uncorked before end()** — fixes partial log delivery on large payloads.
 
 ### Changed
 

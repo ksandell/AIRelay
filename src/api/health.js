@@ -88,7 +88,6 @@ router.get('/health', async (req, res) => {
 
     proxy: {
       enabled: Boolean(config.upstreamUrl),
-      upstream: config.upstreamUrl || null,
       pathPrefix: config.proxyPathPrefix,
       upstreamReachable,
     },

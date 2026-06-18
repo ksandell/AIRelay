@@ -37,6 +37,7 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.4.3 | ✅ Done | **CI: Linux Playwright baselines** — committed the 5 missing `*-visual-linux.png` baselines so the `ubuntu-22.04` visual e2e job is green; documented the OS-pinning gotcha in [docs/e2e-test-plan.md](docs/e2e-test-plan.md) |
 | v0.5.0 | ✅ Done | **Zero-config provider routing** — single-upstream deployments auto-mount a `/proxy/<provider>` alias so SDKs pointed at the provider-named path work without writing `PROXY_ROUTES`; folds in the prior v0.4.next housekeeping (per-IP rate limiting on `/health` + `/api/*`, cleared CodeQL alerts, log-rotation TOCTOU fix, CodeQL Action `v3` → `v4`) |
 | v0.6.0 | ✅ Done | **Dashboard + Settings + Dragonfly Cache** — landing dashboard tab (health, KPIs, cache hit rate, recommendations), Settings tab with live-toggle Compactors, Guardrails, and Cache; optional Dragonfly sidecar for exact-match response cache, request dedup, per-key spend limits, multi-instance SSE fan-out |
+| v0.6.1 | ✅ Done | **Cache metrics + dashboard polish + security hardening** — cache outcomes persisted to SQLite, `/api/cache/history` + `/api/cache/rollups`, Cache tab sparklines, brand identity, secret query-param redaction, XSS fixes, full-SHA spend key |
 | v0.7.0 | ⚪ Queued | **Semantic Cache** — embedding-provider abstraction (OpenAI / Ollama), Dragonfly vector index bootstrap, KNN search, configurable cosine threshold; builds on v0.6.0 cache infrastructure |
 
 Per-release detail in [CHANGELOG.md](CHANGELOG.md).

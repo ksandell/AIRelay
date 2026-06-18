@@ -6,7 +6,6 @@ function keyHash(apiKey) {
   return createHash('sha256')
     .update(apiKey ?? 'anonymous')
     .digest('hex')
-    .slice(0, 16)
 }
 
 const dailyKey = (h) => `airelay:spend:${h}:daily:${new Date().toISOString().slice(0, 10)}`

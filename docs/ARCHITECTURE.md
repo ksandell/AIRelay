@@ -46,7 +46,7 @@ flowchart LR
         collector[metrics/collector.js<br/>ring buffer]
     end
     subgraph slow[Slow path - microtask]
-        provider[providers/*.js<br/>14 parsers]
+        provider[providers/*.js<br/>17 parsers]
         pricing[providers/pricing.js]
     end
     subgraph fanout[Fan-out]
@@ -230,7 +230,7 @@ tests/e2e/fixtures/test-server.js
 Playwright's `webServer` block (see `playwright.config.js`) spawns this
 script, waits on `/health`, then runs two project suites:
 
-- `functional` — 14 specs across all 4 tabs (Setup, Logs, Metrics, Compactor)
+- `functional` — specs covering all 7 tabs (Dashboard, Logs, Metrics, Compressors, Guardrails, Cache, Settings)
 - `visual` — 5 screenshot snapshots vs OS-pinned baselines
 
 Determinism techniques:
@@ -242,10 +242,10 @@ Determinism techniques:
 | LLM token randomness | Fake upstream returns fixed `prompt_tokens: 12, completion_tokens: 2` |
 | Cross-test state leak | `POST /api/test/reset` endpoint (gated to `NODE_ENV=test`) |
 | Dynamic timestamps in DOM | Playwright `mask: [#compactorRecentTable]` in screenshot calls |
-| Render jitter | `maxDiffPixelRatio: 0.03` |
+| Render jitter | `maxDiffPixelRatio: 0.01` |
 | Parallel races | `fullyParallel: false`, `workers: 1` (in-process shared state) |
 
-CI workflow: `.github/workflows/e2e.yml` (push to main + manual dispatch).
+CI workflow: `.github/workflows/e2e.yml` (push to main/develop + manual dispatch).
 Visual baselines OS-pinned — Windows baselines committed; Linux baselines
 generated on first CI run via `--update-snapshots` (one-time bless).
 

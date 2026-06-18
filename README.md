@@ -27,10 +27,10 @@
 - **SQLite metric history, rollups, and CSV export** — opt-in persistence (`METRICS_DB_PATH`) writes every event to a local SQLite database via a batched write-behind queue. Unlocks `/api/metrics/history`, `/api/metrics/rollups?period=hour|day|week`, and `/api/metrics/export.csv`. Dashboard gains a route filter, time-window selector (Live / 5m / 10m / 15m / 30m / 1h / 3h / 6h / 12h / 24h / 7d — drives both the recent table and the RPS / latency / token charts), and CSV download button. See [CONFIGURATION.md §Metric persistence](CONFIGURATION.md#metric-persistence-v040).
 - **Token & cost tracking** — per-request input/output tokens + USD cost for 17 providers ([full list in CONFIGURATION.md](CONFIGURATION.md#token--cost-tracking)). Per-model breakdown via `/api/metrics/models`, sortable by spend.
 - **17 providers** out of the box — Anthropic, OpenAI, Azure, Gemini, xAI, OpenRouter, Together, Fireworks, Groq, Cerebras, DeepSeek, Perplexity, Mistral, NVIDIA, Microsoft, AnLinkAI, Ollama — plus a `generic` mode for anything else.
-- **Live dashboard.** RPS, p50/p95/p99, error rate, status pills, network + token throughput (In/Out), tokens/sec, recent-requests feed, Compressors panel — updated in real time.
+- **Live dashboard.** Dashboard · Logs · Metrics · Compressors · Guardrails · Cache · Settings — updated in real time via SSE. Landing tab shows KPIs, activity sparkline, system health, and recommendations.
 - **Transparent passthrough** by default. Streaming AI responses (SSE / chunked) flow through unmodified — your SDK doesn't know the proxy is there.
-- **Guided setup.** First time you open the dashboard, a Setup tab walks you through generating the right `.env` for your provider.
-- **Single Docker container.** No DB, no Redis, no system cron. Bring `UPSTREAM_URL` and go. Identical on Windows Docker Desktop, macOS, and Linux.
+- **Settings tab.** Runtime toggles for Compactor, Guardrails, and Cache — no restart required. Saved to `data/settings.json`.
+- **Single Docker container.** No system cron. Optional Dragonfly sidecar for caching (`--profile cache`); optional SQLite for metric history (`METRICS_DB_PATH`). Bring `UPSTREAM_URL` and go.
 - **Automated E2E** — Playwright covers Logs, Metrics, Compressors (+ hash-routed Setup) in ~8 s. No Docker required for CI: `npm run test:e2e`. See [docs/e2e-test-plan.md](docs/e2e-test-plan.md).
 
 What shipped in each release: [CHANGELOG.md](CHANGELOG.md). What's coming next: [ROADMAP.md](ROADMAP.md).
@@ -126,7 +126,7 @@ Node.js 24+ · Express · `http-proxy-3` · vanilla JS dashboard with Chart.js �
 
 ## Contributing
 
-1. Branch from `main`.
+1. Branch from `develop`.
 2. `npm run lint && npm test` must pass.
 3. Conventional Commits (`feat:`, `fix:`, `chore:`, …).
 4. PR with summary + test plan.

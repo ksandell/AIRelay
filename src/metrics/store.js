@@ -89,6 +89,9 @@ const ADD_COLUMNS = [
   ['bytes_from_cache', 'INTEGER'],
 ]
 
+const ALLOWED_COL_TYPES = new Set(['TEXT', 'INTEGER', 'REAL'])
+const VALID_COL_NAME = /^[a-z_]+$/
+
 function migrate(database) {
   const existing = new Set(
     database
@@ -97,6 +100,9 @@ function migrate(database) {
       .map((r) => r.name),
   )
   for (const [name, type] of ADD_COLUMNS) {
+    if (!VALID_COL_NAME.test(name) || !ALLOWED_COL_TYPES.has(type)) {
+      throw new Error(`migrate: invalid column definition ${name} ${type}`)
+    }
     if (!existing.has(name)) {
       database.exec(`ALTER TABLE events ADD COLUMN ${name} ${type}`)
     }
