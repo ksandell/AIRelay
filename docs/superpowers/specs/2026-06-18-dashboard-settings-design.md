@@ -1,11 +1,11 @@
 ---
-name: dashboard-settings-v060
-description: Design spec for v0.6.0 — Dashboard landing tab + runtime Settings tab with live Compactor/Guardrail toggles
+name: dashboard-settings-cache-v060
+description: Design spec for v0.6.0 — Dashboard landing tab, runtime Settings tab, and Dragonfly response cache (exact-match, dedup, per-key spend, SSE fan-out)
 metadata:
   type: project
 ---
 
-# v0.6.0 Design Spec — Dashboard + Runtime Settings
+# v0.6.0 Design Spec — Dashboard + Runtime Settings + Dragonfly Cache
 
 **Date:** 2026-06-18
 **Version target:** v0.6.0
@@ -15,14 +15,17 @@ metadata:
 
 ## Overview
 
-Two new tabs added to the AIRelay dashboard:
+Three additions to AIRelay in v0.6.0:
 
-1. **Dashboard** — new first tab (default landing page). Combines the most important health, cost, and activity signals from all tabs into a single view with actionable recommendations.
-2. **Settings** — new last tab (always visible). Allows runtime toggling of all Compactor and Guardrail settings without restarting the server. Changes are persisted to `data/settings.json` and survive restarts.
+1. **Dashboard** — new first tab (default landing page). Combines health, cost, activity, and cache signals from all subsystems into a single view with actionable recommendations.
+2. **Settings** — new last tab (always visible). Runtime toggling of all Compactor, Guardrail, and Cache settings without restart. Persisted to `data/settings.json`.
+3. **Dragonfly Cache** — optional Redis-compatible sidecar. Exact-match response cache, request deduplication, per-key spend limits, multi-instance SSE fan-out. Default off; zero overhead when disabled.
+
+Semantic cache (embedding provider + vector search) is explicitly deferred to a future release; see ROADMAP.md.
 
 ---
 
-## Navigation changes
+## Navigation
 
 **Before:**
 ```
@@ -31,240 +34,329 @@ Two new tabs added to the AIRelay dashboard:
 
 **After:**
 ```
-[Dashboard*] [Logs] [Metrics] [Compressors] [Guardrails]   [Settings]
+[Dashboard*] [Logs] [Metrics] [Compressors] [Guardrails] [Cache] [Settings]
 ```
 
-- Dashboard is the new default tab (`active` on load, no proxy-check gate).
-- Settings is always visible (replaces the hidden-unless-unconfigured Setup tab for runtime config). The initial Setup wizard flow remains for first-run onboarding.
-- Hash routing: `#dashboard`, `#settings` added alongside existing hashes.
+- Dashboard is the new default tab (active on load, no proxy-check gate).
+- Cache tab follows Guardrails; always visible, greyed out when `CACHE_ENABLED=false`.
+- Settings is always last and always visible.
+- Hash routing: `#dashboard`, `#cache`, `#settings` added alongside existing hashes.
 
 ---
 
 ## Dashboard tab
 
-### Layout — two columns
+### Layout
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  [KPI]  [KPI]  [KPI]  [KPI]                            │
-├──────────────────────────────────┬──────────────────────┤
-│  Activity chart (RPS + p95)      │  System health       │
-│                                  │  ─────────────────── │
-│  Recent requests table           │  Recommendations     │
-│                                  │  ─────────────────── │
-│                                  │  Jump to             │
-└──────────────────────────────────┴──────────────────────┘
-       2/3 width                          1/3 width
+┌──────────────────────────────────────────────────────────────────┐
+│  [Requests today]  [Cost today]  [p95 latency]  [Bytes saved*]  [Cache hit rate*]  │
+├──────────────────────────────────────┬───────────────────────────┤
+│  Activity chart (RPS + p95)          │  System health            │
+│                                      │  ─────────────────────── │
+│  Recent requests table               │  Recommendations          │
+│                                      │  ─────────────────────── │
+│                                      │  Jump to                  │
+└──────────────────────────────────────┴───────────────────────────┘
+         2/3 width                               1/3 width
 ```
 
-![Dashboard mockup](../screenshots/dashboard-mockup.png)
+`*` = conditionally hidden when the feature is disabled.
 
-### KPI row (4 counters)
+### KPI row
 
-| Counter | Source | Notes |
+| Counter | Source | Shown when |
 |---|---|---|
-| Requests today | `/api/metrics/summary` → `lifetime.total` (or day rollup if SQLite enabled) | |
-| Cost today | Same, `lifetime.totalCostUsd` | |
-| p95 latency | `window_1m.p95` | Live |
-| Bytes saved | `/api/compactor/summary` → `lifetime.bytesSaved` as % | Only shown when Compactor enabled |
+| Requests today | `/api/metrics/summary` → `lifetime.total` | Always |
+| Cost today | Same, `lifetime.totalCostUsd` | Always |
+| p95 latency | `window_1m.p95` (live via SSE) | Always |
+| Bytes saved | `/api/compactor/summary` → `lifetime.bytesSaved` as % | `compactorEnabled` |
+| Cache hit rate | `/api/cache/summary` → `lifetime.hitRate` as % | `cacheEnabled` |
 
 ### Activity chart
 
-- Dual-line sparkline: RPS (solid) + p95 latency (dashed), last 30 min.
-- Data from SSE `tick` events — no extra endpoint needed.
-- Matches the existing Chart.js integration in the Metrics tab.
+Dual-line sparkline: RPS (solid) + p95 latency (dashed), last 30 min. Fed by existing SSE `tick` events.
 
 ### Recent requests table
 
-- Last 5 proxied requests: time, model, tokens, cost, latency.
-- "View all in Logs →" link switches to Logs tab.
-- Data from `/api/metrics/recent` (already exists).
+Last 5 proxied requests: time, model, tokens, cost, latency. "View all in Logs →" link.
 
 ### System health sidebar
 
 | Row | Source | States |
 |---|---|---|
-| Proxy | `/api/health` | ● OK (green) / ⚠ Degraded (amber) / ✕ Down (red) |
-| Compactors | `/api/compactor/summary` → `enabled` + `compressors.active.length` | ● On (N of M active) / ○ Off |
-| Guardrails | `/api/guardrails/summary` → `enabled` + `detectors.active.length` | ● On (N of M active) / ○ Off |
-| In-flight | SSE `tick` → `inFlight` | count, live |
+| Proxy | `/api/health` | ● OK / ⚠ Degraded / ✕ Down |
+| Compactors | `/api/compactor/summary` | ● On (N/M active) / ○ Off |
+| Guardrails | `/api/guardrails/summary` | ● On (N/M active) / ○ Off |
+| Cache | `/api/cache/summary` | ● Connected (N keys) / ○ Off / ✕ Disconnected |
+| In-flight | SSE `tick.inFlight` | count, live |
 
 ### Recommendations panel
 
-Computed **client-side** from the fetched summary state — no dedicated backend endpoint. Rules:
+Computed client-side. Rules:
 
-| Condition | Recommendation |
+| Condition | Message |
 |---|---|
 | `guardrails.enabled === false` | ⚠ Guardrails disabled — enable at least alert mode → Settings |
-| `compactor.enabled && !settings.toolResultOnly` | ℹ Tool-result-only off — tighter scope available → Settings |
-| `health.proxy.enabled === false` | ✕ No upstream configured → Settings (Setup) |
+| `compactor.enabled && !settings.compactorToolResultOnly` | ℹ Tool-result-only off — tighter scope available → Settings |
+| `health.proxy.enabled === false` | ✕ No upstream configured → Settings |
 | `health.status !== 'ok'` | ✕ Proxy health check failing — check upstream URL |
+| `cache.enabled && !cache.connected` | ✕ Cache enabled but Dragonfly disconnected — check CACHE_REDIS_URL |
 
-Recommendations link directly to the Settings tab (or specific tabs). Panel hidden when no recommendations.
-
-### Quick links
-
-Static links to switch to Metrics, Compressors, Guardrails, Logs tabs.
-
-### Data fetching
-
-On tab activation: parallel fetch of `/api/health`, `/api/metrics/summary`, `/api/metrics/recent`, `/api/compactor/summary`, `/api/guardrails/summary`. KPIs + sparkline update via existing SSE `tick` events (same connection used by Metrics tab).
+Panel hidden when no rules fire.
 
 ---
 
 ## Settings tab
 
-![Settings mockup](../screenshots/settings-mockup.png)
-
 ### Persistence model
 
-- Changes write to **`data/settings.json`** (gitignored, created on first save).
-- `.env` is **never modified**. Settings file is an overlay — loaded at startup after env vars, overrides win.
-- No server restart required. Compactor/Guardrail modules read `config.*` per-request; the override layer propagates immediately.
-- If `data/settings.json` is missing, defaults to empty (env vars are authoritative).
+- Changes write to `data/settings.json` (gitignored, Docker volume safe).
+- `.env` is never modified. Settings file is an overlay loaded at startup.
+- No restart required; all runtime-settable features read `config.*` per-request.
+- Connection-level vars (`CACHE_REDIS_URL`, `UPSTREAM_URL`, etc.) remain env-only.
 
 ### Apply model
 
-- UI tracks a `pendingChanges` diff object against the last-saved server state.
-- Dirty state: amber "⚠ Unsaved changes" banner + Save / Discard buttons appear.
-- **Save** — POST `/api/settings` with the diff, server responds with new effective config, banner clears.
-- **Discard** — resets UI to last-fetched server state, banner clears.
+- UI tracks `pendingChanges` diff against last-saved state.
+- Dirty state: amber "⚠ Unsaved changes" banner + Save / Discard buttons.
+- **Save** → POST `/api/settings` with diff → banner clears.
+- **Discard** → reset UI to last-fetched state.
 
 ### Compactors section
 
-**Master toggle** — `COMPACTOR_ENABLED` override. When off, all sub-controls are visually disabled (not hidden — user can still preview config before enabling).
-
-**Scope toggles** (2-column grid):
-
-| Toggle | Env var |
-|---|---|
-| Request body | `COMPACTOR_REQUEST_BODY` |
-| Response body | `COMPACTOR_RESPONSE_BODY` |
-| Tool results only | `COMPACTOR_TOOL_RESULT_ONLY` |
-| Allow risky ⚠ | `COMPACTOR_ALLOW_RISKY` |
-
-**Individual compressors** — 2-column grid of all 10 compressors. Each card: name, one-line description, on/off toggle, `risky` badge where applicable. Off items dimmed (opacity 0.5). Controlled via `COMPACTOR_<NAME>_ENABLED` override.
+Master toggle → 10 individual compressor toggles (2-column grid) + 4 scope toggles. Off items dimmed. Identical to v0.6.0 original spec.
 
 ### Guardrails section
 
-**Master toggle** — `GUARDRAILS_ENABLED` override. When off, category cards are greyed out with note "Enable Guardrails above to configure detector modes."
+Master toggle → 3 category mode cards (off/alert/block/redact) + 11 detector toggles. Category cards greyed when master off. Identical to v0.6.0 original spec.
 
-**Category mode cards** (3 cards, one per category):
+### Cache section (new)
 
-Each card shows: category name, brief description, 4-pill mode selector (off / alert / block / redact), accent border colour matches selected mode.
+Only rendered when `CACHE_REDIS_URL` is configured (env var present); shown regardless of connected state so operator can toggle features.
 
-| Category | Env var | Detectors |
-|---|---|---|
-| Secrets | `GUARDRAILS_SECRETS_MODE` | AWS key, GitHub PAT, OpenAI key, Anthropic key, generic bearer… |
-| PII | `GUARDRAILS_PII_MODE` | Email, phone, credit card, SSN, IP address… |
-| Prompt Injection | `GUARDRAILS_INJECTION_MODE` | Injection patterns, jailbreak phrases… |
+**Master toggle** — `cacheEnabled` (runtime settable; requires Dragonfly to be reachable)
 
-**Individual detectors** — 2-column grid of all 11 detectors. Each card: detector name, category label, on/off toggle. Controlled via `GUARDRAILS_<NAME>_ENABLED` override. Off items dimmed.
+**Sub-controls** (disabled when master is off):
 
-### Footer
-
-> Saved to `data/settings.json` · Base `.env` never modified · No restart required
+| Control | Key | Type | Default |
+|---|---|---|---|
+| Exact match | `cacheExactMatchEnabled` | boolean | `true` |
+| TTL (seconds) | `cacheExactTtlSeconds` | integer | `3600` |
+| Request dedup | `cacheDedupEnabled` | boolean | `true` |
+| Per-key spend limits | `cacheSpendEnabled` | boolean | `false` |
+| Daily limit ($) | `cacheSpendDailyLimitUsd` | number | — |
+| Monthly limit ($) | `cacheSpendMonthlyLimitUsd` | number | — |
+| SSE fan-out | `cacheSseFanoutEnabled` | boolean | `false` |
 
 ---
 
-## Backend changes
+## Cache tab
 
-### 1. `src/config.js` — override layer
+Follows the Compressors/Guardrails tab pattern.
+
+### KPI cards (1m + lifetime)
+
+| KPI | Source |
+|---|---|
+| Requests from cache | `window_1m.exactHits` / `lifetime.exactHits` |
+| Hit rate % | `lifetime.hitRate` |
+| Bytes served from cache | `lifetime.bytesFromCache` |
+| Dedup coalesced | `lifetime.dedupCoalesced` |
+| Spend rejects | `lifetime.spendRejected` |
+
+### Status row
+
+Dragonfly: ● Connected / ✕ Disconnected  
+Exact match: On / Off  
+Dedup: On / Off  
+Spend limits: On / Off  
+SSE fan-out: On / Off
+
+### Recent events feed
+
+Last 20 events: type (HIT / MISS / DEDUP / SPEND-REJECT / BYPASS), key fingerprint (8-char SHA prefix), latency saved (ms), key age (s). Feed via `GET /api/cache/recent`.
+
+### Spend panel
+
+Shown when `cacheSpendEnabled`. Per-key-hash budget bar (daily / monthly usage vs limit). Keys shown as anonymized SHA-256 prefix (first 12 chars).
+
+---
+
+## Backend — cache module
+
+### Files
+
+```
+src/cache/
+  client.js      — ioredis singleton; lazy connect; graceful degrade when absent
+  normalize.js   — strip stream/request-IDs before hashing; keep model/messages/tools/params
+  exact.js       — SHA-256(normalized body) → GET/SET with TTL
+  dedup.js       — in-process Map<sha256, Promise>; coalesce identical in-flight
+  spend.js       — INCR per-key-hash daily/monthly counter; 429 gate before proxy
+  fanout.js      — pub/sub tick re-publisher for multi-instance SSE
+  metrics.js     — ring counters (hits, misses, dedup, spend rejects, bytes)
+  middleware.js  — orchestrates all of the above; mounts before proxy in server.js
+  api.js         — GET /api/cache/summary + GET /api/cache/recent
+```
+
+### Request pipeline (with cache)
+
+```
+Request → proxy prefix
+  ↓ cache/middleware.js  (mounts BEFORE proxy — first in mount order)
+  ├─ CACHE_ENABLED=false → next()  (zero overhead)
+  ├─ SpendGate:  key-hash daily/monthly counter → 429 if over budget
+  ├─ DedupCheck: in-process Map<sha256, Promise> → await if in-flight
+  ├─ ExactMatch: SHA-256(normalized) → Redis GET → HIT: return + record
+  └─ MISS: create dedup entry → next() → proxy runs
+       → response end: tee body to Redis in queueMicrotask
+       → resolve dedup entry so waiting requests get the response
+```
+
+### Config (env vars)
+
+| Var | Default | Runtime-settable |
+|---|---|---|
+| `CACHE_ENABLED` | `false` | Yes |
+| `CACHE_REDIS_URL` | `redis://dragonfly:6379` | No (env-only) |
+| `CACHE_EXACT_MATCH_ENABLED` | `true` | Yes |
+| `CACHE_EXACT_TTL_SECONDS` | `3600` | Yes |
+| `CACHE_DEDUP_ENABLED` | `true` | Yes |
+| `CACHE_SPEND_ENABLED` | `false` | Yes |
+| `CACHE_SPEND_DAILY_LIMIT_USD` | — | Yes |
+| `CACHE_SPEND_MONTHLY_LIMIT_USD` | — | Yes |
+| `CACHE_SSE_FANOUT_ENABLED` | `false` | Yes |
+
+`CACHE_REDIS_URL` is env-only; changing it requires restart (ioredis connects once at startup).
+
+### API endpoints
+
+```
+GET  /api/cache/summary  → { enabled, connected, exactMatch, dedup, spend, fanout,
+                              window_1m: { exactHits, exactMisses, dedupCoalesced,
+                                           spendRejected, hitRate, bytesFromCache },
+                              lifetime:  { ...same... } }
+GET  /api/cache/recent   → [ { ts, type, keyPrefix, latencySavedMs, keyAgeS } ]
+```
+
+### Response headers
+
+| Header | Value | When |
+|---|---|---|
+| `X-Cache` | `HIT`, `MISS`, `DEDUP`, `BYPASS`, `SPEND-REJECT` | All cached-path requests |
+| `X-Cache-Age` | seconds since cached | On `HIT` |
+| `X-Cache-Key` | first 8 chars of SHA-256 | On `HIT` |
+| `X-Spend-Limit-Exceeded` | `daily` or `monthly` | On 429 spend rejection |
+
+### Graceful degrade
+
+When Dragonfly is absent or disconnected:
+- `client.js` catches connection errors, sets `connected = false`.
+- Middleware checks `connected` before every Redis operation; on false → `next()` immediately.
+- No request is ever blocked by a missing cache — the proxy still works.
+- `GET /api/cache/summary` returns `{ connected: false }` with zeroed counters.
+
+### Settings schema additions
+
+`src/api/settings.js` SCHEMA extended with:
 
 ```js
-// New: mutable in-memory override store
-let _overrides = {}
-
-// Called once at startup
-export async function loadOverrides() {
-  try {
-    const raw = await fs.readFile(SETTINGS_PATH, 'utf8')
-    _overrides = JSON.parse(raw)
-  } catch { _overrides = {} }
-}
-
-// Called by POST /api/settings
-export async function applyOverrides(patch) {
-  _overrides = { ..._overrides, ...patch }
-  await fs.writeFile(SETTINGS_PATH, JSON.stringify(_overrides, null, 2))
-}
-
-// All config.compactor.* and config.guardrails.* getters check _overrides first
-export const compactor = {
-  get enabled() { return _overrides.compactorEnabled ?? env.COMPACTOR_ENABLED === 'true' },
-  // … etc
-}
+cacheEnabled:               'boolean',
+cacheExactMatchEnabled:     'boolean',
+cacheExactTtlSeconds:       'integer',
+cacheDedupEnabled:          'boolean',
+cacheSpendEnabled:          'boolean',
+cacheSpendDailyLimitUsd:    'number',
+cacheSpendMonthlyLimitUsd:  'number',
+cacheSseFanoutEnabled:      'boolean',
 ```
 
-### 2. `src/api/settings.js` — new route
-
-```
-GET  /api/settings       → { effective: {...}, overrides: {...}, defaults: {...} }
-POST /api/settings       → body: partial patch → applies + persists → 200 { effective }
-```
-
-Validation: only known keys accepted (whitelist). Unknown keys → 400.
-
-### 3. `data/settings.json` — new file
-
-Added to `.gitignore`. Schema:
-
-```json
-{
-  "compactorEnabled": true,
-  "compactorRequestBody": true,
-  "compactorResponseBody": false,
-  "compactorToolResultOnly": true,
-  "compactorAllowRisky": false,
-  "compactorAnsiStripEnabled": true,
-  "guardrailsEnabled": false,
-  "guardrailsSecretsMode": "alert",
-  "guardrailsPiiMode": "redact",
-  "guardrailsInjectionMode": "off",
-  "guardrailsAwsAccessKeyEnabled": true
-  // … etc
-}
-```
+`src/config.js` cache getters check `_overrides` first (same pattern as Compactor/Guardrails).
 
 ---
 
-## Data flow — Settings save
+## Docker Compose — Dragonfly sidecar
+
+Added to `docker-compose.yml` under the `cache` profile:
+
+```yaml
+dragonfly:
+  image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.26.2
+  profiles: ["cache"]
+  ports:
+    - "6379:6379"
+  volumes:
+    - dragonfly-data:/data
+  ulimits:
+    memlock: -1
+  restart: unless-stopped
+```
+
+Activated with: `docker compose --profile cache up`  
+Or: `COMPOSE_PROFILES=cache docker compose up`
+
+App service gets `CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://dragonfly:6379}` and all `CACHE_*` vars plumbed through.
+
+---
+
+## Backend changes summary
+
+1. **`src/cache/`** — new module (8 files, see above).
+2. **`src/config.js`** — 9 new cache getters checking `_overrides` first.
+3. **`src/api/settings.js`** — SCHEMA + ENV_DEFAULTS + `buildEffective()` extended with cache keys.
+4. **`src/server.js`** — mount `cacheMiddleware` as first middleware before proxy; register `cacheRouter`.
+5. **`src/index.js`** — `await initCacheClient()` after `loadOverrides()`.
+6. **`docker-compose.yml`** — Dragonfly sidecar + `CACHE_*` env vars in app service.
+7. **`docker-compose.override.yml`** — `CACHE_REDIS_URL` plumbed for dev.
+8. **`.env.example`** — all `CACHE_*` vars with defaults.
+9. **`CONFIGURATION.md`** — `CACHE_*` env var table + Dragonfly deployment recipe.
+10. **`docs/ARCHITECTURE.md`** — `src/cache/` added to module map.
+11. **`docs/OPERATIONS.md`** — Dragonfly health check + cache flush commands.
+12. **`public/index.html`** — Cache tab button + panel.
+13. **`public/app.js`** — Cache tab JS; Dashboard cache KPI tile + health row + recommendation.
+14. **`public/style.css`** — Cache tab styles (reuses compressor-card/kpi patterns).
+
+---
+
+## Data flow — Settings save (cache example)
 
 ```
-User clicks Save
-  → POST /api/settings { patch }
-    → validate whitelist
-    → applyOverrides(patch)          ← merges _overrides in memory (instant)
-    → writeFile data/settings.json  ← async, non-blocking
+User toggles "Exact match" off in Settings
+  → pendingChanges = { cacheExactMatchEnabled: false }
+  → banner appears
+  → Save clicked
+  → POST /api/settings { cacheExactMatchEnabled: false }
+    → applyOverrides(patch) — _overrides updated in memory
+    → writeFile data/settings.json
     → return { effective }
-  → UI receives new effective config
-  → pendingChanges cleared, banner hidden
-  → Compactor/Guardrails pick up new config on next request (no restart)
+  → next proxied request: cache/middleware.js checks config.cacheExactMatchEnabled → false
+  → exact-match lookup skipped; dedup + spend still active
 ```
 
 ---
 
 ## Error handling
 
-- `POST /api/settings` with unknown keys → 400 `{ error: 'Unknown setting key: foo' }`
-- `POST /api/settings` with invalid value type → 400 `{ error: 'Invalid value for compactorEnabled: expected boolean' }`
-- `data/settings.json` write failure → 500, in-memory override still applied (changes survive until next restart)
-- Missing `data/settings.json` at startup → silently ignored, env vars authoritative
+- Cache Redis errors → log warning, `connected = false`, graceful bypass (never blocks requests).
+- Spend counter Redis error → log warning, allow request through (fail-open).
+- Dedup `Promise` rejection → log, remove from Map, allow request through.
+- `POST /api/settings` with `cacheExactTtlSeconds: "abc"` → 400 `{ error: 'Invalid value for cacheExactTtlSeconds: expected integer' }`.
 
 ---
 
 ## Testing
 
-- **Unit:** `src/config.js` override layer — `loadOverrides`, `applyOverrides`, getter fallback chain
-- **Integration:** `GET /api/settings` returns correct merged config; `POST /api/settings` updates in-memory and writes file
-- **E2E (Playwright):** Settings tab renders; toggle a compressor → dirty banner appears → Save → banner clears → re-fetch shows new state
-- **Visual regression:** new Dashboard and Settings baseline screenshots (Linux + Windows)
+- **Unit:** `src/cache/normalize.js` — idempotent, strips stream field; `src/cache/exact.js` — SHA-256 stability; `src/cache/spend.js` — counter logic with mocked Redis.
+- **Integration:** `GET /api/cache/summary` returns correct shape; `POST /api/settings` with cache keys updates in-memory; middleware gracefully degrades when Redis absent.
+- **E2E (Playwright):** Cache tab renders when `CACHE_ENABLED=false` (disabled state); Settings cache section visible; Dashboard cache KPI hidden when disabled.
+- **Visual regression:** Cache tab baseline + updated Dashboard baseline with cache KPI tile.
 
 ---
 
 ## Out of scope for v0.6.0
 
-- Proxy connection config (upstream URL, provider, prefix) — remains `.env`-only, requires restart
-- Redis / caching — v0.7.0
-- Per-user settings or multi-tenant config
-- Settings export / import
+- Proxy connection config (upstream URL, provider, prefix) — remains `.env`-only, requires restart.
+- Semantic / vector cache — deferred to future release (see ROADMAP.md).
+- Per-user settings or multi-tenant config.
+- Settings export / import.

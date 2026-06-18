@@ -36,60 +36,70 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.4.2 | ✅ Done | **Dependency refresh + CI/security housekeeping** — Node 24 LTS, express 5, http-proxy-3, vitest/eslint/dotenv/fast-check/node-cron/playwright majors; Dependabot + CodeQL + Bless workflows; brotli/gzip token-extraction fix |
 | v0.4.3 | ✅ Done | **CI: Linux Playwright baselines** — committed the 5 missing `*-visual-linux.png` baselines so the `ubuntu-22.04` visual e2e job is green; documented the OS-pinning gotcha in [docs/e2e-test-plan.md](docs/e2e-test-plan.md) |
 | v0.5.0 | ✅ Done | **Zero-config provider routing** — single-upstream deployments auto-mount a `/proxy/<provider>` alias so SDKs pointed at the provider-named path work without writing `PROXY_ROUTES`; folds in the prior v0.4.next housekeeping (per-IP rate limiting on `/health` + `/api/*`, cleared CodeQL alerts, log-rotation TOCTOU fix, CodeQL Action `v3` → `v4`) |
-| v0.6.0 | 🔵 Planned | **Dashboard + Runtime Settings** — landing dashboard tab (health, KPIs, recommendations), Settings tab with live-toggle Compactors and Guardrails, runtime overrides persisted to `data/settings.json` (no restart needed) |
-| v0.7.0 | ⚪ Queued | **Redis / Semantic Caching** — optional Dragonfly sidecar; exact-match + semantic (vector) response cache, request dedup, per-key spend limits |
+| v0.6.0 | 🔵 Planned | **Dashboard + Settings + Dragonfly Cache** — landing dashboard tab (health, KPIs, cache hit rate, recommendations), Settings tab with live-toggle Compactors, Guardrails, and Cache; optional Dragonfly sidecar for exact-match response cache, request dedup, per-key spend limits, multi-instance SSE fan-out |
+| v0.7.0 | ⚪ Queued | **Semantic Cache** — embedding-provider abstraction (OpenAI / Ollama), Dragonfly vector index bootstrap, KNN search, configurable cosine threshold; builds on v0.6.0 cache infrastructure |
 
 Per-release detail in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
-## v0.6.0 — Dashboard + Runtime Settings  🔵
+## v0.6.0 — Dashboard + Settings + Dragonfly Cache  🔵
 
 **Planned.** Full spec: [docs/superpowers/specs/2026-06-18-dashboard-settings-design.md](docs/superpowers/specs/2026-06-18-dashboard-settings-design.md).
 
 ### Navigation changes
-- **Dashboard** tab added as the new first tab (default landing page).
-- **Settings** tab added as the last tab (always visible, replaces hidden-until-unconfigured Setup behavior for config tasks).
+- **Dashboard** tab — new first tab (default landing page).
+- **Cache** tab — follows Guardrails; always visible, disabled state when `CACHE_ENABLED=false`.
+- **Settings** tab — new last tab (always visible); replaces hidden-until-unconfigured Setup for config tasks.
 
 ### Dashboard tab
-Two-column layout: metrics + activity left (2/3), health status + recommendations right (1/3).
+Two-column layout: metrics + activity left (2/3), health + recommendations right (1/3).
 
-- **KPI row** — requests today, cost today, p95 latency, bytes saved by Compactors.
+- **KPI row** — requests today, cost today, p95 latency, bytes saved (Compactor, conditional), cache hit rate (conditional).
 - **Activity chart** — RPS + p95 latency sparklines, last 30 min (live via SSE).
-- **Recent requests table** — last 5 proxied requests with model, tokens, cost, latency; links to full Logs view.
-- **System health sidebar** — Proxy status + upstream URL, Compactors (on/off + active count), Guardrails (on/off + active count), in-flight count.
-- **Recommendations panel** — computed client-side from fetched state. Examples: "Guardrails disabled — enable at least alert mode", "Tool-result-only scope off — enable for tighter Compactor targeting".
-- **Quick links** — jump to Metrics, Compressors, Guardrails, Logs tabs.
+- **Recent requests table** — last 5 proxied requests with model, tokens, cost, latency.
+- **System health sidebar** — Proxy, Compactors (on/off + count), Guardrails (on/off + count), Cache (connected/off/disconnected), in-flight.
+- **Recommendations panel** — computed client-side. Includes cache-disconnected warning.
+- **Quick links** — Metrics, Compressors, Guardrails, Cache, Logs.
 
 ### Settings tab
-Runtime overrides for Compactors and Guardrails. Proxy connection config (upstream URL, provider) remains `.env`-only.
+Runtime overrides for Compactors, Guardrails, and Cache. Proxy connection config remains `.env`-only.
 
-- **Persistence** — changes written to `data/settings.json` (gitignored, Docker-friendly). `.env` is never modified. Loaded at startup and overlaid on top of env vars. No restart required.
-- **Apply model** — changes are staged locally; an "Unsaved changes" banner + Save button commits them. Discard reverts to last-saved state.
-- **Compactors section** — master on/off toggle; scope toggles (request body, response body, tool-results-only, allow-risky); 2-column grid of all 10 individual compressor toggles with name, description, risky badge where applicable. Off items dimmed.
-- **Guardrails section** — master on/off toggle; 3 category mode cards (Secrets, PII, Prompt Injection) each with pill-button mode selector (off / alert / block / redact) and description; 2-column grid of all 11 individual detector toggles. Category cards greyed out when master is off.
+- **Persistence** — `data/settings.json` (gitignored). No restart required.
+- **Apply model** — staged locally; "Unsaved changes" banner + Save / Discard.
+- **Compactors section** — master toggle + scope toggles + 10 compressor cards.
+- **Guardrails section** — master toggle + 3 category mode cards + 11 detector cards.
+- **Cache section** — master toggle + exact match on/off + TTL input + dedup on/off + spend limits on/off + daily/monthly $ inputs + SSE fan-out on/off.
+
+### Cache (Dragonfly)
+Optional Redis-compatible sidecar via Docker Compose profile `cache`. Default off; zero overhead when disabled.
+
+- **Exact-match response cache** — normalize + SHA-256 request body → Redis key → stored response. On hit: return cached, skip upstream. TTL configurable. Bypass: `X-Cache: no-store`.
+- **Request deduplication** — identical concurrent in-flight requests coalesce in-process to one upstream call; waiters get the same response.
+- **Per-key spend tracking** — per-API-key-hash daily/monthly `INCR` counter; reject at 429 when budget exceeded.
+- **Multi-instance SSE fan-out** — Redis pub/sub syncs metric `tick` events across replicas so all dashboard connections see the full picture.
+- **Response headers** — `X-Cache: HIT|MISS|DEDUP|BYPASS|SPEND-REJECT`, `X-Cache-Age`, `X-Cache-Key`.
+- **Graceful degrade** — Dragonfly absent or disconnected → all requests pass through unchanged; dashboard shows ✕ Disconnected.
 
 ### Backend changes
-1. **`src/config.js`** — mutable `_overrides` object; `loadOverrides()` reads `data/settings.json` at startup; `applyOverrides(patch)` merges + writes async; all `config.compactor.*` / `config.guardrails.*` getters check overrides first.
-2. **`src/api/settings.js`** — `GET /api/settings` (current effective config, annotated with override vs env-default); `POST /api/settings` (validate + apply patch).
+1. **`src/cache/`** — new module: `client.js`, `normalize.js`, `exact.js`, `dedup.js`, `spend.js`, `fanout.js`, `metrics.js`, `middleware.js`, `api.js`.
+2. **`src/config.js`** — cache getters (9 new) checking `_overrides` first; Compactor/Guardrail getters already converted to this pattern.
+3. **`src/api/settings.js`** — SCHEMA extended with 8 cache keys.
+4. **`src/server.js`** — mount `cacheMiddleware` before proxy; register `cacheRouter`.
+5. **`docker-compose.yml`** — Dragonfly sidecar (profile `cache`) + `CACHE_*` env vars.
 
 ---
 
-## v0.7.0 — Redis / Semantic Caching  ⚪
+## v0.7.0 — Semantic Cache  ⚪
 
-**Queued.** Optional Dragonfly sidecar added to `docker-compose.yml` (disabled by default, no impact unless `CACHE_ENABLED=true`).
+**Queued.** Builds on the v0.6.0 cache infrastructure (Dragonfly connected, exact-match + dedup already in place).
 
-### Capabilities unlocked by Dragonfly
-- **Exact-match response cache** — normalize + SHA-256 request body → Redis key → stored response. On hit: return cached, skip upstream, record as cache hit with $0 cost. TTL per provider/model. Bypass: `X-Cache: no-store`.
-- **Semantic cache** — embed user messages (configurable embedding provider: `text-embedding-3-small`, local `nomic-embed`, etc.) → vector similarity search in Dragonfly → return cached response if cosine ≥ threshold (default 0.97, configurable). Opt-out: `X-Semantic-Cache: off`.
-- **Request deduplication** — identical concurrent in-flight requests coalesce to one upstream call. Other waiters receive the same response from Redis on completion.
-- **Per-key spend tracking** — increment per-API-key-hash daily/monthly counter; reject at 429 with configurable budget limit. Useful for shared-proxy teams.
-- **Multi-instance SSE fan-out** — Redis pub/sub syncs metric events across replicas so all dashboard connections see the full picture.
-
-### Design notes
-- Dragonfly is a drop-in Redis replacement with built-in vector search (no Redis Stack needed), single binary.
-- All cache paths are off the hot path (checked in `queueMicrotask` post-request or via a separate middleware that resolves before proxy mount).
-- Cache hit rate surfaced as a new KPI on the Dashboard tab.
+- **Embedding provider abstraction** — `src/cache/embed.js` with `openai` and `ollama` backends. Configured via `CACHE_EMBED_PROVIDER`, `CACHE_EMBED_MODEL`, `CACHE_EMBED_API_KEY`.
+- **Dragonfly vector index** — `FT.CREATE` bootstrap on first start; index dimension matches model output (`CACHE_EMBED_DIM`).
+- **KNN search** — `FT.SEARCH ... KNN 1` on cache miss after exact-match lookup; cosine ≥ `CACHE_SEMANTIC_THRESHOLD` (default 0.97) returns cached response.
+- **`X-Semantic-Cache: off`** bypass header.
+- **Semantic hit rate** surfaced as additional KPI on the Cache tab.
+- **Settings** — semantic on/off toggle + threshold slider added to Cache section.
 
 ---
 
