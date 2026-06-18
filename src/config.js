@@ -217,18 +217,36 @@ export const config = {
   },
   guardrailsMaxReqBytes: int('GUARDRAILS_MAX_REQ_BYTES', 4_194_304),
   get guardrailsSecretsMode() {
-    const v = _overrides.guardrailsSecretsMode ?? process.env.GUARDRAILS_SECRETS_MODE ?? 'off'
-    if (!GUARDRAILS_MODES.has(v.toLowerCase())) return 'off'
+    const envVal = process.env.GUARDRAILS_SECRETS_MODE ?? 'off'
+    const overrideVal = _overrides.guardrailsSecretsMode
+    const v = overrideVal ?? envVal
+    if (!GUARDRAILS_MODES.has(v.toLowerCase())) {
+      if (!overrideVal)
+        console.warn(`[config] GUARDRAILS_SECRETS_MODE invalid: "${v}", falling back to "off"`)
+      return 'off'
+    }
     return v.toLowerCase()
   },
   get guardrailsPiiMode() {
-    const v = _overrides.guardrailsPiiMode ?? process.env.GUARDRAILS_PII_MODE ?? 'off'
-    if (!GUARDRAILS_MODES.has(v.toLowerCase())) return 'off'
+    const envVal = process.env.GUARDRAILS_PII_MODE ?? 'off'
+    const overrideVal = _overrides.guardrailsPiiMode
+    const v = overrideVal ?? envVal
+    if (!GUARDRAILS_MODES.has(v.toLowerCase())) {
+      if (!overrideVal)
+        console.warn(`[config] GUARDRAILS_PII_MODE invalid: "${v}", falling back to "off"`)
+      return 'off'
+    }
     return v.toLowerCase()
   },
   get guardrailsInjectionMode() {
-    const v = _overrides.guardrailsInjectionMode ?? process.env.GUARDRAILS_INJECTION_MODE ?? 'off'
-    if (!GUARDRAILS_MODES.has(v.toLowerCase())) return 'off'
+    const envVal = process.env.GUARDRAILS_INJECTION_MODE ?? 'off'
+    const overrideVal = _overrides.guardrailsInjectionMode
+    const v = overrideVal ?? envVal
+    if (!GUARDRAILS_MODES.has(v.toLowerCase())) {
+      if (!overrideVal)
+        console.warn(`[config] GUARDRAILS_INJECTION_MODE invalid: "${v}", falling back to "off"`)
+      return 'off'
+    }
     return v.toLowerCase()
   },
   guardrailsCustomPatternsFile: process.env.GUARDRAILS_CUSTOM_PATTERNS_FILE ?? null,

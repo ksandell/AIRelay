@@ -1,7 +1,6 @@
 import express from 'express'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { config } from './config.js'
 import { requestLogger } from './middleware/requestLogger.js'
 import { apiRateLimiter } from './middleware/rateLimiter.js'
 import { errorHandler } from './middleware/errorHandler.js'
@@ -34,12 +33,10 @@ export function createApp() {
   // length so Express's longest-prefix-wins matching does the right thing.
   const routes = getRoutes()
   for (const route of routes) {
-    if (config.compactorEnabled) {
-      app.use(route.prefix, createCompactorMiddleware())
-    }
-    if (config.guardrailsEnabled) {
-      app.use(route.prefix, createGuardrailsMiddleware())
-    }
+    // ALWAYS register — the middleware itself checks config.*Enabled per-request,
+    // so runtime enable/disable (via POST /api/settings) takes effect immediately.
+    app.use(route.prefix, createCompactorMiddleware())
+    app.use(route.prefix, createGuardrailsMiddleware())
     app.use(route.prefix, createProxyHandler(route))
   }
 

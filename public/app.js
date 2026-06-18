@@ -415,7 +415,7 @@ function renderRecentTable(recent) {
   for (const ev of rows) {
     const tr = document.createElement('tr')
     tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
-      <td><code>${ev.model ?? '—'}</code></td>
+      <td><code>${escHtml(ev.model ?? '—')}</code></td>
       <td>${(ev.tokensIn ?? 0) + (ev.tokensOut ?? 0)}</td>
       <td>${ev.costUsd != null ? '$' + ev.costUsd.toFixed(5) : '—'}</td>
       <td>${ev.durationMs != null ? ev.durationMs + ' ms' : '—'}</td>`
