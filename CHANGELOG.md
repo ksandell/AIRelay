@@ -5,6 +5,18 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.3] — 2026-06-18 — Dashboard chart polish, version badge, logo crop
+
+### Added
+
+- **Version badge in header** — `v{version}` displayed in small muted text immediately to the right of the logo, populated from `/health` response on first load.
+
+### Fixed
+
+- **Activity chart bars now visible alongside RPS** — Warn (4xx) and Error (5xx) counts were rendered as raw counts (up to 1 400+) on the same axis as RPS (~4.5), making the RPS line invisible. Both are now normalized to req/s (÷60 in live mode, ÷bucketSec in history mode) so all three series share the same scale. Bars also stack (amber Warn/s on bottom, red Err/s on top).
+- **Consistent number formatting** — new `fmtNum(v, decimals)` utility with non-breaking-space thousands separator (`1 234 567.89`) applied to all KPI tiles, table cells, token counts, and rate metrics across every page.
+- **Logo pixel-perfect** — SVG `viewBox` tightened to actual content bounds (was 250×64 with ~14 px padding on all sides, now 178×39). PNG cropped to match. "AI" wordmark colour changed from muted gray to white.
+
 ## [0.6.2] — 2026-06-18 — Window-aware KPIs, log UX polish, table fixes
 
 ### Fixed
