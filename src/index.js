@@ -14,8 +14,15 @@ import {
   pruneOlderThan,
   close as closeMetricsStore,
 } from './metrics/store.js'
+import { initClient as initCacheClient, closeClient as closeCacheClient } from './cache/client.js'
+import { initFanout, closeFanout } from './cache/fanout.js'
+import { broadcast as hubBroadcast } from './sse/hub.js'
 
 await loadOverrides()
+
+await initCacheClient()
+// The subscriber re-broadcasts ticks from other instances to local SSE clients.
+await initFanout((data) => hubBroadcast('metrics', data, 'tick'))
 
 rotateLogsIfNeeded()
 
@@ -74,7 +81,7 @@ const heartbeat = startHeartbeat()
 startMetricsBroadcaster()
 
 let shuttingDown = false
-function shutdown(signal) {
+async function shutdown(signal) {
   if (shuttingDown) return
   shuttingDown = true
   logger.info('server shutting down', { signal })
@@ -86,6 +93,9 @@ function shutdown(signal) {
   clearInterval(sizeGuard)
   clearInterval(heartbeat)
   closeMetricsStore()
+
+  await closeFanout()
+  await closeCacheClient()
 
   server.close(() => {
     logger.info('server closed')
