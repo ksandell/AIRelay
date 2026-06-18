@@ -4,10 +4,12 @@ import path from 'node:path'
 const DEFAULT_SETTINGS_PATH = path.resolve('./data/settings.json')
 
 let _overrides = {}
+let _settingsPath = DEFAULT_SETTINGS_PATH
 
 export function _getOverrides() { return _overrides }
 
 export async function loadOverrides(filePath = DEFAULT_SETTINGS_PATH) {
+  _settingsPath = filePath
   try {
     const raw = await fs.readFile(filePath, 'utf8')
     _overrides = JSON.parse(raw)
@@ -16,10 +18,10 @@ export async function loadOverrides(filePath = DEFAULT_SETTINGS_PATH) {
   }
 }
 
-export async function applyOverrides(patch, filePath = DEFAULT_SETTINGS_PATH) {
+export async function applyOverrides(patch) {
   _overrides = { ..._overrides, ...patch }
   try {
-    await fs.writeFile(filePath, JSON.stringify(_overrides, null, 2))
+    await fs.writeFile(_settingsPath, JSON.stringify(_overrides, null, 2))
   } catch (err) {
     console.error('applyOverrides: failed to persist settings.json', err.message)
   }

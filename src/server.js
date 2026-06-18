@@ -10,6 +10,7 @@ import logsRouter from './api/logs.js'
 import metricsRouter from './api/metrics.js'
 import compactorRouter from './api/compactor.js'
 import guardrailsRouter from './api/guardrails.js'
+import settingsRouter from './api/settings.js'
 import { createProxyHandler } from './proxy/proxy.js'
 import { createCompactorMiddleware } from './compactor/middleware.js'
 import { createGuardrailsMiddleware } from './guardrails/middleware.js'
@@ -52,6 +53,7 @@ export function createApp() {
   app.use(metricsRouter)
   app.use(compactorRouter)
   app.use(guardrailsRouter)
+  app.use(settingsRouter)
 
   app.use(errorHandler)
 
