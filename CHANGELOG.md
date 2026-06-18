@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Hermetic test env** — `tests/setup-env.js` + Playwright `webServer.env` pin the cache OFF so the unit + E2E suites don't inherit `CACHE_ENABLED` from a developer's local `.env`.
 - **Dashboard activity sparkline** no longer grows unbounded (Chart.js resize feedback loop) — pinned canvas height.
+- **Dashboard activity sparkline now populates** — the dashboard refreshes periodically while visible, so the RPS/p95 line accumulates points instead of rendering a single flat point taken on tab-open.
+- **Dashboard recent-requests table** — added column spacing (Time / Model / Tokens / Cost / Latency previously ran together with no padding).
 
 ### Changed
 
