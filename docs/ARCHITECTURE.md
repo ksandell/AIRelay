@@ -122,7 +122,7 @@ src/cache/
 ├── spend.js        Per-key spend tracking written back to Redis
 ├── fanout.js       Broadcasts cache hit/miss events into the metrics pipeline
 ├── metrics.js      Parallel ring buffer + lifetime counters for cache events
-├── api.js          /api/cache/summary and /api/cache/recent endpoints
+├── api.js          /api/cache/summary, /recent, /history, /rollups endpoints
 └── client.js       ioredis connection factory (singleton); used by all sub-modules
 ```
 
@@ -301,6 +301,8 @@ GET  /api/metrics/export.csv          CSV download; falls back to ring buffer wh
 # Cache (v0.6.0, when CACHE_ENABLED=true)
 GET  /api/cache/summary               enabled, connected, keyCount, lifetime hit/miss counters
 GET  /api/cache/recent                last N per-request cache events
+GET  /api/cache/history               per-event cache history over a window (needs METRICS_DB_PATH)
+GET  /api/cache/rollups               bucketed cache aggregates (hits/misses/dedup/bytesFromCache)
 ```
 
 ## Key design decisions

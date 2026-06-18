@@ -17,3 +17,7 @@ scripts/.mcp-*
 
 # Superpowers brainstorm scratch
 .superpowers/
+
+# Project scratch dir (build/work output, backups, one-off scripts)
+.tmp/
+tmp/

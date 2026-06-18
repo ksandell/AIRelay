@@ -155,6 +155,13 @@ function baseEvent(m) {
     guardrailsAction: ge?.guardrailsAction ?? null,
     guardrailsHits: ge?.guardrailsHits ?? null,
     guardrailsDetectors: ge?.guardrailsDetectors ?? null,
+    // Cache outcome for a proxied request is always a MISS (hits/dedup/reject
+    // short-circuit in the cache middleware and never reach the proxy). Tagged
+    // on m by the cache middleware via req._cacheStatus.
+    cacheStatus: m.cacheStatus ?? null,
+    cacheKeyPrefix: m.cacheKeyPrefix ?? null,
+    cacheAgeS: null,
+    bytesFromCache: null,
   }
 }
 
@@ -360,6 +367,11 @@ export function createProxyHandler(route) {
     }
     // Capture the request for per-key spend accounting in finalize().
     if (config.cacheSpendEnabled) m.spendReq = req
+    // Carry the cache MISS tag set by the cache middleware onto the event.
+    if (req._cacheStatus) {
+      m.cacheStatus = req._cacheStatus
+      m.cacheKeyPrefix = req._cacheKeyPrefix ?? null
+    }
 
     proxy.web(req, res, proxyOpts, (err) => {
       if (err && !m.recorded) {
