@@ -66,6 +66,12 @@ header {
   align-items: center;
   gap: 18px;
 }
+.brand-mark {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: block;
+}
 h1 {
   font-size: 16.5px;
   font-weight: 600;
