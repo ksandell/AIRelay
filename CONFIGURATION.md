@@ -295,6 +295,34 @@ Prices are expressed in **USD per million tokens** (`$/MTok`). The bundled file 
 
 ---
 
+## Cache (v0.6.0)
+
+Optional Dragonfly response cache. All paths gracefully degrade — if Dragonfly
+is absent or disconnected, every request passes through to upstream unchanged.
+The dashboard **Cache** tab shows connection status and hit metrics.
+
+**Quick start:**
+```bash
+# Start AIRelay + Dragonfly together
+CACHE_ENABLED=true docker compose --profile cache up
+```
+
+| Variable | Default | Runtime | Description |
+|---|---|---|---|
+| `CACHE_ENABLED` | `false` | ✓ | Master switch. Zero overhead when false. |
+| `CACHE_REDIS_URL` | `redis://dragonfly:6379` | ✗ | Dragonfly connection URL. Restart required to change. |
+| `CACHE_EXACT_MATCH_ENABLED` | `true` | ✓ | Exact-match response cache via SHA-256 key. |
+| `CACHE_EXACT_TTL_SECONDS` | `3600` | ✓ | Response TTL in seconds. |
+| `CACHE_DEDUP_ENABLED` | `true` | ✓ | Coalesce identical in-flight requests in-process. |
+| `CACHE_SPEND_ENABLED` | `false` | ✓ | Per-API-key daily/monthly spend gate. |
+| `CACHE_SPEND_DAILY_LIMIT_USD` | — | ✓ | Daily budget per key hash. Empty = no limit. |
+| `CACHE_SPEND_MONTHLY_LIMIT_USD` | — | ✓ | Monthly budget per key hash. Empty = no limit. |
+| `CACHE_SSE_FANOUT_ENABLED` | `false` | ✓ | Redis pub/sub SSE tick sync for multi-instance deployments. |
+
+**Runtime = ✓:** configurable via Settings tab or `POST /api/settings` without restart.
+
+---
+
 ## Provider recipes
 
 Drop these into your `.env`:
