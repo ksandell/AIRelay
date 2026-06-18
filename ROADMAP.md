@@ -38,6 +38,7 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.5.0 | ✅ Done | **Zero-config provider routing** — single-upstream deployments auto-mount a `/proxy/<provider>` alias so SDKs pointed at the provider-named path work without writing `PROXY_ROUTES`; folds in the prior v0.4.next housekeeping (per-IP rate limiting on `/health` + `/api/*`, cleared CodeQL alerts, log-rotation TOCTOU fix, CodeQL Action `v3` → `v4`) |
 | v0.6.0 | ✅ Done | **Dashboard + Settings + Dragonfly Cache** — landing dashboard tab (health, KPIs, cache hit rate, recommendations), Settings tab with live-toggle Compactors, Guardrails, and Cache; optional Dragonfly sidecar for exact-match response cache, request dedup, per-key spend limits, multi-instance SSE fan-out |
 | v0.6.1 | ✅ Done | **Cache metrics + dashboard polish + security hardening** — cache outcomes persisted to SQLite, `/api/cache/history` + `/api/cache/rollups`, Cache tab sparklines, brand identity, secret query-param redaction, XSS fixes, full-SHA spend key |
+| v0.6.2 | ✅ Done | **Window-aware KPIs + log UX + table fixes** — all KPI tiles on every page now reflect the selected time window; logs no longer blink on tab switch; log cap 100 entries; status column width fix; horizontal scroll on all table wrappers |
 | v0.7.0 | ⚪ Queued | **Semantic Cache** — embedding-provider abstraction (OpenAI / Ollama), Dragonfly vector index bootstrap, KNN search, configurable cosine threshold; builds on v0.6.0 cache infrastructure |
 
 Per-release detail in [CHANGELOG.md](CHANGELOG.md).
