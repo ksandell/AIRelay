@@ -62,6 +62,10 @@ function activateTab(name) {
   }
   if (name === 'metrics' && typeof loadRecent === 'function') {
     loadRecent().catch(() => {})
+    if (currentHistoryWindow() !== 'live') {
+      lastHistoryChartRefresh = Date.now()
+      refreshChartsForWindow().catch(() => {})
+    }
   }
   if (name === 'dashboard') refreshDashboard().catch(() => {})
   if (name === 'settings') refreshSettings().catch(() => {})
@@ -78,7 +82,7 @@ async function refreshCompactor() {
   try {
     const [summaryRes, recentRes] = await Promise.all([
       fetch('/api/compactor/summary'),
-      fetch('/api/compactor/recent?limit=50'),
+      fetch('/api/compactor/recent?limit=500'),
     ])
     if (!summaryRes.ok || !recentRes.ok) throw new Error('fetch failed')
     const s = await summaryRes.json()
@@ -130,7 +134,7 @@ async function refreshCompactor() {
     rbody.innerHTML = ''
     for (const ev of recent) {
       const tr = document.createElement('tr')
-      tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
+      tr.innerHTML = `<td>${fmtTimeShort(ev.ts)}</td>
         <td>${escHtml(ev.scope)}</td>
         <td>${escHtml(ev.filtersFired.join(', ') || '—')}</td>
         <td>${ev.bytesIn} → ${ev.bytesOut}</td>
@@ -189,7 +193,7 @@ async function refreshCompactorAuto() {
     for (const ev of body.events ?? []) {
       const tr = document.createElement('tr')
       const filters = ev.compactorCompressors || '—'
-      tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
+      tr.innerHTML = `<td>${fmtTimeShort(ev.ts)}</td>
         <td>request</td>
         <td>${filters}</td>
         <td>${ev.bytesIn ?? 0} → ${ev.bytesOut ?? 0}</td>
@@ -210,7 +214,7 @@ async function refreshGuardrails() {
   try {
     const [summaryRes, recentRes] = await Promise.all([
       fetch('/api/guardrails/summary'),
-      fetch('/api/guardrails/recent?limit=50'),
+      fetch('/api/guardrails/recent?limit=500'),
     ])
     if (!summaryRes.ok || !recentRes.ok) throw new Error('fetch failed')
     const s = await summaryRes.json()
@@ -263,7 +267,7 @@ async function refreshGuardrails() {
     rbody.innerHTML = ''
     for (const ev of recent) {
       const tr = document.createElement('tr')
-      tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
+      tr.innerHTML = `<td>${fmtTimeShort(ev.ts)}</td>
         <td>${escHtml(ev.mode)}</td>
         <td>${escHtml(ev.detectorsFired.join(', ') || '—')}</td>
         <td>${ev.hits}</td>
@@ -308,7 +312,7 @@ async function refreshGuardrailsAuto() {
     for (const ev of body.events ?? []) {
       const tr = document.createElement('tr')
       const det = ev.guardrailsDetectors || '—'
-      tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
+      tr.innerHTML = `<td>${fmtTimeShort(ev.ts)}</td>
         <td>${ev.guardrailsAction ?? '—'}</td>
         <td>${det}</td>
         <td>${ev.guardrailsHits ?? 0}</td>
@@ -355,6 +359,7 @@ function initDashSparkline() {
           fill: false,
           tension: 0.3,
           pointRadius: 0,
+          yAxisID: 'y',
         },
         {
           label: 'p95 (ms)',
@@ -365,6 +370,7 @@ function initDashSparkline() {
           fill: false,
           tension: 0.3,
           pointRadius: 0,
+          yAxisID: 'y1',
         },
       ],
     },
@@ -373,7 +379,13 @@ function initDashSparkline() {
       plugins: { legend: { display: true, position: 'bottom' } },
       scales: {
         x: { display: false },
-        y: { beginAtZero: true },
+        y: { beginAtZero: true, position: 'left', title: { display: true, text: 'RPS' } },
+        y1: {
+          beginAtZero: true,
+          position: 'right',
+          grid: { drawOnChartArea: false },
+          title: { display: true, text: 'ms' },
+        },
       },
       responsive: true,
       maintainAspectRatio: false,
@@ -448,7 +460,7 @@ function renderCacheKpi(cacheData) {
 function dashRecentRow(ev) {
   const tr = document.createElement('tr')
   const tokens = (ev.inputTokens ?? ev.tokensIn ?? 0) + (ev.outputTokens ?? ev.tokensOut ?? 0)
-  tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
+  tr.innerHTML = `<td>${fmtTimeShort(ev.ts)}</td>
     <td><code>${escHtml(ev.model ?? '—')}</code></td>
     <td>${tokens}</td>
     <td>${ev.costUsd != null ? '$' + ev.costUsd.toFixed(5) : '—'}</td>
@@ -460,7 +472,9 @@ function renderRecentTable(recent) {
   const tbody = document.querySelector('#dashRecentTable tbody')
   if (!tbody) return
   tbody.innerHTML = ''
-  const rows = Array.isArray(recent) ? recent.slice(0, 5) : (recent.events ?? []).slice(0, 5)
+  // API returns oldest-first; reverse so newest appears at top (matches updateDashRecent).
+  const src = Array.isArray(recent) ? recent : (recent.events ?? [])
+  const rows = src.slice().reverse().slice(0, 5)
   for (const ev of rows) tbody.appendChild(dashRecentRow(ev))
 }
 
@@ -596,7 +610,7 @@ async function refreshCache() {
   try {
     const [summaryRes, recentRes] = await Promise.all([
       fetch('/api/cache/summary'),
-      fetch('/api/cache/recent?limit=20'),
+      fetch('/api/cache/recent?limit=500'),
     ])
     if (!summaryRes.ok) throw new Error('cache summary fetch failed')
     const s = await summaryRes.json()
@@ -671,7 +685,7 @@ async function refreshCache() {
       for (const ev of recent) {
         const tr = document.createElement('tr')
         const type = ev.type ?? '—'
-        tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
+        tr.innerHTML = `<td>${fmtTimeShort(ev.ts)}</td>
           <td><span class="cache-type-badge cache-${String(type).toLowerCase()}">${escHtml(type)}</span></td>
           <td><code>${escHtml(ev.keyPrefix ?? '—')}</code></td>
           <td>${ev.keyAgeS ?? '—'}</td>
@@ -722,7 +736,7 @@ async function refreshCacheAuto() {
     for (const ev of body.events ?? []) {
       const tr = document.createElement('tr')
       const type = ev.type ?? ev.cacheEventType ?? '—'
-      tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
+      tr.innerHTML = `<td>${fmtTimeShort(ev.ts)}</td>
         <td><span class="cache-type-badge cache-${String(type).toLowerCase()}">${escHtml(type)}</span></td>
         <td><code>${escHtml(ev.keyPrefix ?? ev.cacheKey?.slice(0, 16) ?? '—')}</code></td>
         <td>${ev.keyAgeS ?? '—'}</td>
@@ -1433,11 +1447,12 @@ let totalCostSinceBoot = 0
 let totalCostSeeded = false
 
 const MAX_TICKS = 300 // 5 minutes at 1Hz
-const MAX_TABLE_ROWS = 40
+const MAX_TABLE_ROWS = 500
 
 const tickLabels = []
 const tickTimestamps = []
 let chartMode = 'live'
+let lastHistoryChartRefresh = 0
 const rpsSeries = []
 const p95Series = []
 const tokenInSeries = []
@@ -1505,21 +1520,27 @@ function fmtNum(n, decimals = 0) {
   return decimals > 0 ? `${intFormatted}.${dec}` : intFormatted
 }
 
-// Browser-local timestamp with millisecond precision: `YYYY-MM-DD HH:MM:SS.mmm`.
-// The native `Date` getters already return values in the browser's timezone, so
-// there's no need to pull in a library for this — manual zero-padding gives us
-// a stable, sortable, copy-pasteable format for log lines + recent-request rows.
+// UTC timestamp with millisecond precision: `YYYY-MM-DD HH:MM:SS.mmm UTC`.
+// All timestamps in the UI are UTC, 24-hour format.
 function fmtTime(ts) {
   const d = new Date(ts)
   if (isNaN(d.getTime())) return ''
   const p = (n, w = 2) => String(n).padStart(w, '0')
   return (
-    `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
-    `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`
+    `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ` +
+    `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}.${p(d.getUTCMilliseconds(), 3)} UTC`
   )
 }
 
-// Chart-only x-axis formatter. Outputs `HH:MM:SS`, with a `DD.MM.YYYY ` prefix
+// Short UTC time for table cells: `HH:MM:SS`.
+function fmtTimeShort(ts) {
+  const d = new Date(ts)
+  if (isNaN(d.getTime())) return ''
+  const p = (n) => String(n).padStart(2, '0')
+  return `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`
+}
+
+// Chart-only x-axis formatter (UTC). Outputs `HH:MM:SS`, with a `DD.MM.YYYY ` prefix
 // when the date differs from the previous label (or when no previous label is
 // given). Keeps tick labels short for live charts while still disambiguating
 // day rollovers in long-range views (7d).
@@ -1527,8 +1548,8 @@ function fmtAxisTime(ts, prevTs) {
   const d = new Date(ts)
   if (isNaN(d.getTime())) return ''
   const p = (n, w = 2) => String(n).padStart(w, '0')
-  const hhmmss = `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
-  const dateStr = `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()}`
+  const hhmmss = `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`
+  const dateStr = `${p(d.getUTCDate())}.${p(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}`
   if (prevTs == null) return hhmmss
   const prev = new Date(prevTs)
   if (isNaN(prev.getTime())) return hhmmss
@@ -1864,7 +1885,7 @@ function appendRequest(ev) {
 
 async function loadRecent() {
   try {
-    const r = await fetch('/api/metrics/recent?limit=200')
+    const r = await fetch('/api/metrics/recent?limit=500')
     if (!r.ok) return
     const events = await r.json()
     recentTbody.innerHTML = ''
@@ -1959,6 +1980,14 @@ function connectMetricsSSE() {
     try {
       const tick = JSON.parse(e.data)
       pushTick(tick)
+      // History mode: charts don't update via pushTick, so re-fetch on a 30s throttle.
+      if (chartMode === 'history') {
+        const now = Date.now()
+        if (now - lastHistoryChartRefresh >= 30_000) {
+          lastHistoryChartRefresh = now
+          refreshChartsForWindow().catch(() => {})
+        }
+      }
       const dashPanel = document.getElementById('dashboardPanel')
       if (!dashPanel?.classList.contains('hidden')) {
         const p95 = tick.windows?.['1m']?.p95 ?? tick.p95 ?? tick.window_1m?.p95 ?? 0
@@ -2152,8 +2181,9 @@ async function refreshRecentForWindow() {
     return
   }
   recentTbody.innerHTML = ''
-  // history returns newest-first; render in that order with prepend → reverse
-  for (let i = events.length - 1; i >= 0; i--) appendRequest(events[i])
+  // events are newest-first; take most recent MAX_TABLE_ROWS then render oldest-first
+  const slice = events.slice(0, MAX_TABLE_ROWS)
+  for (let i = slice.length - 1; i >= 0; i--) appendRequest(slice[i])
 }
 
 // Bucket size (seconds) chosen so we render ~60–120 points regardless of window
@@ -2295,19 +2325,45 @@ async function refreshChartsForWindow() {
   const win = currentHistoryWindow()
   if (win === 'live') {
     chartMode = 'live'
-    // Reset arrays so the live SSE stream starts fresh and doesn't graft new
-    // ticks onto stale history buckets.
-    tickLabels.length = 0
-    tickTimestamps.length = 0
-    rpsSeries.length = 0
-    p95Series.length = 0
-    tokenInSeries.length = 0
-    tokenToolInSeries.length = 0
-    tokenOutSeries.length = 0
-    tokenToolOutSeries.length = 0
-    chartRps.update('none')
-    chartLat.update('none')
-    chartTokens.update('none')
+    // Repopulate charts from the in-memory ring buffer so switching back to
+    // Live doesn't show blank charts. Use recent events (~5 min window) to
+    // seed the series; the SSE tick stream then appends from here.
+    try {
+      const rb = await fetch('/api/metrics/recent?limit=5000')
+      if (rb.ok) {
+        const all = await rb.json()
+        const fiveMinAgo = Date.now() - 5 * 60 * 1000
+        const recent5m = all.filter((ev) => new Date(ev.ts).getTime() >= fiveMinAgo)
+        if (recent5m.length > 0) {
+          rebuildChartsFromHistory(recent5m, '5m')
+        } else {
+          tickLabels.length = 0
+          tickTimestamps.length = 0
+          rpsSeries.length = 0
+          p95Series.length = 0
+          tokenInSeries.length = 0
+          tokenToolInSeries.length = 0
+          tokenOutSeries.length = 0
+          tokenToolOutSeries.length = 0
+          chartRps.update('none')
+          chartLat.update('none')
+          chartTokens.update('none')
+        }
+      }
+    } catch {
+      // fallback: clear arrays
+      tickLabels.length = 0
+      tickTimestamps.length = 0
+      rpsSeries.length = 0
+      p95Series.length = 0
+      tokenInSeries.length = 0
+      tokenToolInSeries.length = 0
+      tokenOutSeries.length = 0
+      tokenToolOutSeries.length = 0
+      chartRps.update('none')
+      chartLat.update('none')
+      chartTokens.update('none')
+    }
     return
   }
   chartMode = 'history'

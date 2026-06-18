@@ -221,7 +221,7 @@
             <table id="dashRecentTable">
               <thead>
                 <tr>
-                  <th>Time</th>
+                  <th>Time (UTC)</th>
                   <th>Model</th>
                   <th>Tokens</th>
                   <th>Cost</th>
@@ -666,19 +666,21 @@ npm run dev</pre
         <header class="chart-title">
           <i aria-hidden="true" data-lucide="trending-up"></i>Top 10 most expensive requests
         </header>
-        <table id="topCostTable">
-          <thead>
-            <tr>
-              <th>time</th>
-              <th>model</th>
-              <th class="num">input</th>
-              <th class="num">output</th>
-              <th class="num">cost</th>
-              <th class="num">ms</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <div id="topCostTable-wrap">
+          <table id="topCostTable">
+            <thead>
+              <tr>
+                <th>Time (UTC)</th>
+                <th>model</th>
+                <th class="num">input</th>
+                <th class="num">output</th>
+                <th class="num">cost</th>
+                <th class="num">ms</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </section>
 
       <section class="table-card">
@@ -689,7 +691,7 @@ npm run dev</pre
           <table id="recentTable">
             <thead>
               <tr>
-                <th>time</th>
+                <th>Time (UTC)</th>
                 <th>method</th>
                 <th>path</th>
                 <th>status</th>
@@ -761,7 +763,7 @@ npm run dev</pre
           <table id="compactorRecentTable">
             <thead>
               <tr>
-                <th>Time</th>
+                <th>Time (UTC)</th>
                 <th>Scope</th>
                 <th>Filters fired</th>
                 <th>Bytes in → out</th>
@@ -844,7 +846,7 @@ npm run dev</pre
           <table id="guardrailsRecentTable">
             <thead>
               <tr>
-                <th>Time</th>
+                <th>Time (UTC)</th>
                 <th>Mode</th>
                 <th>Detectors fired</th>
                 <th>Hits</th>
@@ -942,18 +944,20 @@ npm run dev</pre
       <!-- Recent events -->
       <div class="card" id="cacheRecentCard" hidden>
         <h3>Recent cache events</h3>
-        <table id="cacheRecentTable">
-          <thead>
-            <tr>
-              <th>Time</th>
-              <th>Type</th>
-              <th>Key prefix</th>
-              <th>Key age (s)</th>
-              <th>Bytes</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <div id="cacheRecent-wrap">
+          <table id="cacheRecentTable">
+            <thead>
+              <tr>
+                <th>Time (UTC)</th>
+                <th>Type</th>
+                <th>Key prefix</th>
+                <th>Key age (s)</th>
+                <th>Bytes</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
     </main>
 
