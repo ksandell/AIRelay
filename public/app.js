@@ -722,7 +722,10 @@ async function refreshCacheAuto() {
   }
 }
 
-if (cacheHistoryWindowEl) cacheHistoryWindowEl.addEventListener('change', () => syncHistoryWindow(cacheHistoryWindowEl.value))
+if (cacheHistoryWindowEl)
+  cacheHistoryWindowEl.addEventListener('change', () =>
+    syncHistoryWindow(cacheHistoryWindowEl.value),
+  )
 if (cacheRefreshBtn) cacheRefreshBtn.addEventListener('click', refreshCacheAuto)
 
 // Wire "View all in Logs →" link
@@ -2241,10 +2244,16 @@ function rebuildChartsFromHistory(events, windowKey) {
   overwriteSpark('p95', p95)
   overwriteSpark('tokIn', tokInRate)
   overwriteSpark('tokOut', tokOutRate.map(Math.abs))
-  overwriteSpark('costPerMin', costs.map((c) => (c / bucketSec) * 60))
+  overwriteSpark(
+    'costPerMin',
+    costs.map((c) => (c / bucketSec) * 60),
+  )
   overwriteSpark('bytesIn', bytesInBucket)
   overwriteSpark('bytesOut', bytesOutBucket)
-  overwriteSpark('err', counts.map((n, i) => (n > 0 ? (errCounts[i] / n) * 100 : 0)))
+  overwriteSpark(
+    'err',
+    counts.map((n, i) => (n > 0 ? (errCounts[i] / n) * 100 : 0)),
+  )
 }
 
 async function refreshChartsForWindow() {
@@ -2303,9 +2312,11 @@ function syncHistoryWindow(value) {
   applyHistoryWindowToAll(value)
   updateKpiWindowLabels(value)
   updateChartWindowLabels(value)
-  const tab = (location.hash.replace('#', '') || 'dashboard')
+  const tab = location.hash.replace('#', '') || 'dashboard'
   if (tab === 'metrics') {
-    refreshChartsForWindow().then(() => refreshRecentForWindow()).catch(() => {})
+    refreshChartsForWindow()
+      .then(() => refreshRecentForWindow())
+      .catch(() => {})
   } else if (tab === 'compactor') {
     refreshCompactorAuto().catch(() => {})
   } else if (tab === 'guardrails') {
@@ -2326,11 +2337,15 @@ if (historyWindowEl) {
 }
 if (compactorHistoryWindowEl) {
   compactorHistoryWindowEl.removeEventListener('change', refreshCompactorAuto)
-  compactorHistoryWindowEl.addEventListener('change', () => syncHistoryWindow(compactorHistoryWindowEl.value))
+  compactorHistoryWindowEl.addEventListener('change', () =>
+    syncHistoryWindow(compactorHistoryWindowEl.value),
+  )
 }
 if (guardrailsHistoryWindowEl) {
   guardrailsHistoryWindowEl.removeEventListener('change', refreshGuardrailsAuto)
-  guardrailsHistoryWindowEl.addEventListener('change', () => syncHistoryWindow(guardrailsHistoryWindowEl.value))
+  guardrailsHistoryWindowEl.addEventListener('change', () =>
+    syncHistoryWindow(guardrailsHistoryWindowEl.value),
+  )
 }
 if (csvBtn) {
   csvBtn.addEventListener('click', () => {
