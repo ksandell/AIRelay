@@ -27,6 +27,9 @@ export async function exactSet(sha256, entry) {
   }
 }
 
+// Total key count in the Dragonfly instance. Assumes a dedicated cache
+// instance (as provisioned by the docker-compose `cache` profile); on a shared
+// instance this also counts `airelay:spend:*` and any non-AIRelay keys.
 export async function exactKeyCount() {
   if (!isConnected()) return 0
   try {
