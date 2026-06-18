@@ -348,18 +348,66 @@ async function refreshGuardrailsAuto() {
 // ─── Dashboard panel ─────────────────────────────────────────
 let dashSparklineChart = null
 let dashRpsHistory = []
+let dashErrHistory = []
 let dashP95History = []
 const DASH_SPARKLINE_POINTS = 30
 
-function pushDashPoint(rps, p95) {
+function pushDashPoint(rps, p95, errRate) {
   dashRpsHistory = [...dashRpsHistory, rps].slice(-DASH_SPARKLINE_POINTS)
+  dashErrHistory = [...dashErrHistory, (errRate ?? 0) * 100].slice(-DASH_SPARKLINE_POINTS)
   dashP95History = [...dashP95History, p95].slice(-DASH_SPARKLINE_POINTS)
   if (dashSparklineChart) {
     dashSparklineChart.data.labels = dashRpsHistory.map((_, i) => i)
     dashSparklineChart.data.datasets[0].data = [...dashRpsHistory]
-    dashSparklineChart.data.datasets[1].data = [...dashP95History]
+    dashSparklineChart.data.datasets[1].data = [...dashErrHistory]
+    dashSparklineChart.data.datasets[2].data = [...dashP95History]
     dashSparklineChart.update('none')
   }
+}
+
+function rebuildDashChartFromHistory(events, windowKey) {
+  const winSec = HISTORY_WINDOW_SECONDS[windowKey]
+  if (!winSec || !dashSparklineChart) return
+  const bucketSec = bucketSecondsFor(winSec)
+  const bucketMs = bucketSec * 1000
+  const nowMs = Date.now()
+  const startMs = nowMs - winSec * 1000
+  const numBuckets = Math.max(1, Math.ceil(winSec / bucketSec))
+
+  const counts = new Array(numBuckets).fill(0)
+  const errCounts = new Array(numBuckets).fill(0)
+  const durations = Array.from({ length: numBuckets }, () => [])
+
+  for (const ev of events) {
+    const t = new Date(ev.ts).getTime()
+    if (isNaN(t)) continue
+    const idx = Math.floor((t - startMs) / bucketMs)
+    if (idx < 0 || idx >= numBuckets) continue
+    counts[idx]++
+    if (ev.error || (ev.status != null && ev.status >= 400)) errCounts[idx]++
+    if (typeof ev.durationMs === 'number') durations[idx].push(ev.durationMs)
+  }
+
+  const labels = [], rps = [], errPct = [], p95 = []
+  let prevTs = null
+  for (let i = 0; i < numBuckets; i++) {
+    const bucketStartMs = startMs + i * bucketMs
+    labels.push(fmtAxisTime(bucketStartMs, prevTs))
+    prevTs = bucketStartMs
+    rps.push(counts[i] / bucketSec)
+    errPct.push(counts[i] > 0 ? (errCounts[i] / counts[i]) * 100 : 0)
+    const sorted = durations[i].slice().sort((a, b) => a - b)
+    const pi = Math.floor(sorted.length * 0.95)
+    p95.push(sorted.length ? sorted[Math.min(pi, sorted.length - 1)] : 0)
+  }
+
+  dashSparklineChart.data.labels = labels
+  dashSparklineChart.data.datasets[0].data = rps
+  dashSparklineChart.data.datasets[1].data = errPct
+  dashSparklineChart.data.datasets[2].data = p95
+  // Show x-axis labels in history mode
+  dashSparklineChart.options.scales.x.display = true
+  dashSparklineChart.update('none')
 }
 
 function initDashSparkline() {
@@ -374,11 +422,23 @@ function initDashSparkline() {
           label: 'RPS',
           data: [],
           borderColor: '#6366f1',
+          backgroundColor: 'rgba(99,102,241,0.15)',
           borderWidth: 2,
           fill: false,
           tension: 0.3,
           pointRadius: 0,
           yAxisID: 'y',
+          order: 2,
+        },
+        {
+          label: 'Errors %',
+          data: [],
+          type: 'bar',
+          backgroundColor: 'rgba(239,68,68,0.55)',
+          borderColor: 'rgba(239,68,68,0.8)',
+          borderWidth: 0,
+          yAxisID: 'y',
+          order: 1,
         },
         {
           label: 'p95 (ms)',
@@ -390,6 +450,7 @@ function initDashSparkline() {
           tension: 0.3,
           pointRadius: 0,
           yAxisID: 'y1',
+          order: 3,
         },
       ],
     },
@@ -398,7 +459,7 @@ function initDashSparkline() {
       plugins: { legend: { display: true, position: 'bottom' } },
       scales: {
         x: { display: false },
-        y: { beginAtZero: true, position: 'left', title: { display: true, text: 'RPS' } },
+        y: { beginAtZero: true, position: 'left', title: { display: true, text: 'RPS / Err%' } },
         y1: {
           beginAtZero: true,
           position: 'right',
@@ -598,19 +659,31 @@ async function refreshDashboard() {
 
     const p95 = renderKpiRow(summary, compactor)
     renderCacheKpi(cacheData)
-    pushDashPoint(summary?.window_1m?.rps ?? 0, p95 ?? 0)
+    const errRate = summary?.windows?.['1m']?.errorRate ?? summary?.window_1m?.errorRate ?? 0
+    const dashWin = currentHistoryWindow()
+    if (dashWin === 'live') {
+      pushDashPoint(summary?.window_1m?.rps ?? 0, p95 ?? 0, errRate)
+      // Restore x-axis to hidden in live mode
+      if (dashSparklineChart) {
+        dashSparklineChart.options.scales.x.display = false
+        dashSparklineChart.update('none')
+      }
+    }
     renderRecentTable(recent)
     renderHealthSidebar(health, compactor, guardrails, cacheData)
     renderRecommendations(health, compactor, guardrails, cacheData)
-    // Override KPIs with history aggregates when a window is selected
-    const dashWin = currentHistoryWindow()
+    // History mode: fetch events, rebuild chart + override KPIs
     if (dashWin !== 'live') {
       const range = windowToRange(dashWin)
       if (range) {
         const params = new URLSearchParams({ from: range.from, to: range.to, limit: '5000' })
         fetch('/api/metrics/history?' + params)
           .then(r => r.ok ? r.json() : null)
-          .then(body => { if (body) renderDashboardHistoryKpis(body.events ?? [], dashWin) })
+          .then(body => {
+            if (!body) return
+            rebuildDashChartFromHistory(body.events ?? [], dashWin)
+            renderDashboardHistoryKpis(body.events ?? [], dashWin)
+          })
           .catch(() => {})
       }
     }
