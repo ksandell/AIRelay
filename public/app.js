@@ -57,7 +57,8 @@ function activateTab(name) {
   if (name === 'guardrails') refreshGuardrails()
   // Re-pull ring-buffer data when the user lands on Logs/Metrics so tables
   // populate even if the tab was hidden when the proxy traffic arrived.
-  if (name === 'logs' && typeof loadLive === 'function' && !dateSelect?.value) {
+  // Only reload on first visit; SSE stream handles incremental updates after that.
+  if (name === 'logs' && typeof loadLive === 'function' && !dateSelect?.value && logBuffer.length === 0) {
     loadLive().catch(() => {})
   }
   if (name === 'metrics' && typeof loadRecent === 'function') {
@@ -1173,7 +1174,7 @@ let paused = false
 let count = 0
 
 // ─── Log panel state ─────────────────────────────────────────
-const LOG_BUFFER_MAX = 2000
+const LOG_BUFFER_MAX = 100
 const logBuffer = [] // { type: 'proxy'|'internal'|'system', entry: object }
 
 const filterProxy = document.getElementById('filterProxy')
@@ -1349,8 +1350,8 @@ async function loadLive() {
   // both sources so the Logs panel shows historical proxy traffic on first
   // render, not just events that arrive over SSE after the page loads.
   const [logsR, recentR] = await Promise.all([
-    fetch('/api/logs?limit=500').catch(() => null),
-    fetch('/api/metrics/recent?limit=500').catch(() => null),
+    fetch('/api/logs?limit=100').catch(() => null),
+    fetch('/api/metrics/recent?limit=100').catch(() => null),
   ])
   const appEntries = logsR && logsR.ok ? await logsR.json() : []
   const proxyEntries = recentR && recentR.ok ? await recentR.json() : []

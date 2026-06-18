@@ -201,7 +201,7 @@ button.active {
 
 .log-entry {
   display: grid;
-  grid-template-columns: 190px 52px 1fr;
+  grid-template-columns: 190px 74px 1fr;
   gap: 0 12px;
   padding: 2px 16px;
   line-height: 1.6;
@@ -371,6 +371,7 @@ button.active {
 #recentTable-wrap {
   max-height: 560px;
   overflow-y: auto;
+  overflow-x: auto;
 }
 
 #recentTable thead tr {
@@ -429,6 +430,7 @@ button.active {
 #topCostTable-wrap {
   max-height: 360px;
   overflow-y: auto;
+  overflow-x: auto;
 }
 #modelsTable,
 #topCostTable {
@@ -872,12 +874,14 @@ footer {
 #guardrailsRecent-wrap {
   max-height: 420px;
   overflow-y: auto;
+  overflow-x: auto;
 }
 
 /* ─── Cache recent-events table ──────────────────────────────── */
 #cacheRecent-wrap {
   max-height: 420px;
   overflow-y: auto;
+  overflow-x: auto;
 }
 #cacheRecentTable {
   width: 100%;
