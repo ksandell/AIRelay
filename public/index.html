@@ -15,25 +15,7 @@
     <header>
       <div class="brand">
         <a class="brand-logo" href="/" aria-label="AIRelay home">
-          <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-            <defs>
-              <linearGradient id="brandTeal" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stop-color="#2dd4bf" />
-                <stop offset="1" stop-color="#0d9488" />
-              </linearGradient>
-            </defs>
-            <g
-              fill="none"
-              stroke="url(#brandTeal)"
-              stroke-width="9"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <polyline points="14,14 29,32 14,50" opacity="0.25" />
-              <polyline points="26,14 41,32 26,50" opacity="0.55" />
-              <polyline points="38,14 53,32 38,50" opacity="1" />
-            </g>
-          </svg>
+          <img src="logo.svg" class="brand-mark" width="28" height="28" alt="" />
           <h1>AI<span class="brand-accent">Relay</span></h1>
         </a>
         <nav class="tabs">
@@ -163,6 +145,20 @@
         <span id="cacheStatus" class="status disconnected" role="status" aria-live="polite"
           >Disabled</span
         >
+        <select id="cacheHistoryWindow" aria-label="Time window" data-history-window>
+          <option value="live">Live</option>
+          <option value="5m">Last 5m</option>
+          <option value="10m">Last 10m</option>
+          <option value="15m">Last 15m</option>
+          <option value="30m">Last 30m</option>
+          <option value="1h">Last 1h</option>
+          <option value="3h">Last 3h</option>
+          <option value="6h">Last 6h</option>
+          <option value="12h">Last 12h</option>
+          <option value="24h">Last 24h</option>
+          <option value="7d">Last 7d</option>
+        </select>
+        <button id="cacheRefreshBtn">Refresh</button>
       </div>
 
       <div class="controls hidden" id="settingsControls">

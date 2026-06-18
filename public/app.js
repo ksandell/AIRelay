@@ -65,7 +65,7 @@ function activateTab(name) {
   }
   if (name === 'dashboard') refreshDashboard().catch(() => {})
   if (name === 'settings') refreshSettings().catch(() => {})
-  if (name === 'cache') refreshCache().catch(() => {})
+  if (name === 'cache') refreshCacheAuto().catch(() => {})
 }
 tabs.forEach((t) => t.addEventListener('click', () => activateTab(t.dataset.tab)))
 
@@ -156,7 +156,7 @@ setInterval(() => {
 // Keep the Cache tab's KPIs + sparklines live while it's the active panel.
 setInterval(() => {
   const cp = document.getElementById('cachePanel')
-  if (cp && !cp.classList.contains('hidden')) refreshCache().catch(() => {})
+  if (cp && !cp.classList.contains('hidden')) refreshCacheAuto().catch(() => {})
 }, 5000)
 
 // Keep the Dashboard live while it's the active panel. Without this the activity
@@ -674,6 +674,56 @@ async function refreshCache() {
     }
   }
 }
+
+const cacheHistoryWindowEl = document.getElementById('cacheHistoryWindow')
+const cacheRefreshBtn = document.getElementById('cacheRefreshBtn')
+
+async function refreshCacheAuto() {
+  const win = cacheHistoryWindowEl?.value || 'live'
+  if (win === 'live') {
+    // Resize sparklines now that the panel is visible — Chart.js may have
+    // created them at zero size while the panel was hidden.
+    requestAnimationFrame(() => {
+      for (const k of [
+        'cacheHits1m',
+        'cacheHitRate',
+        'cacheBytesFromCache',
+        'cacheDedup1m',
+        'cacheSpendRejects1m',
+      ]) {
+        sparkCharts[k]?.resize()
+      }
+    })
+    return refreshCache()
+  }
+  const range = windowToRange(win)
+  if (!range) return refreshCache()
+  await refreshCache() // keep KPIs / status fresh
+  const params = new URLSearchParams({ from: range.from, to: range.to, limit: '500' })
+  try {
+    const r = await fetch('/api/cache/history?' + params)
+    if (!r.ok) return
+    const body = await r.json()
+    const tbody = document.querySelector('#cacheRecentTable tbody')
+    if (!tbody) return
+    tbody.innerHTML = ''
+    for (const ev of body.events ?? []) {
+      const tr = document.createElement('tr')
+      const type = ev.type ?? ev.cacheEventType ?? '—'
+      tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
+        <td><span class="cache-type-badge cache-${String(type).toLowerCase()}">${escHtml(type)}</span></td>
+        <td><code>${escHtml(ev.keyPrefix ?? ev.cacheKey?.slice(0, 16) ?? '—')}</code></td>
+        <td>${ev.keyAgeS ?? '—'}</td>
+        <td>${ev.bytes != null ? cacheFmtBytes(ev.bytes) : '—'}</td>`
+      tbody.appendChild(tr)
+    }
+  } catch {
+    // ignore
+  }
+}
+
+if (cacheHistoryWindowEl) cacheHistoryWindowEl.addEventListener('change', () => syncHistoryWindow(cacheHistoryWindowEl.value))
+if (cacheRefreshBtn) cacheRefreshBtn.addEventListener('click', refreshCacheAuto)
 
 // Wire "View all in Logs →" link
 document.getElementById('dashLogsLink')?.addEventListener('click', (e) => {
@@ -2196,6 +2246,32 @@ async function refreshChartsForWindow() {
   rebuildChartsFromHistory(events ?? [], win)
 }
 
+// ─── History-window persistence + cross-tab sync ─────────────
+// All [data-history-window] selects share one value, stored in localStorage.
+// Changing any one syncs the others and triggers the current tab's refresh.
+const HW_STORAGE_KEY = 'airelay_historyWindow'
+
+function applyHistoryWindowToAll(value) {
+  for (const sel of document.querySelectorAll('[data-history-window]')) {
+    if (sel.value !== value) sel.value = value
+  }
+}
+
+function syncHistoryWindow(value) {
+  localStorage.setItem(HW_STORAGE_KEY, value)
+  applyHistoryWindowToAll(value)
+  const tab = (location.hash.replace('#', '') || 'dashboard')
+  if (tab === 'metrics') {
+    refreshChartsForWindow().then(() => refreshRecentForWindow()).catch(() => {})
+  } else if (tab === 'compactor') {
+    refreshCompactorAuto().catch(() => {})
+  } else if (tab === 'guardrails') {
+    refreshGuardrailsAuto().catch(() => {})
+  } else if (tab === 'cache') {
+    refreshCacheAuto().catch(() => {})
+  }
+}
+
 if (routeFilterEl) {
   routeFilterEl.addEventListener('change', () => {
     refreshRecentForWindow()
@@ -2203,10 +2279,15 @@ if (routeFilterEl) {
   })
 }
 if (historyWindowEl) {
-  historyWindowEl.addEventListener('change', async () => {
-    await refreshChartsForWindow()
-    await refreshRecentForWindow()
-  })
+  historyWindowEl.addEventListener('change', () => syncHistoryWindow(historyWindowEl.value))
+}
+if (compactorHistoryWindowEl) {
+  compactorHistoryWindowEl.removeEventListener('change', refreshCompactorAuto)
+  compactorHistoryWindowEl.addEventListener('change', () => syncHistoryWindow(compactorHistoryWindowEl.value))
+}
+if (guardrailsHistoryWindowEl) {
+  guardrailsHistoryWindowEl.removeEventListener('change', refreshGuardrailsAuto)
+  guardrailsHistoryWindowEl.addEventListener('change', () => syncHistoryWindow(guardrailsHistoryWindowEl.value))
 }
 if (csvBtn) {
   csvBtn.addEventListener('click', () => {
@@ -2229,6 +2310,13 @@ if (csvBtn) {
 }
 
 // ─── Boot ────────────────────────────────────────────────────
+// Restore saved history-window choice before activating the initial tab so
+// the first refresh uses the persisted window instead of defaulting to Live.
+;(function restoreHistoryWindow() {
+  const saved = localStorage.getItem(HW_STORAGE_KEY)
+  if (saved) applyHistoryWindowToAll(saved)
+})()
+
 const HASH_TO_TAB = {
   '#dashboard': 'dashboard',
   '#metrics': 'metrics',

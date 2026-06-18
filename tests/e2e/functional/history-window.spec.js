@@ -31,7 +31,7 @@ test.describe('History window dropdown', () => {
     baseURL,
   }) => {
     await page.goto('/?testMode=1#metrics')
-    await expect(page.locator('canvas').first()).toBeVisible({ timeout: 10_000 })
+    await expect(page.locator('#metricsPanel canvas').first()).toBeVisible({ timeout: 10_000 })
     await seedProxyCalls(baseURL, { count: 3 })
 
     for (const win of WINDOWS) {
