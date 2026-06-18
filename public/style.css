@@ -345,6 +345,14 @@ button.active {
   height: 160px !important;
 }
 
+/* Dashboard activity sparkline — pin the height so Chart.js (responsive +
+   maintainAspectRatio:false) can't enter a resize feedback loop and grow the
+   canvas every frame until the tab crashes. */
+#dashSparkline {
+  height: 80px !important;
+  max-height: 80px;
+}
+
 .table-card {
   padding: 0;
   overflow: visible;
