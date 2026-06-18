@@ -71,4 +71,11 @@ test.describe('visual: dashboard tabs', () => {
     await page.waitForTimeout(300) // let settings fetch settle
     await expect(page).toHaveScreenshot('settings-initial.png', { fullPage: true })
   })
+
+  test('cache tab — disabled state', async ({ page }) => {
+    await page.goto('/?testMode=1#cache')
+    await page.waitForSelector('#cachePanel:not(.hidden)')
+    await page.waitForTimeout(300) // let cache summary fetch settle
+    await expect(page).toHaveScreenshot('cache-disabled.png', { fullPage: true })
+  })
 })
