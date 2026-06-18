@@ -153,6 +153,12 @@ setInterval(() => {
   if (compactorPanel && !compactorPanel.classList.contains('hidden')) refreshCompactorAuto()
 }, 5000)
 
+// Keep the Cache tab's KPIs + sparklines live while it's the active panel.
+setInterval(() => {
+  const cp = document.getElementById('cachePanel')
+  if (cp && !cp.classList.contains('hidden')) refreshCache().catch(() => {})
+}, 5000)
+
 const compactorHistoryWindowEl = document.getElementById('compactorHistoryWindow')
 if (compactorHistoryWindowEl) {
   compactorHistoryWindowEl.addEventListener('change', refreshCompactorAuto)
@@ -626,6 +632,13 @@ async function refreshCache() {
     )
     document.getElementById('cacheKpiKeyCount').textContent = cacheFmt(s.keyCount)
     document.getElementById('cacheKpiInflight').textContent = cacheFmt(s.dedup?.inflight)
+
+    // Feed the 1-minute sparklines (same live-accumulation pattern as the other tabs).
+    pushSpark('cacheHits1m', s.window_1m?.exactHits ?? 0)
+    pushSpark('cacheHitRate', Math.round((s.window_1m?.hitRate ?? 0) * 100))
+    pushSpark('cacheBytesFromCache', s.window_1m?.bytesFromCache ?? 0)
+    pushSpark('cacheDedup1m', s.window_1m?.dedupCoalesced ?? 0)
+    pushSpark('cacheSpendRejects1m', s.window_1m?.spendRejected ?? 0)
 
     const notice = document.getElementById('cacheDisabledNotice')
     const recentCard = document.getElementById('cacheRecentCard')
@@ -1636,6 +1649,11 @@ function initSparklines() {
     ['sparkGuardrailsRedactedLifetime', '#a371f7', 'guardrailsRedactedLifetime'],
     ['sparkGuardrailsAlertedLifetime', '#f0b72f', 'guardrailsAlertedLifetime'],
     ['sparkGuardrailsBypassesLifetime', '#d29922', 'guardrailsBypassesLifetime'],
+    ['sparkCacheHits1m', '#3fb950', 'cacheHits1m'],
+    ['sparkCacheHitRate', '#58a6ff', 'cacheHitRate'],
+    ['sparkCacheBytesFromCache', '#3fb950', 'cacheBytesFromCache'],
+    ['sparkCacheDedup1m', '#a371f7', 'cacheDedup1m'],
+    ['sparkCacheSpendRejects1m', '#d29922', 'cacheSpendRejects1m'],
   ]
   for (const [id, color, key] of specs) {
     const ch = makeSparkline(id, color)

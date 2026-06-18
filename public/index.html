@@ -4,6 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AIRelay — Live</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="alternate icon" type="image/x-icon" href="favicon.ico" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
     <link rel="stylesheet" href="style.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
@@ -11,7 +14,28 @@
   <body>
     <header>
       <div class="brand">
-        <h1>AIRelay</h1>
+        <a class="brand-logo" href="/" aria-label="AIRelay home">
+          <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+            <defs>
+              <linearGradient id="brandTeal" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#2dd4bf" />
+                <stop offset="1" stop-color="#0d9488" />
+              </linearGradient>
+            </defs>
+            <g
+              fill="none"
+              stroke="url(#brandTeal)"
+              stroke-width="9"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="14,14 29,32 14,50" opacity="0.25" />
+              <polyline points="26,14 41,32 26,50" opacity="0.55" />
+              <polyline points="38,14 53,32 38,50" opacity="1" />
+            </g>
+          </svg>
+          <h1>AI<span class="brand-accent">Relay</span></h1>
+        </a>
         <nav class="tabs">
           <button class="tab" data-tab="setup" id="setupTab" hidden>
             <i aria-hidden="true" data-lucide="settings"></i>Setup
@@ -855,22 +879,27 @@ npm run dev</pre
         <div class="kpi-card">
           <span class="kpi-label">Cache hits (1m)</span>
           <span class="kpi-value" id="cacheKpiHits1m">—</span>
+          <canvas class="kpi-spark" id="sparkCacheHits1m"></canvas>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">Hit rate</span>
           <span class="kpi-value" id="cacheKpiHitRate">—</span>
+          <canvas class="kpi-spark" id="sparkCacheHitRate"></canvas>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">Bytes from cache</span>
           <span class="kpi-value" id="cacheKpiBytesFromCache">—</span>
+          <canvas class="kpi-spark" id="sparkCacheBytesFromCache"></canvas>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">Dedup coalesced</span>
           <span class="kpi-value" id="cacheKpiDedup">—</span>
+          <canvas class="kpi-spark" id="sparkCacheDedup1m"></canvas>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">Spend rejects</span>
           <span class="kpi-value" id="cacheKpiSpendRejects">—</span>
+          <canvas class="kpi-spark" id="sparkCacheSpendRejects1m"></canvas>
         </div>
       </div>
 
