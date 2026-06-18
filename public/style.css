@@ -836,16 +836,16 @@ footer {
   letter-spacing: 0.04em;
 }
 /* Numeric columns: Fires / Bytes saved / Avg µs / Hits / Key age / Bytes */
-#compactorTable td:nth-child(n+3),
-#compactorTable th:nth-child(n+3),
+#compactorTable td:nth-child(n + 3),
+#compactorTable th:nth-child(n + 3),
 #compactorRecentTable td:nth-child(4),
 #compactorRecentTable th:nth-child(4),
 #compactorRecentTable td:nth-child(5),
 #compactorRecentTable th:nth-child(5),
 #compactorRecentTable td:nth-child(6),
 #compactorRecentTable th:nth-child(6),
-#guardrailsTable td:nth-child(n+4),
-#guardrailsTable th:nth-child(n+4),
+#guardrailsTable td:nth-child(n + 4),
+#guardrailsTable th:nth-child(n + 4),
 #guardrailsRecentTable td:nth-child(4),
 #guardrailsRecentTable th:nth-child(4),
 #cacheRecentTable td:nth-child(4),

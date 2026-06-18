@@ -107,9 +107,9 @@ async function refreshCompactor() {
       document.getElementById('compactorBytesLifetime').textContent = fmtBytes(
         s.lifetime.bytesSaved,
       )
-      document.getElementById('compactorTokensLifetime').textContent = Math.floor(
-        s.lifetime.bytesSaved / 4,
-      ).toLocaleString()
+      document.getElementById('compactorTokensLifetime').textContent = fmtNum(
+        Math.floor(s.lifetime.bytesSaved / 4),
+      )
       const r = s.windows['5m'].ratio
       document.getElementById('compactorRatio5m').textContent =
         r == null ? '—' : `${Math.round((1 - r) * 100)}%`
@@ -392,9 +392,11 @@ function resetDashLiveHistory() {
 }
 
 function pushDashPoint(rps, p95, errCount, warnCount) {
+  const warnRate = (warnCount ?? 0) / 60
+  const errRate = (errCount ?? 0) / 60
   dashRpsHistory = [...dashRpsHistory.slice(1), rps]
-  dashWarnHistory = [...dashWarnHistory.slice(1), warnCount ?? 0]
-  dashErrHistory = [...dashErrHistory.slice(1), errCount ?? 0]
+  dashWarnHistory = [...dashWarnHistory.slice(1), warnRate]
+  dashErrHistory = [...dashErrHistory.slice(1), errRate]
   dashP95History = [...dashP95History.slice(1), p95]
   if (dashSparklineChart) {
     dashSparklineChart.data.labels = DASH_LABELS
@@ -451,8 +453,8 @@ function rebuildDashChartFromHistory(events, windowKey) {
 
   dashSparklineChart.data.labels = labels
   dashSparklineChart.data.datasets[0].data = rps
-  dashSparklineChart.data.datasets[1].data = warns
-  dashSparklineChart.data.datasets[2].data = errs
+  dashSparklineChart.data.datasets[1].data = warnCounts.map((v) => v / bucketSec)
+  dashSparklineChart.data.datasets[2].data = errCounts.map((v) => v / bucketSec)
   dashSparklineChart.data.datasets[3].data = p95
   // Show x-axis labels in history mode
   dashSparklineChart.options.scales.x.display = true
@@ -481,7 +483,7 @@ function initDashSparkline() {
           order: 3,
         },
         {
-          label: 'Warn (4xx)',
+          label: 'Warn/s (4xx)',
           data: [],
           type: 'bar',
           backgroundColor: 'rgba(245,158,11,0.6)',
@@ -492,7 +494,7 @@ function initDashSparkline() {
           order: 2,
         },
         {
-          label: 'Error (5xx)',
+          label: 'Err/s (5xx)',
           data: [],
           type: 'bar',
           backgroundColor: 'rgba(239,68,68,0.65)',
@@ -522,7 +524,7 @@ function initDashSparkline() {
       plugins: { legend: { display: true, position: 'bottom' } },
       scales: {
         x: { display: false },
-        y: { beginAtZero: true, position: 'left', title: { display: true, text: 'RPS / Count' } },
+        y: { beginAtZero: true, position: 'left', title: { display: true, text: 'req/s' } },
         y1: {
           beginAtZero: true,
           position: 'right',
@@ -570,7 +572,7 @@ function renderKpiRow(summary, compactor) {
   // "total" we have without a persistent DB. Label reflects "session" scope.
   const total = summary?.count
   document.getElementById('dashKpiRequests').textContent =
-    typeof total === 'number' ? total.toLocaleString() : '—'
+    typeof total === 'number' ? fmtNum(total) : '—'
   // Cost: use the SSE-accumulated running total (seeded from ring buffer on boot).
   document.getElementById('dashKpiCost').textContent = fmtCost(totalCostSinceBoot)
   const p95 = summary?.windows?.['1m']?.p95 ?? summary?.window_1m?.p95
@@ -594,7 +596,7 @@ function renderCacheKpi(cacheData) {
   if (cacheData?.enabled) {
     cacheKpiCard.hidden = false
     const rate = cacheData.lifetime?.hitRate ?? 0
-    document.getElementById('dashKpiCacheHitRate').textContent = (rate * 100).toFixed(1) + '%'
+    document.getElementById('dashKpiCacheHitRate').textContent = fmtNum(rate * 100, 1) + '%'
   } else {
     cacheKpiCard.hidden = true
   }
@@ -606,8 +608,8 @@ function dashRecentRow(ev) {
   tr.innerHTML = `<td>${fmtTimeShort(ev.ts)}</td>
     <td><code>${escHtml(ev.model ?? '—')}</code></td>
     <td>${tokens}</td>
-    <td>${ev.costUsd != null ? '$' + ev.costUsd.toFixed(5) : '—'}</td>
-    <td>${ev.durationMs != null ? ev.durationMs + ' ms' : '—'}</td>`
+    <td>${ev.costUsd != null ? fmtCost(ev.costUsd) : '—'}</td>
+    <td>${ev.durationMs != null ? fmtNum(ev.durationMs, 0) + ' ms' : '—'}</td>`
   return tr
 }
 
@@ -770,10 +772,10 @@ async function refreshDashboard() {
 
 // ─── Cache tab ────────────────────────────────────────
 function cacheFmt(n) {
-  return n == null ? '—' : n.toLocaleString()
+  return n == null ? '—' : fmtNum(n)
 }
 function cacheFmtPct(r) {
-  return r == null ? '—' : (r * 100).toFixed(1) + '%'
+  return r == null ? '—' : fmtNum(r * 100, 1) + '%'
 }
 function cacheFmtBytes(b) {
   if (b == null) return '—'
@@ -1705,11 +1707,11 @@ function fmtCost(n) {
   return `$${n.toFixed(6)}`
 }
 
-function fmtNum(n, decimals = 0) {
-  if (n == null || isNaN(n)) return '—'
-  const [int, dec] = n.toFixed(decimals).split('.')
-  const intFormatted = int.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
-  return decimals > 0 ? `${intFormatted}.${dec}` : intFormatted
+function fmtNum(v, decimals = 0) {
+  if (v == null || isNaN(v)) return '—'
+  const parts = Number(v).toFixed(decimals).split('.')
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  return parts.join('.')
 }
 
 // UTC timestamp with millisecond precision: `YYYY-MM-DD HH:MM:SS.mmm UTC`.
@@ -1968,10 +1970,10 @@ function pushTick(tick) {
   const w1 = tick.windows['1m']
   const w5 = tick.windows['5m']
 
-  kpiRps.textContent = w1.rps.toFixed(2)
-  kpiP95.textContent = w1.p95
-  kpiP99.textContent = w1.p99
-  kpiErr.textContent = (w1.errorRate * 100).toFixed(1)
+  kpiRps.textContent = fmtNum(w1.rps, 2)
+  kpiP95.textContent = fmtNum(w1.p95, 0)
+  kpiP99.textContent = fmtNum(w1.p99, 0)
+  kpiErr.textContent = fmtNum(w1.errorRate * 100, 1)
   kpiTotal.textContent = fmtNum(w5.total)
   kpiBytesIn.textContent = fmtBytes(w5.bytesIn)
   kpiBytesOut.textContent = fmtBytes(w5.bytesOut)
@@ -1997,7 +1999,7 @@ function pushTick(tick) {
   const cacheRead = w1.cacheReadTokens ?? 0
   const cacheDenom = cacheRead + (w1.inputTokens ?? inTok)
   if (kpiCacheHit)
-    kpiCacheHit.textContent = cacheDenom > 0 ? ((cacheRead / cacheDenom) * 100).toFixed(1) : '—'
+    kpiCacheHit.textContent = cacheDenom > 0 ? fmtNum((cacheRead / cacheDenom) * 100, 1) : '—'
   const avgDur = w1.avgDurationMs ?? w1.meanDurationMs
   if (kpiAvgDur) kpiAvgDur.textContent = avgDur != null ? fmtNum(avgDur, 0) : '—'
   if (kpiInFlight) kpiInFlight.textContent = fmtNum(tick.inFlight ?? 0)
@@ -2723,10 +2725,10 @@ function computeWindowKpis(events, winSec) {
 
 function renderMetricsHistoryKpis(events, win) {
   const k = computeWindowKpis(events, HISTORY_WINDOW_SECONDS[win] ?? 60)
-  kpiRps.textContent = k.rps.toFixed(2)
-  kpiP95.textContent = Math.round(k.p95)
-  kpiP99.textContent = Math.round(k.p99)
-  kpiErr.textContent = (k.errorRate * 100).toFixed(1)
+  kpiRps.textContent = fmtNum(k.rps, 2)
+  kpiP95.textContent = fmtNum(k.p95, 0)
+  kpiP99.textContent = fmtNum(k.p99, 0)
+  kpiErr.textContent = fmtNum(k.errorRate * 100, 1)
   kpiTotal.textContent = fmtNum(k.total)
   kpiBytesIn.textContent = fmtBytes(k.bytesIn)
   kpiBytesOut.textContent = fmtBytes(k.bytesOut)
@@ -2741,7 +2743,7 @@ function renderMetricsHistoryKpis(events, win) {
   if (kpiAvgCost) kpiAvgCost.textContent = k.total > 0 ? fmtCost(k.avgCost) : '—'
   if (kpiAvgTokens) kpiAvgTokens.textContent = k.total > 0 ? fmtNum(k.avgTokens, 0) : '—'
   if (kpiCacheHit)
-    kpiCacheHit.textContent = k.cacheDenom > 0 ? (k.cacheHitRate * 100).toFixed(1) : '—'
+    kpiCacheHit.textContent = k.cacheDenom > 0 ? fmtNum(k.cacheHitRate * 100, 1) : '—'
   if (kpiAvgDur) kpiAvgDur.textContent = k.total > 0 ? fmtNum(k.avgDur, 0) : '—'
   if (kpiTopModel) kpiTopModel.textContent = k.topModel ?? '—'
   const compBytesEl = document.getElementById('kpiCompactorBytesSaved5m')
@@ -2764,9 +2766,7 @@ function renderCompactorHistoryKpis(metricEvents, win) {
   if (el('compactorBytesLifetime'))
     el('compactorBytesLifetime').textContent = fmtBytes(k.compactorBytesSaved)
   if (el('compactorTokensLifetime'))
-    el('compactorTokensLifetime').textContent = Math.floor(
-      k.compactorBytesSaved / 4,
-    ).toLocaleString()
+    el('compactorTokensLifetime').textContent = fmtNum(Math.floor(k.compactorBytesSaved / 4))
   if (el('compactorRatio5m')) {
     const r = k.compactorBytesIn > 0 ? k.compactorBytesSaved / k.compactorBytesIn : 0
     el('compactorRatio5m').textContent = k.compactorBytesIn > 0 ? `${Math.round(r * 100)}%` : '—'
@@ -2856,9 +2856,9 @@ function renderCacheHistoryKpis(metricEvents, win) {
 
 function renderDashboardHistoryKpis(metricEvents, win) {
   const k = computeWindowKpis(metricEvents, HISTORY_WINDOW_SECONDS[win] ?? 60)
-  document.getElementById('dashKpiRequests').textContent = k.total.toLocaleString()
+  document.getElementById('dashKpiRequests').textContent = fmtNum(k.total)
   document.getElementById('dashKpiCost').textContent = fmtCost(k.costTotal)
-  document.getElementById('dashKpiP95').textContent = k.p95 > 0 ? Math.round(k.p95) + ' ms' : '—'
+  document.getElementById('dashKpiP95').textContent = k.p95 > 0 ? fmtNum(k.p95, 0) + ' ms' : '—'
   const bytesSavedCard = document.getElementById('dashKpiBytesSavedCard')
   if (bytesSavedCard && !bytesSavedCard.hidden && k.compactorBytesIn > 0) {
     const pct = Math.round((k.compactorBytesSaved / k.compactorBytesIn) * 100)
