@@ -411,13 +411,14 @@ function buildRecommendations(health, compactorSummary, guardrailsSummary, cache
 }
 
 function renderKpiRow(summary, compactor) {
-  const total = summary?.lifetime?.total
+  // Ring-buffer count since boot (snapshot().count) is the most reliable
+  // "total" we have without a persistent DB. Label reflects "session" scope.
+  const total = summary?.count
   document.getElementById('dashKpiRequests').textContent =
     typeof total === 'number' ? total.toLocaleString() : '—'
-  const cost = summary?.lifetime?.totalCostUsd
-  document.getElementById('dashKpiCost').textContent =
-    typeof cost === 'number' ? '$' + cost.toFixed(4) : '—'
-  const p95 = summary?.window_1m?.p95
+  // Cost: use the SSE-accumulated running total (seeded from ring buffer on boot).
+  document.getElementById('dashKpiCost').textContent = fmtCost(totalCostSinceBoot)
+  const p95 = summary?.windows?.['1m']?.p95 ?? summary?.window_1m?.p95
   document.getElementById('dashKpiP95').textContent = typeof p95 === 'number' ? p95 + ' ms' : '—'
   const bytesSavedCard = document.getElementById('dashKpiBytesSavedCard')
   if (compactor?.enabled && bytesSavedCard) {
@@ -444,20 +445,31 @@ function renderCacheKpi(cacheData) {
   }
 }
 
+function dashRecentRow(ev) {
+  const tr = document.createElement('tr')
+  const tokens = (ev.inputTokens ?? ev.tokensIn ?? 0) + (ev.outputTokens ?? ev.tokensOut ?? 0)
+  tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
+    <td><code>${escHtml(ev.model ?? '—')}</code></td>
+    <td>${tokens}</td>
+    <td>${ev.costUsd != null ? '$' + ev.costUsd.toFixed(5) : '—'}</td>
+    <td>${ev.durationMs != null ? ev.durationMs + ' ms' : '—'}</td>`
+  return tr
+}
+
 function renderRecentTable(recent) {
   const tbody = document.querySelector('#dashRecentTable tbody')
   if (!tbody) return
   tbody.innerHTML = ''
   const rows = Array.isArray(recent) ? recent.slice(0, 5) : (recent.events ?? []).slice(0, 5)
-  for (const ev of rows) {
-    const tr = document.createElement('tr')
-    tr.innerHTML = `<td>${new Date(ev.ts).toLocaleTimeString()}</td>
-      <td><code>${escHtml(ev.model ?? '—')}</code></td>
-      <td>${(ev.tokensIn ?? 0) + (ev.tokensOut ?? 0)}</td>
-      <td>${ev.costUsd != null ? '$' + ev.costUsd.toFixed(5) : '—'}</td>
-      <td>${ev.durationMs != null ? ev.durationMs + ' ms' : '—'}</td>`
-    tbody.appendChild(tr)
-  }
+  for (const ev of rows) tbody.appendChild(dashRecentRow(ev))
+}
+
+// Called from SSE request handler to keep the dashboard recent table live.
+function updateDashRecent(ev) {
+  const tbody = document.querySelector('#dashRecentTable tbody')
+  if (!tbody) return
+  tbody.prepend(dashRecentRow(ev))
+  while (tbody.children.length > 5) tbody.removeChild(tbody.lastChild)
 }
 
 function renderHealthSidebar(health, compactor, guardrails, cacheData) {
@@ -1970,6 +1982,14 @@ function connectMetricsSSE() {
         totalCostSinceBoot += ev.costUsd
         kpiCostTotal.textContent = fmtCost(totalCostSinceBoot)
       }
+      // Keep dashboard live: update recent table and KPI values in real time.
+      const dashPanel = document.getElementById('dashboardPanel')
+      if (!dashPanel?.classList.contains('hidden')) {
+        updateDashRecent(ev)
+        // Refresh the cost KPI immediately so "Cost (session)" stays current.
+        const costEl = document.getElementById('dashKpiCost')
+        if (costEl) costEl.textContent = fmtCost(totalCostSinceBoot)
+      }
     } catch {}
   })
   es.addEventListener('tick', () => {
@@ -2087,6 +2107,8 @@ async function loadRoutesIntoFilter() {
       routeFilterEl.appendChild(opt)
     }
     if (current && routes.some((r) => r.prefix === current)) routeFilterEl.value = current
+    // Hide the route filter when there's only one route (no meaningful choice).
+    routeFilterEl.hidden = routes.length <= 1
   } catch {
     // ignore
   }
@@ -2101,6 +2123,19 @@ async function loadHistoryEvents() {
   if (route) params.set('route', route)
   try {
     const r = await fetch('/api/metrics/history?' + params)
+    if (r.status === 503) {
+      // Persistence not configured — fall back to the in-memory ring buffer and
+      // filter it to the requested time window so the charts still show data.
+      const rb = await fetch('/api/metrics/recent?limit=5000')
+      if (!rb.ok) return []
+      const all = await rb.json()
+      const fromMs = new Date(range.from).getTime()
+      const toMs = new Date(range.to).getTime()
+      return all.filter((ev) => {
+        const t = new Date(ev.ts).getTime()
+        return t >= fromMs && t <= toMs
+      })
+    }
     if (!r.ok) return []
     const body = await r.json()
     return body.events ?? []
@@ -2313,7 +2348,9 @@ function syncHistoryWindow(value) {
   updateKpiWindowLabels(value)
   updateChartWindowLabels(value)
   const tab = location.hash.replace('#', '') || 'dashboard'
-  if (tab === 'metrics') {
+  if (tab === 'dashboard') {
+    refreshDashboard().catch(() => {})
+  } else if (tab === 'metrics') {
     refreshChartsForWindow()
       .then(() => refreshRecentForWindow())
       .catch(() => {})
@@ -2334,6 +2371,10 @@ if (routeFilterEl) {
 }
 if (historyWindowEl) {
   historyWindowEl.addEventListener('change', () => syncHistoryWindow(historyWindowEl.value))
+}
+const dashHistoryWindowEl = document.getElementById('dashHistoryWindow')
+if (dashHistoryWindowEl) {
+  dashHistoryWindowEl.addEventListener('change', () => syncHistoryWindow(dashHistoryWindowEl.value))
 }
 if (compactorHistoryWindowEl) {
   compactorHistoryWindowEl.removeEventListener('change', refreshCompactorAuto)
@@ -2412,6 +2453,11 @@ setInterval(() => {
   loadTopCost().catch(() => {})
   refreshMetricsCompactorKpis().catch(() => {})
 }, 5000)
+// Refresh dashboard KPIs periodically so "session requests" counter stays current.
+setInterval(() => {
+  const dashPanel = document.getElementById('dashboardPanel')
+  if (!dashPanel?.classList.contains('hidden')) refreshDashboard().catch(() => {})
+}, 30_000)
 
 // Expose chart instances and chartMode so Playwright specs (under ?testMode=1)
 // can verify dropdown-driven label/data changes without poking at internals.
