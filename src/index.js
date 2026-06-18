@@ -1,5 +1,5 @@
 import cron from 'node-cron'
-import { config } from './config.js'
+import { config, loadOverrides } from './config.js'
 import { createApp } from './server.js'
 import { logger } from './logs/logger.js'
 import { rotateLogsIfNeeded, rotateLogs, startSizeGuard } from './logs/rotation.js'
@@ -14,6 +14,8 @@ import {
   pruneOlderThan,
   close as closeMetricsStore,
 } from './metrics/store.js'
+
+await loadOverrides()
 
 rotateLogsIfNeeded()
 
