@@ -14,3 +14,6 @@ playwright-report/
 playwright/.cache/
 /blob-report/
 scripts/.mcp-*
+
+# Superpowers brainstorm scratch
+.superpowers/
