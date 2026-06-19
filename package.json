@@ -1,6 +1,6 @@
 {
   "name": "airelay",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "AIRelay — transparent passthrough proxy for AI/LLM HTTP APIs with live observability dashboard",
   "type": "module",
   "engines": {

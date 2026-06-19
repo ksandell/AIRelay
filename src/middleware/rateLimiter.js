@@ -8,4 +8,6 @@ export const apiRateLimiter = rateLimit({
   limit: config.apiRateLimitMax,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
+  // ponytail: draft-8 hashes keyGenerator result; undefined req.ip (Docker/proxy) throws TypeError and hangs the request
+  keyGenerator: (req) => req.ip ?? req.socket?.remoteAddress ?? 'unknown',
 })
