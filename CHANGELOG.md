@@ -5,6 +5,12 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.4] — 2026-06-19 — Rate limiter crash fix
+
+### Fixed
+
+- **Rate limiter no longer hangs requests in Docker** — `express-rate-limit` with `standardHeaders: 'draft-8'` hashes `req.ip` as a partition key; when running behind Docker's bridge network without trust-proxy configuration `req.ip` is `undefined`, causing `Hash.update(undefined)` to throw a `TypeError`. The middleware threw before calling `next()`, leaving requests permanently pending and making the dashboard unreachable. Fixed with a safe `keyGenerator` fallback (`req.ip ?? req.socket?.remoteAddress ?? 'unknown'`).
+
 ## [0.6.3] — 2026-06-18 — Dashboard chart polish, version badge, logo crop
 
 ### Added
