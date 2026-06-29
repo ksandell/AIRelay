@@ -547,7 +547,12 @@ function initDashSparkline() {
       plugins: { legend: { display: true, position: 'bottom' } },
       scales: {
         x: { display: false },
-        y: { beginAtZero: true, stacked: true, position: 'left', title: { display: true, text: 'req/s' } },
+        y: {
+          beginAtZero: true,
+          stacked: true,
+          position: 'left',
+          title: { display: true, text: 'req/s' },
+        },
         y1: {
           beginAtZero: true,
           position: 'right',
