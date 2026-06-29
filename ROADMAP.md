@@ -40,6 +40,8 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.6.1 | ✅ Done | **Cache metrics + dashboard polish + security hardening** — cache outcomes persisted to SQLite, `/api/cache/history` + `/api/cache/rollups`, Cache tab sparklines, brand identity, secret query-param redaction, XSS fixes, full-SHA spend key |
 | v0.6.2 | ✅ Done | **Window-aware KPIs + log UX + table fixes** — all KPI tiles on every page now reflect the selected time window; logs no longer blink on tab switch; log cap 100 entries; status column width fix; horizontal scroll on all table wrappers |
 | v0.6.3 | ✅ Done | **Dashboard chart polish + version badge + logo** — activity chart bars normalized to req/s and stacked; `fmtNum` thousands formatting everywhere; version badge next to logo; logo cropped pixel-tight; "AI" text white |
+| v0.6.4 | ✅ Done | **Rate limiter crash fix** — safe `keyGenerator` fallback for `undefined` `req.ip` behind Docker's bridge network (draft-8 header hashing threw, hanging all dashboard requests) |
+| v0.6.5 | ✅ Done | **SSE rate-limit exemption + Dragonfly memory fit** — `/stream` endpoints skip the per-IP limiter (a 429 burst could wedge EventSource reconnects and freeze live charts); `dragonfly` sidecar pins `--proactor_threads=4 --maxmemory=1gb` so it boots on low-RAM hosts |
 | v0.7.0 | ⚪ Queued | **Semantic Cache** — embedding-provider abstraction (OpenAI / Ollama), Dragonfly vector index bootstrap, KNN search, configurable cosine threshold; builds on v0.6.0 cache infrastructure |
 
 Per-release detail in [CHANGELOG.md](CHANGELOG.md).

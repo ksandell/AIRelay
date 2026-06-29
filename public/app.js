@@ -72,6 +72,29 @@ function activateTab(name) {
       lastHistoryChartRefresh = Date.now()
       refreshChartsForWindow().catch(() => {})
     }
+    // Chart.js may have latched a 0×0 size while the panel was hidden; in live
+    // mode nothing rebuilds the charts on show, so resize them now that the
+    // panel is visible (mirrors refreshCacheAuto). Without this the live charts
+    // can stay blank until the window selector forces a rebuild.
+    requestAnimationFrame(() => {
+      chartRps?.resize()
+      chartLat?.resize()
+      chartTokens?.resize()
+      for (const k of [
+        'rps',
+        'p95',
+        'err',
+        'costPerMin',
+        'tokIn',
+        'tokOut',
+        'toolCalls',
+        'bytesIn',
+        'bytesOut',
+        'inFlight',
+      ]) {
+        sparkCharts[k]?.resize()
+      }
+    })
   }
   if (name === 'dashboard') refreshDashboard().catch(() => {})
   if (name === 'settings') refreshSettings().catch(() => {})
@@ -524,7 +547,12 @@ function initDashSparkline() {
       plugins: { legend: { display: true, position: 'bottom' } },
       scales: {
         x: { display: false },
-        y: { beginAtZero: true, stacked: true, position: 'left', title: { display: true, text: 'req/s' } },
+        y: {
+          beginAtZero: true,
+          stacked: true,
+          position: 'left',
+          title: { display: true, text: 'req/s' },
+        },
         y1: {
           beginAtZero: true,
           position: 'right',
