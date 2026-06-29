@@ -100,6 +100,10 @@ services:
   dragonfly:
     image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.26.2
     profiles: ["cache"]
+    # Host has many cores but little free RAM. Dragonfly spawns one io thread per
+    # core and demands ~256MB/thread; on a 20-core/4GB box that's 5GiB > available,
+    # so it exits on boot. Cap threads + maxmemory to fit. Tune up if cache grows.
+    command: ["--proactor_threads=4", "--maxmemory=1gb"]
     ports:
       - "${DRAGONFLY_PORT:-6379}:6379"
     volumes:

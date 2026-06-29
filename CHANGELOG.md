@@ -5,6 +5,13 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.5] — 2026-06-29 — SSE rate-limit exemption + Dragonfly memory fit
+
+### Fixed
+
+- **Live dashboard no longer freezes after a request burst** — the SSE endpoints (`/api/metrics/stream`, `/api/logs/stream`) were mounted behind `apiRateLimiter`. EventSource auto-reconnects, so once a polling burst tripped the per-IP cap (429), the stream's own reconnect also got 429 and could never re-establish — the live charts and recent tables silently stopped updating until a full reload. The limiter now skips any `/stream` path.
+- **Dragonfly no longer exits on boot on low-RAM hosts** — Dragonfly spawns one io thread per core and requires ~256MB/thread; on a many-core box with little free RAM the auto-computed `maxmemory` falls below the required total and the process exits immediately (`There are N threads, so X GiB are required. Exiting...`). The `dragonfly` compose service now pins `--proactor_threads=4 --maxmemory=1gb`; raise both as the cache grows.
+
 ## [0.6.4] — 2026-06-19 — Rate limiter crash fix
 
 ### Fixed
