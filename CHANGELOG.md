@@ -5,6 +5,20 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.8] — 2026-09-08 — Stream/cache-key fix + pricing refresh
+
+### Fixed
+
+- **`stream:true` requests could be served a cached non-streaming response (#190)** — `normalize.js` strips `stream` from the cache key so request shape doesn't fragment the hash, but that meant a `stream:true` request and an otherwise-identical `stream:false` request hashed to the same exact-match key. A non-streaming leader could populate that entry, and a later streaming request for the same content would get served the cached JSON object back (`Content-Type: application/json`, zero SSE frames) instead of the stream it asked for. Found live against a real Mistral upstream while verifying v0.6.7. The cache middleware now skips the dedup and exact-match lookups entirely whenever the request body has `stream: true`, falling straight through to the proxy; the spend gate still runs first since budget enforcement doesn't depend on response shape.
+
+### Changed
+
+- **`config/pricing.json` refreshed to current provider rate cards** — every one of the 17 provider tables rewritten against each vendor's current public pricing, not patched. Retired and superseded models dropped (OpenAI/Azure/Microsoft `gpt-4-turbo`/`o1`/`o3-mini`; Google `gemini-1.5-*`/`gemini-2.0-flash`; Mistral `open-mistral-7b`/`open-mistral-nemo`; four Groq models moved to enterprise-only pricing on 2026-08-26; stale entries across Together, Fireworks, DeepSeek, xAI, Perplexity, OpenRouter, Cerebras), current model lines added (GPT-5.x, Gemini 2.5/3.x, Ministral 3, Claude Fable/Opus/Sonnet 5, Grok 4.x, current Sonar names, and more), and prices corrected on entries that were kept but priced at a superseded generation's rate (`claude-opus-4-5`, `claude-haiku-4-5`, `mistral-large-latest`).
+
+### Added
+
+- **`tests/cache/middleware.test.js`** — new coverage asserting a `stream:true` request never calls `exactGet`, never sets `X-Cache`, and never touches the dedup map, even with a matching entry already cached.
+
 ## [0.6.7] — 2026-09-08 — Cache middleware hang fixes
 
 Four defects in the opt-in cache layer, three of which could hang a request
