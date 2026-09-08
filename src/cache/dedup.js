@@ -15,3 +15,8 @@ export function dedupDelete(sha256) {
 export function dedupSize() {
   return _inflight.size
 }
+
+// Test-only: drop every in-flight entry so cases start from a clean Map.
+export function _resetDedup() {
+  _inflight.clear()
+}

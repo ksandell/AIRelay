@@ -5,6 +5,27 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.7] — 2026-09-08 — Cache middleware hang fixes
+
+Four defects in the opt-in cache layer, three of which could hang a request
+indefinitely. All are inert when `CACHE_ENABLED=false` (the default).
+
+### Fixed
+
+- **Request stream drained without a replay buffer (#179)** — `src/cache/middleware.js` buffered the body to test it against the 8 MiB cap, then called `next()` on the oversize path having consumed the stream and set no `req._cacheBodyBuffer`. Compactor then attached `req.on('end')` to an already-ended stream and waited forever; with Compactor and Guardrails both off, the proxy instead forwarded zero bytes under the client's original `Content-Length`. The middleware now decides from the `Content-Length` header _before_ touching the stream, and sets `req._cacheBodyBuffer` before attempting the JSON parse so a malformed body is still replayed upstream verbatim. Chunked requests (no `Content-Length`) skip the cache.
+- **Dedup waiters gated on the Redis write (#177)** — the in-flight promise resolved only after `await exactSet(...)`. With no per-command timeout on the client, a stalled-but-connected Dragonfly left that write pending forever, hanging every coalesced waiter and permanently leaking the `_inflight` entry — so later identical requests joined the same dead promise. Waiters are now released before the cache write is issued.
+- **No `commandTimeout` on the ioredis clients (#178)** — `connectTimeout` covers only opening the socket. `exactGet` and `checkSpendLimit` are awaited on the hot path of every JSON POST, so an unresponsive-but-connected cache stalled all proxy traffic, not just cache traffic; a hang throws nothing, so the existing fail-open `catch` never ran. All three clients (`client.js`, and both fanout connections) now set `commandTimeout: 2000` and degrade to a miss.
+- **Dedup waiters parked through uncacheable streams (#180)** — when the tee gave up (SSE content type, or the tee cap exceeded) the outcome was already known to be "no cache entry", but waiters stayed blocked until `res.end` — potentially minutes for a stream — then received `null` and started their own upstream call anyway. They are now freed the moment cacheability is decided.
+
+### Changed
+
+- **Dragonfly sidecar updated to `v1.39.0`** — the pinned image in `docker-compose.yml` was 13 minor versions behind (`v1.26.2`); the running instance's version monitor flagged the upgrade. Pull and recreate the `cache` profile to apply: `docker compose --profile cache pull && docker compose --profile cache up -d`. Snapshot in the `dragonfly-data` volume reloads on restart.
+
+### Added
+
+- **`tests/cache/middleware.test.js`** — first direct coverage of `createCacheMiddleware()`; exercises both hang paths, the malformed-body replay, and the full dedup release lifecycle. No test touched this middleware before, which is why the four defects survived.
+- **`_resetDedup()`** in `src/cache/dedup.js` — test-only Map reset, matching the existing `_resetCacheMetrics()` convention.
+
 ## [0.6.5] — 2026-06-29 — SSE rate-limit exemption + Dragonfly memory fit
 
 ### Fixed

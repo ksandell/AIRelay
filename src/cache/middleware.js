@@ -53,15 +53,15 @@ function buildCacheServedEvent(
   }
 }
 
-function readBody(req, cap) {
+const BODY_CAP = 8_388_608 // 8 MiB — hard cap on what the cache will buffer
+
+// Only ever called once Content-Length has cleared the cap, so every chunk is
+// kept and the resolved buffer is always the complete body.
+function readBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = []
-    let total = 0
-    req.on('data', (chunk) => {
-      total += chunk.length
-      if (total <= cap) chunks.push(chunk)
-    })
-    req.on('end', () => resolve(total > cap ? null : Buffer.concat(chunks)))
+    req.on('data', (chunk) => chunks.push(chunk))
+    req.on('end', () => resolve(Buffer.concat(chunks)))
     req.on('error', reject)
   })
 }
@@ -77,10 +77,21 @@ export function createCacheMiddleware() {
     const cacheHeader = (req.headers['x-cache'] ?? '').toString().toLowerCase()
     if (cacheHeader === 'no-store') return next()
 
-    // Buffer body — stored on req so Compactor/Guardrails can use it too
-    const buf = await readBody(req, 8_388_608 /* 8 MiB hard cap */).catch(() => null)
-    if (!buf) return next() // oversize or read error — pass through
+    // Never drain a body we cannot hand back. Draining the stream and then
+    // falling through leaves Compactor/Guardrails waiting on an 'end' that has
+    // already fired (request hangs), or the proxy forwarding zero bytes under
+    // the client's original Content-Length. Decide from the header first.
+    // ponytail: chunked requests (no Content-Length) skip the cache — SDK JSON
+    // posts always declare one, and an unknown length is exactly the case we
+    // cannot safely drain.
+    const declaredLen = Number(req.headers['content-length'])
+    if (!Number.isFinite(declaredLen) || declaredLen > BODY_CAP) return next()
 
+    const buf = await readBody(req).catch(() => null)
+    if (!buf) return next() // read error — the socket is gone either way
+
+    // Set before the parse attempt: on invalid JSON we still fall through, and
+    // the proxy needs these bytes to replay the consumed stream upstream.
     req._cacheBodyBuffer = buf
 
     let parsed
@@ -175,16 +186,20 @@ export function createCacheMiddleware() {
     })
     if (config.cacheDedupEnabled) dedupSet(sha256, dedupPromise)
 
-    // Guard against a dedup leak: if the connection is destroyed (idle
-    // watchdog, client abort) the wrapped res.end never runs, so the in-flight
-    // promise would stay pending and the Map entry would leak. Resolve null +
-    // delete on close if nothing settled it first.
-    res.on('close', () => {
+    // Release every coalesced waiter with "no cached result — go upstream
+    // yourself" and drop the Map entry. Idempotent, so every path that learns
+    // the request will never produce a cache entry can call it freely.
+    const releaseWaiters = () => {
       if (settled) return
       settled = true
       resolveDedup?.(null)
       dedupDelete(sha256)
-    })
+    }
+
+    // Guard against a dedup leak: if the connection is destroyed (idle
+    // watchdog, client abort) the wrapped res.end never runs, so the in-flight
+    // promise would stay pending and the Map entry would leak.
+    res.on('close', releaseWaiters)
 
     // Intercept res.write + res.end to capture upstream response.
     // Buffering is bounded: we stop accumulating once the response is known to
@@ -203,21 +218,22 @@ export function createCacheMiddleware() {
     const isCacheableContentType = () =>
       !String(res.getHeader('content-type') ?? '').includes('text/event-stream')
 
+    // The moment the tee gives up, this response can never become a cache
+    // entry — so free the waiters now instead of parking them for the rest of
+    // a stream that may run for minutes.
+    const disableTee = () => {
+      teeDisabled = true
+      chunks = []
+      releaseWaiters()
+    }
+
     const accumulate = (chunk) => {
       if (teeDisabled || !chunk) return
       // Decide once we have headers: never buffer a streaming response.
-      if (!isCacheableContentType()) {
-        teeDisabled = true
-        chunks = []
-        return
-      }
+      if (!isCacheableContentType()) return disableTee()
       const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
       bufBytes += buf.length
-      if (bufBytes > TEE_CAP) {
-        teeDisabled = true
-        chunks = []
-        return
-      }
+      if (bufBytes > TEE_CAP) return disableTee()
       chunks.push(buf)
     }
 
@@ -240,11 +256,12 @@ export function createCacheMiddleware() {
       if (!alreadySettled && isSuccess && !teeDisabled && chunks.length > 0) {
         const body = Buffer.concat(chunks).toString('utf8')
         const entry = { body, statusCode, contentType }
-        queueMicrotask(async () => {
-          await exactSet(sha256, entry).catch(() => {})
-          resolveDedup?.(entry)
-          dedupDelete(sha256)
-        })
+        // Hand the waiters their result FIRST. A stalled-but-connected
+        // Dragonfly can leave exactSet pending indefinitely, and nothing about
+        // the cache write changes what the waiters get.
+        resolveDedup?.(entry)
+        dedupDelete(sha256)
+        queueMicrotask(() => exactSet(sha256, entry).catch(() => {}))
       } else if (!alreadySettled) {
         resolveDedup?.(null)
         dedupDelete(sha256)

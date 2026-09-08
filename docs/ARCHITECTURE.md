@@ -130,6 +130,27 @@ On a cache hit the response is returned immediately — no Compactor, Guardrails
 or upstream call runs. On a miss the upstream response is teed into Redis in a
 `queueMicrotask` after `res.finish`, preserving the hot-path zero-sync-I/O invariant.
 
+Three rules keep the cache from ever holding a request hostage (v0.6.7):
+
+- **Never drain a body that cannot be handed back.** The middleware admits a
+  request only when `Content-Length` is present and within the 8 MiB cap;
+  anything else (chunked, oversize) passes through with its stream untouched.
+  Once admitted, `req._cacheBodyBuffer` is set _before_ the JSON parse attempt,
+  so even a malformed body is replayed upstream verbatim. Draining and then
+  falling through would leave Compactor/Guardrails awaiting an `end` event that
+  already fired.
+- **Waiters are never gated on Redis.** The dedup promise resolves and its Map
+  entry is dropped before `exactSet` is issued; the cache write is
+  fire-and-forget.
+- **Waiters are released the moment the response is known uncacheable** — an SSE
+  content type or a blown tee cap frees them immediately rather than at
+  `res.end`, which for a stream can be minutes later.
+
+All Redis clients set `commandTimeout` (2 s). `connectTimeout` alone covers only
+opening the socket; a connected-but-unresponsive instance would otherwise leave
+`exactGet` and `checkSpendLimit` — both awaited on the hot path of every JSON
+POST — pending forever. A rejection degrades to a cache miss; a hang does not.
+
 ## Compactor (v0.3.0, opt-in)
 
 A second per-request pipeline, mounted under the same proxy prefix but
