@@ -323,6 +323,23 @@ CACHE_ENABLED=true docker compose --profile cache up
 
 **Runtime = ✓:** configurable via Settings tab or `POST /api/settings` without restart.
 
+**What is never cached.** These bypass the cache and reach upstream byte-for-byte:
+
+| Skipped | Why |
+|---|---|
+| Anything but `POST` with `Content-Type: application/json` | Nothing to key on |
+| `X-Cache: no-store` on the request | Explicit per-request opt-out |
+| Request with no `Content-Length` (chunked) | Length must be known before the stream can be safely buffered and replayed |
+| Request body over 8 MiB | Fixed cap, independent of `CACHE_MAX_RESPONSE_BYTES` |
+| Request body that is not valid JSON | Buffered, then replayed upstream verbatim |
+| Non-2xx responses | Errors are never stored |
+| `text/event-stream` responses, or responses over `CACHE_MAX_RESPONSE_BYTES` | Streamed straight through; in-flight duplicates are released as soon as this is known |
+
+**When Dragonfly is slow.** Every cache command has a 2-second deadline. A
+Dragonfly that is connected but unresponsive degrades the proxy to all-misses
+— each request pays the timeout once and then goes upstream. Cache problems
+never block traffic.
+
 ---
 
 ## Provider recipes
