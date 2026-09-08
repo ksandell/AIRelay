@@ -19,6 +19,13 @@ export async function initClient() {
   _client = new IORedis(config.cacheRedisUrl, {
     maxRetriesPerRequest: 1,
     connectTimeout: 3000,
+    // connectTimeout only covers opening the socket. Without a per-command
+    // deadline a connected-but-unresponsive Dragonfly leaves every GET/SET
+    // pending forever — and exactGet/checkSpendLimit are awaited on the hot
+    // path of every JSON POST, so the whole proxy stalls. A rejection here is
+    // caught by the callers and degrades to a cache miss, which a hang is not.
+    // ponytail: fixed 2s; make it env-tunable if it ever trips on a healthy box
+    commandTimeout: 2000,
     enableOfflineQueue: false,
     lazyConnect: true,
   })
