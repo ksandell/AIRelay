@@ -222,7 +222,9 @@ export const config = {
     const v = overrideVal ?? envVal
     if (!GUARDRAILS_MODES.has(v.toLowerCase())) {
       if (!overrideVal)
-        console.warn(`[config] GUARDRAILS_SECRETS_MODE invalid: "${v}", falling back to "off"`)
+        console.warn(
+          `[config] GUARDRAILS_SECRETS_MODE invalid: ${JSON.stringify(v)}, falling back to "off"`,
+        )
       return 'off'
     }
     return v.toLowerCase()
@@ -233,7 +235,9 @@ export const config = {
     const v = overrideVal ?? envVal
     if (!GUARDRAILS_MODES.has(v.toLowerCase())) {
       if (!overrideVal)
-        console.warn(`[config] GUARDRAILS_PII_MODE invalid: "${v}", falling back to "off"`)
+        console.warn(
+          `[config] GUARDRAILS_PII_MODE invalid: ${JSON.stringify(v)}, falling back to "off"`,
+        )
       return 'off'
     }
     return v.toLowerCase()
@@ -244,7 +248,9 @@ export const config = {
     const v = overrideVal ?? envVal
     if (!GUARDRAILS_MODES.has(v.toLowerCase())) {
       if (!overrideVal)
-        console.warn(`[config] GUARDRAILS_INJECTION_MODE invalid: "${v}", falling back to "off"`)
+        console.warn(
+          `[config] GUARDRAILS_INJECTION_MODE invalid: ${JSON.stringify(v)}, falling back to "off"`,
+        )
       return 'off'
     }
     return v.toLowerCase()
