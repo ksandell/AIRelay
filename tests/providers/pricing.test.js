@@ -86,14 +86,14 @@ describe('pricing coverage', () => {
     }
   })
 
-  it('mistral table includes medium-latest and open-mistral-7b', () => {
+  it('mistral table includes medium-latest and codestral-latest', () => {
     const pricing = loadPricing('mistral')
     expect(pricing['mistral-medium-latest']).toBeDefined()
     expect(pricing['mistral-medium-latest'].input).toBeGreaterThan(0)
     expect(pricing['mistral-medium-latest'].output).toBeGreaterThan(0)
-    expect(pricing['open-mistral-7b']).toBeDefined()
-    expect(pricing['open-mistral-7b'].input).toBeGreaterThan(0)
-    expect(pricing['open-mistral-7b'].output).toBeGreaterThan(0)
+    expect(pricing['codestral-latest']).toBeDefined()
+    expect(pricing['codestral-latest'].input).toBeGreaterThan(0)
+    expect(pricing['codestral-latest'].output).toBeGreaterThan(0)
   })
 })
 
