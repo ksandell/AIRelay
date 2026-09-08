@@ -2462,8 +2462,6 @@ function rebuildChartsFromHistory(events, windowKey) {
   const durations = Array.from({ length: numBuckets }, () => [])
   const inTok = new Array(numBuckets).fill(0)
   const outTok = new Array(numBuckets).fill(0)
-  const toolIn = new Array(numBuckets).fill(0)
-  const toolOut = new Array(numBuckets).fill(0)
   const costs = new Array(numBuckets).fill(0)
   const errCounts = new Array(numBuckets).fill(0)
   const bytesInBucket = new Array(numBuckets).fill(0)

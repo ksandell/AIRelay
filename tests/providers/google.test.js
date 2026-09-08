@@ -35,7 +35,7 @@ describe('GoogleProvider', () => {
   it('calculates cost (1M tokens each — $0.10 input + $0.40 output = $0.50)', () => {
     expect(
       p.calculateCost({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash-lite',
         inputTokens: 1_000_000,
         outputTokens: 1_000_000,
       }),
