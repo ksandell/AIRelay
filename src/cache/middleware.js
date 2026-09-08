@@ -114,6 +114,16 @@ export function createCacheMiddleware() {
       }
     }
 
+    // A streaming request can never be served from — or coalesced onto — an
+    // exact-match cache entry. The response tee already refuses to buffer
+    // text/event-stream (see disableTee below), so any entry already cached
+    // under this body's hash was necessarily produced by a non-streaming
+    // leader; serving it here would silently swap the SSE stream the caller
+    // asked for with a single cached JSON object. Skip the cache and dedup
+    // lookups entirely and fall straight through to the proxy — the spend
+    // gate above still applies since it is independent of response shape.
+    if (parsed && parsed.stream === true) return next()
+
     const sha256 = hashBody(parsed)
 
     // 2. Dedup — if same sha256 is in-flight, wait for its result

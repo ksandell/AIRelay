@@ -332,6 +332,7 @@ CACHE_ENABLED=true docker compose --profile cache up
 | Request with no `Content-Length` (chunked) | Length must be known before the stream can be safely buffered and replayed |
 | Request body over 8 MiB | Fixed cap, independent of `CACHE_MAX_RESPONSE_BYTES` |
 | Request body that is not valid JSON | Buffered, then replayed upstream verbatim |
+| Request body has `"stream": true` | Never looked up or written — the response can't be cached anyway, and this also stops a streaming and non-streaming request for the same content from colliding on one cache key |
 | Non-2xx responses | Errors are never stored |
 | `text/event-stream` responses, or responses over `CACHE_MAX_RESPONSE_BYTES` | Streamed straight through; in-flight duplicates are released as soon as this is known |
 

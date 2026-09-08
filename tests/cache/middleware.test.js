@@ -49,7 +49,7 @@ vi.mock('../../src/cache/dedup.js', async (importOriginal) => {
   }
 })
 
-import { exactSet } from '../../src/cache/exact.js'
+import { exactGet, exactSet } from '../../src/cache/exact.js'
 import { createCacheMiddleware } from '../../src/cache/middleware.js'
 import { dedupSize, _resetDedup } from '../../src/cache/dedup.js'
 
@@ -98,6 +98,7 @@ function withTimeout(promise, ms) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  exactGet.mockResolvedValue(null)
   exactSet.mockResolvedValue(undefined)
   inflight = null
   _resetDedup()
@@ -138,6 +139,32 @@ describe('body buffering (F3) — never consume what we cannot hand back', () =>
   })
 })
 
+describe('stream requests bypass the cache entirely', () => {
+  it('never checks or populates the exact-match cache for stream:true, even with a matching entry cached', async () => {
+    // A non-streaming request with identical content already produced a
+    // cache-worthy entry. If the stream:true request below reached exactGet,
+    // it would get this back — and get served a single JSON object instead
+    // of the SSE stream it asked for.
+    exactGet.mockResolvedValue({
+      body: '{"cached":true}',
+      statusCode: 200,
+      contentType: 'application/json',
+      cachedAt: Date.now(),
+    })
+
+    const req = makeReq('{"model":"m","stream":true,"messages":[{"role":"user","content":"hi"}]}')
+    const res = makeRes()
+    const next = vi.fn()
+
+    await createCacheMiddleware()(req, res, next)
+
+    expect(next).toHaveBeenCalledOnce()
+    expect(exactGet).not.toHaveBeenCalled()
+    expect(res.getHeader('x-cache')).toBeUndefined()
+    expect(dedupSize()).toBe(0)
+  })
+})
+
 describe('dedup lifecycle', () => {
   it('releases waiters without waiting on the cache write (F1)', async () => {
     // A stalled-but-connected Dragonfly: the SET never settles, never throws.
@@ -160,7 +187,12 @@ describe('dedup lifecycle', () => {
   })
 
   it('releases waiters as soon as the response is known uncacheable (F4)', async () => {
-    const req = makeReq('{"model":"claude-opus-5","stream":true}')
+    // Request itself is a normal JSON POST — it's the *response* that turns
+    // out to be SSE (some upstreams stream by default regardless of the
+    // request body), which is what the tee's disableTee path detects. A
+    // request that declares stream:true up front is covered separately by
+    // the "stream requests bypass the cache entirely" tests below.
+    const req = makeReq('{"model":"claude-opus-5"}')
     const res = makeRes()
     await createCacheMiddleware()(req, res, vi.fn())
     expect(dedupSize()).toBe(1)
