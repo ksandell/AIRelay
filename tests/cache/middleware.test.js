@@ -56,7 +56,7 @@ import { dedupSize, _resetDedup } from '../../src/cache/dedup.js'
 const CAP = 8_388_608
 
 /** Request stub: a real Readable, so "already consumed" behaves as in production. */
-function makeReq(body, { contentLength = 'auto', headers = {} } = {}) {
+function makeReq(body, { contentLength = 'auto' } = {}) {
   const buf = Buffer.isBuffer(body) ? body : Buffer.from(body)
   const req = Readable.from([buf])
   req.method = 'POST'
@@ -65,7 +65,6 @@ function makeReq(body, { contentLength = 'auto', headers = {} } = {}) {
   req.headers = {
     'content-type': 'application/json',
     ...(contentLength === null ? {} : { 'content-length': String(declared) }),
-    ...headers,
   }
   return req
 }
@@ -75,31 +74,18 @@ function makeRes() {
   const res = new EventEmitter()
   const headers = {}
   res.statusCode = 200
-  res.body = null
   res.set = (k, v) => {
     headers[k.toLowerCase()] = v
     return res
   }
   res.setHeader = res.set
   res.getHeader = (k) => headers[k.toLowerCase()]
-  res.status = (code) => {
-    res.statusCode = code
-    return res
-  }
-  res.send = (b) => {
-    res.body = b
-    return res
-  }
-  res.json = res.send
   res.writeHead = (code) => {
     res.statusCode = code
     return res
   }
   res.write = () => true
-  res.end = (chunk) => {
-    res.body = chunk ?? res.body
-    return res
-  }
+  res.end = () => res
   return res
 }
 

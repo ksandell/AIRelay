@@ -250,10 +250,9 @@ export function createCacheMiddleware() {
       contentType = res.getHeader('content-type') ?? 'application/json'
 
       const isSuccess = statusCode >= 200 && statusCode < 300
-      const alreadySettled = settled
-      settled = true
 
-      if (!alreadySettled && isSuccess && !teeDisabled && chunks.length > 0) {
+      if (!settled && isSuccess && !teeDisabled && chunks.length > 0) {
+        settled = true
         const body = Buffer.concat(chunks).toString('utf8')
         const entry = { body, statusCode, contentType }
         // Hand the waiters their result FIRST. A stalled-but-connected
@@ -262,9 +261,8 @@ export function createCacheMiddleware() {
         resolveDedup?.(entry)
         dedupDelete(sha256)
         queueMicrotask(() => exactSet(sha256, entry).catch(() => {}))
-      } else if (!alreadySettled) {
-        resolveDedup?.(null)
-        dedupDelete(sha256)
+      } else {
+        releaseWaiters()
       }
 
       return origEnd(chunk, ...args)
