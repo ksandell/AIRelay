@@ -24,6 +24,25 @@ source-of-truth file — do not duplicate version strings elsewhere.
 - [ ] Create GitHub release; paste the matching CHANGELOG section.
 - [ ] Confirm README badges resolve (Node version, Docker badge, etc.).
 
+## CI
+
+CI is a release gate, not a per-push service. **Every workflow runs on merge to
+`main` only** — E2E (Playwright, functional + visual) and CodeQL. Nothing runs
+on a schedule, on pull requests, or on pushes to `develop`, so a PR showing "no
+checks reported" is expected, not a misconfiguration. Both workflows accept
+`workflow_dispatch` if you want to scan or exercise a branch on demand.
+
+That puts the burden of proof before the merge: `npm run lint && npm test`
+locally is the gate, and `npm run test:e2e` for anything touching the dashboard.
+
+**If GitHub Actions credits are exhausted**, a queued, skipped, or failed run is
+not a release blocker — ignore it and rely on the local run. Do not hold a
+release waiting for minutes to reset.
+
+Dependabot still opens its weekly PRs; those consume no Actions minutes on their
+own, and with the triggers above they run no workflows until their changes reach
+`main`.
+
 ## What lives where
 
 | Fact | File |
