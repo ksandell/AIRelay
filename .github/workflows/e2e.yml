@@ -1,6 +1,7 @@
 name: E2E
 
-# Runs on merge to main only — see codeql.yml for the rationale.
+# Runs on merge to main only — CI is a release gate here, not a per-push
+# service. See docs/RELEASING.md for the rationale.
 on:
   push:
     branches:
