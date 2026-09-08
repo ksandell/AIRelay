@@ -130,7 +130,7 @@ On a cache hit the response is returned immediately — no Compactor, Guardrails
 or upstream call runs. On a miss the upstream response is teed into Redis in a
 `queueMicrotask` after `res.finish`, preserving the hot-path zero-sync-I/O invariant.
 
-Three rules keep the cache from ever holding a request hostage (v0.6.7):
+Three rules keep the cache from ever holding a request hostage:
 
 - **Never drain a body that cannot be handed back.** The middleware admits a
   request only when `Content-Length` is present and within the 8 MiB cap;
