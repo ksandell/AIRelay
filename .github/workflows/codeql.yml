@@ -1,18 +1,14 @@
 name: CodeQL
 
+# Runs on merge to main only. No schedule, no pull_request — CI is a release
+# gate here, not a per-push service, and scans that fire on their own burn
+# Actions minutes we would rather spend on releases. Dispatch manually to scan
+# any branch on demand.
 on:
   push:
     branches:
       - main
-      - develop
-  pull_request:
-    branches:
-      - main
-      - develop
-  schedule:
-    # Weekly, Monday 07:00 UTC — staggered after Dependabot's 06:00 run so
-    # scans pick up any auto-bumped versions.
-    - cron: '0 7 * * 1'
+  workflow_dispatch:
 
 permissions:
   contents: read

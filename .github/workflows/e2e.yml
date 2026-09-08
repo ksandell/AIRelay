@@ -1,10 +1,10 @@
 name: E2E
 
+# Runs on merge to main only — see codeql.yml for the rationale.
 on:
   push:
     branches:
       - main
-      - develop
   workflow_dispatch:
     inputs:
       update_snapshots:
