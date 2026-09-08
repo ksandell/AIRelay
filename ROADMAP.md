@@ -42,6 +42,7 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.6.3 | ✅ Done | **Dashboard chart polish + version badge + logo** — activity chart bars normalized to req/s and stacked; `fmtNum` thousands formatting everywhere; version badge next to logo; logo cropped pixel-tight; "AI" text white |
 | v0.6.4 | ✅ Done | **Rate limiter crash fix** — safe `keyGenerator` fallback for `undefined` `req.ip` behind Docker's bridge network (draft-8 header hashing threw, hanging all dashboard requests) |
 | v0.6.5 | ✅ Done | **SSE rate-limit exemption + Dragonfly memory fit** — `/stream` endpoints skip the per-IP limiter (a 429 burst could wedge EventSource reconnects and freeze live charts); `dragonfly` sidecar pins `--proactor_threads=4 --maxmemory=1gb` so it boots on low-RAM hosts |
+| v0.6.7 | ✅ Done | **Cache middleware hang fixes** — cache no longer drains a request body it cannot replay (hung the request or forwarded 0 bytes); dedup waiters released before the Redis write and as soon as a response is known uncacheable; `commandTimeout` on all Redis clients so a stalled Dragonfly degrades to misses instead of stalling the hot path. Includes the Dragonfly `v1.26.2 → v1.39.0` image bump |
 | v0.7.0 | ⚪ Queued | **Semantic Cache** — embedding-provider abstraction (OpenAI / Ollama), Dragonfly vector index bootstrap, KNN search, configurable cosine threshold; builds on v0.6.0 cache infrastructure |
 
 Per-release detail in [CHANGELOG.md](CHANGELOG.md).

@@ -12,6 +12,7 @@ export async function initFanout(broadcastFn) {
 
   _sub = new IORedis(config.cacheRedisUrl, {
     maxRetriesPerRequest: 1,
+    commandTimeout: 2000, // no per-command deadline otherwise — see client.js
     enableOfflineQueue: false,
     lazyConnect: true,
   })
@@ -19,6 +20,7 @@ export async function initFanout(broadcastFn) {
 
   _pub = new IORedis(config.cacheRedisUrl, {
     maxRetriesPerRequest: 1,
+    commandTimeout: 2000, // no per-command deadline otherwise — see client.js
     enableOfflineQueue: false,
     lazyConnect: true,
   })

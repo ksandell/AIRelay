@@ -98,7 +98,7 @@ services:
     restart: always
 
   dragonfly:
-    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.26.2
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.39.0
     profiles: ["cache"]
     # Host has many cores but little free RAM. Dragonfly spawns one io thread per
     # core and demands ~256MB/thread; on a 20-core/4GB box that's 5GiB > available,
