@@ -131,9 +131,10 @@ Healthcheck inside the container uses `127.0.0.1` so it doesn't depend on DNS.
 PRs **must** close their linked issues on merge. Use GitHub closing keywords
 in the PR body: `Closes #<issue-number>` (or `Fixes`, `Resolves`).
 
-CI runs on merge to `main` only — PRs and `develop` pushes report no checks by
-design, so never wait on CI before merging. Verify with `npm run lint && npm
-test` locally instead. See [docs/RELEASING.md](docs/RELEASING.md) § CI.
+The E2E workflow runs on merge to `main` only — PRs and `develop` pushes report
+no checks by design, so never wait on CI before merging. Verify with `npm run
+lint && npm test` locally instead. Code scanning is GitHub's CodeQL default
+setup, not a workflow. See [docs/RELEASING.md](docs/RELEASING.md) § CI.
 
 For releases, follow [docs/RELEASING.md](docs/RELEASING.md).
 

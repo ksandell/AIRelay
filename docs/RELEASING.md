@@ -26,11 +26,19 @@ source-of-truth file — do not duplicate version strings elsewhere.
 
 ## CI
 
-CI is a release gate, not a per-push service. **Every workflow runs on merge to
-`main` only** — E2E (Playwright, functional + visual) and CodeQL. Nothing runs
-on a schedule, on pull requests, or on pushes to `develop`, so a PR showing "no
-checks reported" is expected, not a misconfiguration. Both workflows accept
-`workflow_dispatch` if you want to scan or exercise a branch on demand.
+CI is a release gate, not a per-push service. **The E2E workflow (Playwright,
+functional + visual) runs on merge to `main` only**, plus `workflow_dispatch` to
+exercise a branch on demand. Nothing runs on a schedule, on pull requests, or on
+pushes to `develop`, so a PR showing "no checks reported" is expected, not a
+misconfiguration.
+
+**CodeQL is not a workflow.** Code scanning uses GitHub's *default setup*
+(Settings → Code security), configured with the `extended` query suite. GitHub
+schedules and runs it — there is no file in `.github/workflows/` to maintain,
+and on a public repo it costs no Actions minutes. The old advanced workflow was
+removed: it had never once fired on `push` or `pull_request` despite being
+configured for both, and default setup cannot coexist with it. Findings appear
+under the repository's Security tab.
 
 That puts the burden of proof before the merge: `npm run lint && npm test`
 locally is the gate, and `npm run test:e2e` for anything touching the dashboard.
@@ -40,7 +48,7 @@ not a release blocker — ignore it and rely on the local run. Do not hold a
 release waiting for minutes to reset.
 
 Dependabot still opens its weekly PRs; those consume no Actions minutes on their
-own, and with the triggers above they run no workflows until their changes reach
+own, and with the trigger above they run no workflow until their changes reach
 `main`.
 
 ## What lives where
