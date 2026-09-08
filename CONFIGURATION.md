@@ -433,7 +433,7 @@ CEREBRAS_API_KEY=your-key-here
 
 [Cerebras](https://cerebras.ai/) runs inference on dedicated wafer-scale hardware.
 Wire format is OpenAI-compatible (`Authorization: Bearer ...`), so any OpenAI SDK works.
-Pricing is per-model; bundled entries cover `llama3.1-8b` and `qwen-3-235b-a22b`.
+Pricing is per-model; the bundled entry covers `gpt-oss-120b`.
 
 ### Azure OpenAI Service
 
@@ -459,7 +459,7 @@ Per-deployment URL pattern still applies — point your SDK's `baseURL` at
 `<resource>.openai.azure.com/openai/deployments/<deployment>/...?api-version=…`.
 
 Pricing is keyed under `azure` so cost reporting is separate from raw OpenAI;
-bundled entries: `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`, `o1`, `o3-mini`.
+bundled entries: `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.1`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-4o`, `gpt-4o-mini`.
 
 ### AnLinkAI (private beta)
 

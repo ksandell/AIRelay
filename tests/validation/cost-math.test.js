@@ -36,9 +36,13 @@ describe('cost math — exact values from pricing.json', () => {
     expect(expected).toBeCloseTo(12.5, 10)
   })
 
-  it('google gemini-2.0-flash: 1M input + 1M output', () => {
-    const tokens = { model: 'gemini-2.0-flash', inputTokens: 1_000_000, outputTokens: 1_000_000 }
-    const expected = expectedCost('google', 'gemini-2.0-flash', 1_000_000, 1_000_000)
+  it('google gemini-2.5-flash-lite: 1M input + 1M output', () => {
+    const tokens = {
+      model: 'gemini-2.5-flash-lite',
+      inputTokens: 1_000_000,
+      outputTokens: 1_000_000,
+    }
+    const expected = expectedCost('google', 'gemini-2.5-flash-lite', 1_000_000, 1_000_000)
     const provider = new GoogleProvider(pricing.providers.google)
     const cost = provider.calculateCost(tokens)
     expect(cost).toBeCloseTo(expected, 10)
