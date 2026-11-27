@@ -70,6 +70,7 @@ Every variable, what it does, and when you'd touch it. Defaults match `.env.exam
 | `UPSTREAM_URL` | _(unset)_ | The vendor API host the proxy forwards to. Empty = proxy disabled (returns 503 at the prefix). |
 | `PROXY_PATH_PREFIX` | `/proxy` | All `/<prefix>/*` requests are forwarded. Strip the prefix off the inbound URL before forwarding. When a concrete `PROXY_PROVIDER` is set, a `/<prefix>/<provider>` alias (e.g. `/proxy/mistral`) is also mounted automatically — see [docs/ROUTING.md](docs/ROUTING.md#provider-prefix-alias-v050). |
 | `PROXY_TRUST_FORWARDED` | `false` | Add `X-Forwarded-*` headers. Off by default because adding headers is technically a modification. |
+| `PROXY_MAP_SEED` | `false` | Opt-in. On `mistral` routes rename the OpenAI-spec `seed` body field to Mistral's `random_seed` (small JSON POSTs only). Modifies bytes, hence off by default |
 | `PROXY_INSECURE_TLS` | `false` | Disable upstream TLS cert verification. Use **only** for self-signed dev upstreams. |
 
 ### Metrics
@@ -671,7 +672,8 @@ These knobs control memory usage and throughput ceilings. All have safe defaults
 | `MAX_API_RESULT_ROWS` | `5000` | Max rows returned by `/api/logs` and `/api/metrics/recent` |
 | `PROXY_MAX_BODY_PARSE_MB` | `10` | Request/response body size cap before token extraction is skipped |
 | `MAX_SSE_CLIENTS` | `50` | Max concurrent SSE connections per hub (metrics + logs each) |
-| `PROXY_REQUEST_IDLE_TIMEOUT_MS` | `120000` | Idle timeout for hung upstream connections (ms) |
+| `PROXY_REQUEST_IDLE_TIMEOUT_MS` | `600000` | Idle timeout (ms): fires after this long with no bytes in either direction; any data resets it. Answers `504` JSON. `0` = disabled. Clients may override per request with `X-AIRelay-Timeout-Ms` (ms) or `X-Stainless-Timeout` (s, sent by the OpenAI/Anthropic/Mistral SDKs) |
+| `PROXY_REQUEST_MAX_TIMEOUT_MS` | `3600000` | Upper clamp for client-requested timeouts (floor is 1 s; clients cannot disable the watchdog) |
 | `SHUTDOWN_TIMEOUT_MS` | `30000` | Graceful shutdown drain timeout (ms) |
 
 **Memory estimate:** `MAX_METRIC_EVENTS × ~500 bytes ≈ 5 MB` at defaults. Increase `MAX_METRIC_EVENTS` for longer in-memory history.

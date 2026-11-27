@@ -75,6 +75,9 @@ export const config = {
   upstreamUrl: process.env.UPSTREAM_URL ?? '',
   proxyPathPrefix: process.env.PROXY_PATH_PREFIX ?? '/proxy',
   proxyTrustForwarded: process.env.PROXY_TRUST_FORWARDED === 'true',
+  // Opt-in (default off, bytes stay untouched): on Mistral routes rename the
+  // OpenAI-spec `seed` body field to Mistral's `random_seed` (issue #194).
+  proxyMapSeed: process.env.PROXY_MAP_SEED === 'true',
   // Skip TLS cert verification on the upstream connection. Default false —
   // real AI providers have valid certs. Opt in only for self-signed dev upstreams.
   proxyInsecureTls: process.env.PROXY_INSECURE_TLS === 'true',
@@ -105,9 +108,13 @@ export const config = {
   // the request omits it. Empty string disables auto-append.
   azureOpenaiApiVersion: process.env.AZURE_OPENAI_API_VERSION ?? '2024-10-21',
 
-  // Per-request idle timeout: destroy hung upstream + client after N ms (H1).
-  // 0 = disabled (v0.1 behaviour). Default 120 s.
-  proxyRequestIdleTimeoutMs: int('PROXY_REQUEST_IDLE_TIMEOUT_MS', 120_000),
+  // Per-request idle timeout (H1): fires after N ms with no bytes moving in either
+  // direction; any request/response data resets it. Non-streamed "thinking" models
+  // stay silent until the full reply is ready, so the default is generous (10 min).
+  // 0 = disabled. Clients may override per request via X-AIRelay-Timeout-Ms or
+  // X-Stainless-Timeout (seconds), clamped to PROXY_REQUEST_MAX_TIMEOUT_MS.
+  proxyRequestIdleTimeoutMs: int('PROXY_REQUEST_IDLE_TIMEOUT_MS', 600_000),
+  proxyRequestMaxTimeoutMs: int('PROXY_REQUEST_MAX_TIMEOUT_MS', 3_600_000),
 
   maxBodyParseMb: +(process.env.PROXY_MAX_BODY_PARSE_MB || 10),
   maxApiResultRows: +(process.env.MAX_API_RESULT_ROWS || 5000),
