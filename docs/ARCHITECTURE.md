@@ -369,7 +369,7 @@ For release process see [RELEASING.md](RELEASING.md).
 | `SSE_EVENT_RATE` | 50 | Per-second `request` event budget per tick window |
 | `METRICS_TICK_MS` | 1 000 | How often the `tick` aggregate is pushed to dashboards |
 | `PROXY_TOKEN_TEE_MAX_BYTES` | 2 097 152 (2 MB) | Per-request tee buffer cap; overflow drops token extraction |
-| `PROXY_REQUEST_IDLE_TIMEOUT_MS` | 120 000 (2 min) | Hung upstream destroyed after this; 0 = disabled |
+| `PROXY_REQUEST_IDLE_TIMEOUT_MS` | 600 000 (10 min) | No-activity limit, reset by any byte either way; answers 504; per-request override via `X-AIRelay-Timeout-Ms` / `X-Stainless-Timeout`, clamped by `PROXY_REQUEST_MAX_TIMEOUT_MS`; 0 = disabled |
 
 ### Observed throughput envelope
 

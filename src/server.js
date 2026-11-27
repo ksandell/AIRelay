@@ -12,6 +12,7 @@ import guardrailsRouter from './api/guardrails.js'
 import settingsRouter from './api/settings.js'
 import cacheRouter from './cache/api.js'
 import { createProxyHandler } from './proxy/proxy.js'
+import { createSeedMapMiddleware } from './proxy/seed.js'
 import { createCacheMiddleware } from './cache/middleware.js'
 import { createCompactorMiddleware } from './compactor/middleware.js'
 import { createGuardrailsMiddleware } from './guardrails/middleware.js'
@@ -42,6 +43,7 @@ export function createApp() {
     app.use(route.prefix, createCacheMiddleware())
     app.use(route.prefix, createCompactorMiddleware())
     app.use(route.prefix, createGuardrailsMiddleware())
+    app.use(route.prefix, createSeedMapMiddleware(route))
     app.use(route.prefix, createProxyHandler(route))
   }
 
