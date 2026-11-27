@@ -44,6 +44,7 @@ Provider-agnostic. Self-hosted. One Docker container. No vendor lock-in on eithe
 | v0.6.5 | ✅ Done | **SSE rate-limit exemption + Dragonfly memory fit** — `/stream` endpoints skip the per-IP limiter (a 429 burst could wedge EventSource reconnects and freeze live charts); `dragonfly` sidecar pins `--proactor_threads=4 --maxmemory=1gb` so it boots on low-RAM hosts |
 | v0.6.7 | ✅ Done | **Cache middleware hang fixes** — cache no longer drains a request body it cannot replay (hung the request or forwarded 0 bytes); dedup waiters released before the Redis write and as soon as a response is known uncacheable; `commandTimeout` on all Redis clients so a stalled Dragonfly degrades to misses instead of stalling the hot path. Includes the Dragonfly `v1.26.2 → v1.39.0` image bump |
 | v0.6.8 | ✅ Done | **Stream/cache-key fix + pricing refresh** — `stream:true` requests no longer collide with a cached non-streaming response for the same body (found live against Mistral); all 17 provider pricing tables refreshed to current rate cards, retired models dropped |
+| v0.6.9 | ✅ Done | **Long-request timeouts + Mistral seed** — idle timer resets on traffic (default 10 min), 504 instead of empty reply, client timeout headers, opt-in `seed`→`random_seed` (#194), pricing refresh |
 | v0.7.0 | ⚪ Queued | **Semantic Cache** — embedding-provider abstraction (OpenAI / Ollama), Dragonfly vector index bootstrap, KNN search, configurable cosine threshold; builds on v0.6.0 cache infrastructure |
 
 Per-release detail in [CHANGELOG.md](CHANGELOG.md).

@@ -87,7 +87,7 @@ To force a manual rotation, restart the container — the writer re-opens on sta
 | API result rows | `MAX_API_RESULT_ROWS` | 5 000 | `/api/logs` + `/api/metrics/recent` |
 | Body parse cap | `PROXY_MAX_BODY_PARSE_MB` | 10 MB | Provider token extraction only |
 | SSE clients | `MAX_SSE_CLIENTS` | 50 | Per hub (metrics + logs each) |
-| Request idle timeout | `PROXY_REQUEST_IDLE_TIMEOUT_MS` | 120 000 ms | Kills hung upstream connections |
+| Request idle timeout | `PROXY_REQUEST_IDLE_TIMEOUT_MS` | 600 000 ms | Answers 504 + aborts upstream after no traffic for this long |
 
 ## Known Limitations
 

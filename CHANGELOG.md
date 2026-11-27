@@ -5,6 +5,23 @@ All notable changes to AIRelay are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.9] — 2026-11-27 — Long-request timeouts, client timeout override, Mistral seed, pricing refresh
+
+### Fixed
+
+- **Slow non-streamed replies were cut at 120 s with cURL 52 "Empty reply"** — the idle watchdog was armed once at request start and never reset, so it behaved as a total-time limit, and on fire it destroyed both sockets without sending a response. It is now a true idle timer re-armed by every request/response chunk, and when it fires before a response has started it answers `504` JSON (`code: upstream_timeout`) and aborts the upstream request. Default raised from 120 s to 600 s.
+- **OpenAI `seed` rejected by Mistral with 422 (#194)** — Mistral's API names the field `random_seed`. New opt-in `PROXY_MAP_SEED=true` renames `seed` to `random_seed` on `mistral` routes (small JSON POSTs only; an explicit `random_seed` wins). Off by default to keep the bytes-unchanged guarantee.
+
+### Added
+
+- **Per-request client timeout** — `X-AIRelay-Timeout-Ms` (ms) or `X-Stainless-Timeout` (seconds, sent by the official OpenAI/Anthropic/Mistral SDKs) override the idle timeout for that request, clamped to 1 s … `PROXY_REQUEST_MAX_TIMEOUT_MS` (new, default 3 600 000). Clients cannot disable the watchdog.
+- `tests/proxy/timeout-seed.test.js`.
+
+### Changed
+
+- **`config/pricing.json` refreshed (2026-11-27)** — new Claude Fable 5.2/5, Opus 5.5/4.x, Sonnet 5.5/4.5; GPT-6.x family, GPT-5.5/5.4 Pro, GPT-5.3 Codex; Gemini 4 family, 3.6 flash; Mistral Large 4 (`mistral-large-latest` now 0.70/2.10), Small 4 (`mistral-small-2603`), Codestral 25-08, Ministral 3, GLM-5.3; DeepSeek flash; Grok 4.7/4.20. Cache-read prices added for OpenAI, Google, xAI, Together. `deepseek-v4-flash` repriced to 0.15/0.60 (off-peak rate). Removed retired `zai-glm-5-2`.
+- Not verified against vendor pages (left as-is): Perplexity, Cerebras, OpenRouter, Microsoft/Azure, NVIDIA, Anlinkai, `mistral-medium-latest`, several Together/Fireworks ids. Tiered pricing (Haiku 5.5, Gemini >200k) is not modelled.
+
 ## [0.6.8] — 2026-09-08 — Stream/cache-key fix + pricing refresh
 
 ### Fixed

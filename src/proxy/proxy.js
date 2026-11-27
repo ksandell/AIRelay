@@ -4,6 +4,7 @@ import { gunzipSync, inflateSync, brotliDecompressSync } from 'node:zlib'
 import { URL } from 'node:url'
 import { config } from '../config.js'
 import { pickAgent } from './agent.js'
+import { resolveTimeoutMs } from './timeout.js'
 import { record, incInFlight, decInFlight } from '../metrics/collector.js'
 import { incrementSpend } from '../cache/spend.js'
 
@@ -87,7 +88,9 @@ proxy.on('proxyRes', (proxyRes, req, res) => {
     if (!proxyRes.destroyed && proxyRes.isPaused()) proxyRes.resume()
   })
 
+  m.touch?.()
   proxyRes.on('data', (chunk) => {
+    m.touch?.()
     m.bytesOut += chunk.length
     if (res.writableNeedDrain && !proxyRes.isPaused()) {
       proxyRes.pause()
@@ -124,8 +127,13 @@ function classifyError(err) {
   return code || err?.message || 'upstream_error'
 }
 
+proxy.on('proxyReq', (proxyReq, req) => {
+  req._proxyReq = proxyReq
+})
+
 proxy.on('error', (err, req, res) => {
   const m = req?._metrics
+  if (m?.timedOut) return // watchdog already answered + recorded
   if (m) {
     m.error = classifyError(err)
     m.status = m.status || 502
@@ -294,39 +302,59 @@ export function createProxyHandler(route) {
       req.url = `${req.url}${sep}api-version=${azureApiVersionParam}`
     }
 
-    // Idle watchdog — destroy hung connections after proxyRequestIdleTimeoutMs.
+    // Idle watchdog — fires after `idleMs` with no bytes in either direction
+    // (every request/response chunk re-arms it). The limit is the operator
+    // default unless the client asks for another via X-AIRelay-Timeout-Ms /
+    // X-Stainless-Timeout. On fire: answer 504 if no response has started (a
+    // bare socket destroy surfaces as cURL 52 "Empty reply"), abort upstream.
+    const idleMs = resolveTimeoutMs(req.headers)
     let idleTimer = null
-    if (config.proxyRequestIdleTimeoutMs > 0) {
-      idleTimer = setTimeout(() => {
-        if (!m.recorded) {
-          m.error = 'upstream_timeout'
-          m.status = m.status || 504
-          finalize(m, route.providerInstance)
-        }
-        try {
-          req.destroy()
-        } catch {
-          /* ignore */
-        }
-        try {
-          res.destroy()
-        } catch {
-          /* ignore */
-        }
-      }, config.proxyRequestIdleTimeoutMs)
+    const onIdle = () => {
+      idleTimer = null
+      if (m.recorded) return
+      m.timedOut = true
+      m.error = 'upstream_timeout'
+      m.status = m.status || 504
+      finalize(m, route.providerInstance)
+      try {
+        req._proxyReq?.destroy()
+      } catch {
+        /* ignore */
+      }
+      if (!res.headersSent && res.writable) {
+        res.statusCode = 504
+        res.setHeader('Content-Type', 'application/json')
+        res.end(
+          JSON.stringify({ error: 'gateway timeout', code: 'upstream_timeout', timeoutMs: idleMs }),
+        )
+        return
+      }
+      try {
+        res.destroy()
+      } catch {
+        /* ignore */
+      }
+    }
+    const arm = () => {
+      if (idleMs <= 0) return
+      if (idleTimer) clearTimeout(idleTimer)
+      idleTimer = setTimeout(onIdle, idleMs)
       idleTimer.unref()
     }
-
     const clearIdle = () => {
       if (idleTimer) {
         clearTimeout(idleTimer)
         idleTimer = null
       }
+      m.touch = null
     }
+    m.touch = arm
+    arm()
     res.on('finish', clearIdle)
     res.on('close', clearIdle)
 
     req.on('data', (chunk) => {
+      arm()
       m.bytesIn += chunk.length
       if (route.providerInstance && !m.reqTeeAborted) {
         if (!m.reqChunks) {
